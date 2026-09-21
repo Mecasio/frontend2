@@ -79,7 +79,6 @@ const MigrationDataPanel = () => {
         if (branding.campusAddress) setCampusAddress(branding.campusAddress);
         const normalizedBranches = settings?.branches || [];
         setBranches(normalizedBranches);
-        setCampusFilter(prev => prev || normalizedBranches?.[0]?.id || "");
     }, [settings]);
 
     /* ── auth ── */
@@ -119,6 +118,10 @@ const MigrationDataPanel = () => {
     /* ── import grades ── */
     const handleImport = async () => {
         setMissingCourses([]);
+        if (!campusFilter) {
+            setSnack1({ open: true, message: "Please select a campus first!", severity: "warning" });
+            return;
+        }
         if (!selectedFile) {
             setSnack1({ open: true, message: "Please choose a file first!", severity: "warning" });
             return;
@@ -417,12 +420,20 @@ const MigrationDataPanel = () => {
                                 "& .MuiOutlinedInput-root": { borderRadius: 2, backgroundColor: "#fff" },
                             }}
                         >
-                            <InputLabel>Campus</InputLabel>
+                            <InputLabel shrink>Campus</InputLabel>
                             <Select
                                 value={campusFilter}
                                 label="Campus"
+                                displayEmpty
+                                renderValue={(selected) => {
+                                    if (!selected) return "Select campus";
+                                    return branches.find((b) => String(b.id) === String(selected))?.branch || "Select campus";
+                                }}
                                 onChange={(e) => setCampusFilter(e.target.value)}
                             >
+                                <MenuItem value="" disabled>
+                                    Select campus
+                                </MenuItem>
                                 {branches.map((b) => (
                                     <MenuItem key={b.id ?? b.branch} value={b.id ?? ""}>
                                         {b.branch}
@@ -434,6 +445,7 @@ const MigrationDataPanel = () => {
                         {/* CHOOSE */}
                         <Button
                             variant="outlined"
+                            disabled={!campusFilter}
                             startIcon={<FaFileExcel />}
                             onClick={() => document.getElementById("grades-excel-upload").click()}
                             sx={{
@@ -450,7 +462,7 @@ const MigrationDataPanel = () => {
                         {/* IMPORT */}
                         <Button
                             variant="contained"
-                            disabled={!selectedFile}
+                            disabled={!selectedFile || !campusFilter}
                             startIcon={<FileUpload />}
                             onClick={handleImport}
                             sx={{

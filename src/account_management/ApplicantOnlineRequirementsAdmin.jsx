@@ -46,7 +46,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";

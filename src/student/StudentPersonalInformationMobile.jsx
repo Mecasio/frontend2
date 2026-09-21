@@ -32,7 +32,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import useStudentEditPermissions from "../account_management/useStudentEditPermissions";
 import { CircularProgress } from "@mui/material"; // add to your existing MUI import line
 import StudentECATApplicationForm from "./StudentECATApplicationForm";

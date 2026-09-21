@@ -31,7 +31,7 @@ import API_BASE_URL from "../apiConfig";
 import EaristLogo from "../assets/EaristLogo.png";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import DownloadIcon from "@mui/icons-material/Download";
 import PersonalDataForm from "./PersonalDataForm";
 import OfficeOfTheRegistrar from "./OfficeOfTheRegistrar";

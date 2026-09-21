@@ -69,7 +69,7 @@ import { postAuditEvent } from "../utils/auditEvents";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";

@@ -32,7 +32,7 @@ import DateField from "../components/DateField";
 import { Snackbar, Alert } from "@mui/material";
 import useStudentEditPermissions from "../account_management/useStudentEditPermissions";
 import API_BASE_URL from "../apiConfig";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import StudentECATApplicationForm from "./StudentECATApplicationForm";
 import StudentPersonalDataForm from "./StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";

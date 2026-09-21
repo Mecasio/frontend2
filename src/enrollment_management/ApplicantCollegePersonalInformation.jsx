@@ -71,7 +71,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";

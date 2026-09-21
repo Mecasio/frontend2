@@ -29,7 +29,7 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import { Link, useLocation } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import { Snackbar, Alert } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";

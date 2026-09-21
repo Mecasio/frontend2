@@ -26,7 +26,7 @@ import Search from "@mui/icons-material/Search";
 import { useLocation } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import { Snackbar, Alert } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";

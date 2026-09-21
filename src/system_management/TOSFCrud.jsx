@@ -29,7 +29,7 @@ import {
   CircularProgress,
   IconButton,
 } from "@mui/material";
-import EARISTLogo from "../assets/EARISTLogo.png";
+import EaristLogo from "../assets/EaristLogo.png";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
@@ -443,7 +443,7 @@ const TOSF = () => {
     if (assets.logoUrl) {
       setFetchedLogo(assets.logoUrl);
     } else {
-      setFetchedLogo(EARISTLogo);
+      setFetchedLogo(EaristLogo);
     }
 
     if (branding.companyName) setCompanyName(branding.companyName);

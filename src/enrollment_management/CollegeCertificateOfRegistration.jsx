@@ -1538,6 +1538,16 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           margin-right: 0 !important;
                           box-sizing: border-box;
                         }
+
+                        .certificate-wrapper > .section {
+                          min-height: 297mm;
+                          display: flex;
+                          flex-direction: column;
+                        }
+
+                        .certificate-wrapper > .section > table:last-child {
+                          margin-top: auto !important;
+                        }
         
                         @media print {
                           @page {
@@ -3968,16 +3978,18 @@ const CertificateOfRegistrationForCollege = forwardRef(
                         }}
                       >
                         {showFreeTuitionStamp && (
-                          <img
-                            src={FreeTuitionImage}
-                            alt="EARIST MIS FEE"
-                            style={{
-                              width: "420px",
-                              height: "236px",
-                              objectFit: "contain",
-                              display: "block",
-                            }}
-                          />
+                          <div style={{ marginTop: "20px", marginBottom: "-70px", marginLeft: "-110px", scale: 1.1 }}>
+                            <img
+                              src={FreeTuitionImage}
+                              alt="EARIST MIS FEE"
+                              style={{
+                                width: "420px",
+                                height: "236px",
+                                objectFit: "contain",
+                                display: "block",
+                              }}
+                            />
+                          </div>
                         )}
                       </td>
 

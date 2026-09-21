@@ -42,6 +42,77 @@ import {
   toNumber as toFeeNumber,
 } from "../utils/corDynamicFees";
 
+const FreeTuitionMark = () => (
+  <svg
+    viewBox="0 0 650 520"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="EARIST MIS FEE"
+    style={{
+      width: "420px",
+      height: "236px",
+      objectFit: "contain",
+      display: "block",
+      pointerEvents: "none",
+    }}
+  >
+    <defs>
+      <path
+        id="free-tuition-top-circle"
+        d="M 70 330 A 255 255 0 0 1 580 330"
+      />
+    </defs>
+    <text
+      fill="#ed1c24"
+      fontFamily="Arial, Helvetica, sans-serif"
+      fontSize="40px"
+      fontWeight="900"
+      letterSpacing="0"
+    >
+      <textPath
+        href="#free-tuition-top-circle"
+        startOffset="50%"
+        textAnchor="middle"
+      >
+        FREE TUITION AND MISCELLANEOUS
+      </textPath>
+    </text>
+    <text
+      x="325"
+      y="270"
+      textAnchor="middle"
+      fill="#ed1c24"
+      fontFamily="Arial, Helvetica, sans-serif"
+      fontSize="60px"
+      fontWeight="900"
+    >
+      RA 10931
+    </text>
+    <text
+      x="325"
+      y="310"
+      textAnchor="middle"
+      fill="#ed1c24"
+      fontFamily="Arial, Helvetica, sans-serif"
+      fontSize="20px"
+      fontWeight="900"
+    >
+      (Universal Access to Quality Tertiary
+    </text>
+    <text
+      x="325"
+      y="330"
+      textAnchor="middle"
+      fill="#ed1c24"
+      fontFamily="Arial, Helvetica, sans-serif"
+      fontSize="20px"
+      fontWeight="900"
+    >
+      Education Act of 2017 beneficiary)
+    </text>
+  </svg>
+);
+
 const CertificateOfRegistration = forwardRef(
   (
     {
@@ -68,8 +139,6 @@ const CertificateOfRegistration = forwardRef(
       }
     };
     const divToPrintRef = useRef(null);
-    const FreeTuitionImage = `${API_BASE_URL}/assets/FreeTuition.png`;
-
     useEffect(() => {
       if (settings) {
         // ? load dynamic logo
@@ -3909,19 +3978,12 @@ const CertificateOfRegistration = forwardRef(
                           textAlign: "left",
                           paddingLeft: "50px", // ?? margin-left effect
                         }}
-                      >
-                        {showFreeTuitionStamp && (
-                          <img
-                            src={FreeTuitionImage}
-                            alt="EARIST MIS FEE"
-                            style={{
-                              width: "420px",
-                              height: "236px",
-                              objectFit: "contain",
-                              display: "block",
-                            }}
-                          />
-                        )}
+                      > 
+                        <div style={{marginTop: "20px", marginBottom: "-70px", marginLeft: '-110px', scale: 1.1}}>
+                          {showFreeTuitionStamp && (
+                            <FreeTuitionMark />
+                          )}
+                        </div>
                       </td>
 
                       {/* RIGHT SIDE */}

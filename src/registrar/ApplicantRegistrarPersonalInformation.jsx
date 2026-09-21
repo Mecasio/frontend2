@@ -41,7 +41,7 @@ import useAuditMac from "../utils/useAuditMac";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DateField from "../components/DateField";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 

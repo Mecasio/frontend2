@@ -65,7 +65,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import DateField from "../components/DateField";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";

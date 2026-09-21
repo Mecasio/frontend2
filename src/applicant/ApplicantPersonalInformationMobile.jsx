@@ -34,7 +34,7 @@ import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ExamPermit from "./ExamPermit";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import PersonalDataForm from "./PersonalDataForm";
 import OfficeOfTheRegistrar from "./OfficeOfTheRegistrar";
 import AdmissionServices from "./ApplicantServicesSurvey";

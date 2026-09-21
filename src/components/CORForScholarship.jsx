@@ -3888,16 +3888,18 @@ const CertificateOfRegistration = forwardRef(
                           paddingLeft: "50px", // ?? margin-left effect
                         }}
                       >
-                        <img
-                          src={FreeTuitionImage}
-                          alt="EARIST MIS FEE"
-                          style={{
-                            width: "420px",
-                            height: "236px",
-                            objectFit: "contain",
-                            display: "block",
-                          }}
-                        />
+                        <div style={{ marginTop: "20px", marginBottom: "-70px", marginLeft: "-110px", scale: 1.1 }}>
+                          <img
+                            src={FreeTuitionImage}
+                            alt="EARIST MIS FEE"
+                            style={{
+                              width: "420px",
+                              height: "236px",
+                              objectFit: "contain",
+                              display: "block",
+                            }}
+                          />
+                        </div>
                       </td>
 
                       {/* RIGHT SIDE */}

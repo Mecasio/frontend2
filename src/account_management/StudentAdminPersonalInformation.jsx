@@ -62,7 +62,7 @@ import PrintingHistoryDialog, {
   PRINTING_STUDENT_ACTION,
 } from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import FormalExample from "../assets/formalexample.png";
+import FormalExample from "../assets/FormalExample.png";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
