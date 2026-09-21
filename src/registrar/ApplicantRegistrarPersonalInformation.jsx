@@ -146,7 +146,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
       setSelectedPerson(res.data);
       if (res.data?.applicant_number) {
@@ -219,7 +219,7 @@ const ApplicantRegistrarPersonalInformation = () => {
   useEffect(() => {
     const fetchYearLevels = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+        const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setYearLevelOptions(res.data);
       } catch (err) {
         console.error("Error fetching year levels:", err);
@@ -269,7 +269,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
   useEffect(() => {
     const fetchActiveYearAndAvailability = async () => {
-      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const activeYear = yearRes.data[0];
       console.log(activeYear);
 
@@ -279,7 +279,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
         const availRes = await axios.get(
           `${API_BASE_URL}/api/programs/availability`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: {
               year_id: activeYear.year_id,
               semester_id: activeYear.semester_id,
@@ -327,7 +327,7 @@ const ApplicantRegistrarPersonalInformation = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -346,9 +346,9 @@ const ApplicantRegistrarPersonalInformation = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -358,7 +358,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -393,7 +393,7 @@ const ApplicantRegistrarPersonalInformation = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -464,7 +464,7 @@ const ApplicantRegistrarPersonalInformation = () => {
       if (!userID) return;
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${userID}`);
+        const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (res.data) {
           setPerson(res.data);
           setSelectedPerson(res.data);
@@ -487,7 +487,7 @@ const ApplicantRegistrarPersonalInformation = () => {
   useEffect(() => {
     const fetchPersons = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setPersons(res.data);
       } catch (err) {
         console.error("❌ Failed to fetch persons list", err);
@@ -601,7 +601,7 @@ const ApplicantRegistrarPersonalInformation = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
@@ -772,7 +772,7 @@ const ApplicantRegistrarPersonalInformation = () => {
       }
 
       // ✅ Execute safe update
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
@@ -850,7 +850,7 @@ const ApplicantRegistrarPersonalInformation = () => {
         return;
       }
 
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log(`💾 Auto-saved (manual) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (manual) failed:", {
@@ -919,7 +919,7 @@ const ApplicantRegistrarPersonalInformation = () => {
         `${API_BASE_URL}/api/upload-profile-picture`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
         }
       );
 
@@ -1085,7 +1085,7 @@ const ApplicantRegistrarPersonalInformation = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data); // array of { curriculum_id: "..." }
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -1145,12 +1145,12 @@ const ApplicantRegistrarPersonalInformation = () => {
       if (searchQuery.trim() === "") return; // Don't search empty
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
+        const res = await axios.get(`${API_BASE_URL}/api/search-person`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query: searchQuery }
         });
 
         if (res.data && res.data.person_id) {
-          const details = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`);
+          const details = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           setPerson(details.data);
 
           sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
@@ -1189,7 +1189,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
     try {
       const details = await axios.get(
-        `${API_BASE_URL}/api/person_with_applicant/${applicant.person_id}`,
+        `${API_BASE_URL}/api/person_with_applicant/${applicant.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPerson(details.data);
       sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
@@ -1362,10 +1362,10 @@ const ApplicantRegistrarPersonalInformation = () => {
           document_label: config.label,
           audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+          audit_actor_role: userRole || "administrator",
           ...getLoginMacPayload(),
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -1412,7 +1412,7 @@ const ApplicantRegistrarPersonalInformation = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
@@ -1436,7 +1436,7 @@ const ApplicantRegistrarPersonalInformation = () => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -1483,7 +1483,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
   useEffect(() => {
     if (!userID) return;
-    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`)
+    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => {
         const verified = res.data.some(a => a.person_id === parseInt(userID));
         setCanPrintPermit(verified);

@@ -55,7 +55,7 @@ const UploadEnrolledSubject = () => {
       formData.append("campus", campus);
 
       const response = await axios.post(`${API_BASE_URL}/import-xlsx-into-enrolled-subject`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           ...getAuditHeaders(),
         },

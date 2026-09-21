@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import "../styles/TempStyles.css";
 import axios from "axios";
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import {
   Box,
   Grid,
@@ -201,7 +201,7 @@ const ApplicantDashboard = (props) => {
     if (!applicantNumber) return;
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/verify-document-schedule/${applicantNumber}`
+        `${API_BASE_URL}/api/verify-document-schedule/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       if (data && Number(data.email_sent) === 1) {
         setVerifyDocSchedule(normalizeSchedule(data));
@@ -282,7 +282,7 @@ const ApplicantDashboard = (props) => {
   const fetchProctorSchedule = async (applicantNumber) => {
     if (!applicantNumber) return;
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/applicant-schedule/${applicantNumber}`);
+      const { data } = await axios.get(`${API_BASE_URL}/api/applicant-schedule/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (Number(data?.email_sent) === 1) {
         setProctor(normalizeSchedule(data));
@@ -293,7 +293,7 @@ const ApplicantDashboard = (props) => {
     } catch (err) {
       console.error("Error fetching schedule:", err);
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/api/exam-schedule/${applicantNumber}`);
+        const { data } = await axios.get(`${API_BASE_URL}/api/exam-schedule/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setProctor(normalizeSchedule(data));
       } catch (fallbackErr) {
         console.error("Fallback schedule fetch failed:", fallbackErr);
@@ -312,7 +312,7 @@ const ApplicantDashboard = (props) => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const res = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("❌ Failed to fetch curriculum options:", err);
@@ -330,7 +330,7 @@ const ApplicantDashboard = (props) => {
   useEffect(() => {
     const fetchActiveSchoolYear = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const data = Array.isArray(res.data) ? res.data[0] : res.data;
         setActiveSchoolYear(data || null);
       } catch (err) {
@@ -353,7 +353,7 @@ const ApplicantDashboard = (props) => {
     if (!person?.campus) return; // wait until we know the applicant's branch
     const fetchAdmissionContact = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/admission_contact/active`, {
+        const res = await axios.get(`${API_BASE_URL}/api/admission_contact/active`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { branch_id: person.campus },
         });
         setAdmissionContact(res.data || null);
@@ -377,7 +377,7 @@ const ApplicantDashboard = (props) => {
 
   const fetchApplicantNumber = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicant_number/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/applicant_number/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data && res.data.applicant_number) {
         setApplicantID(res.data.applicant_number);
         setApplicantNumber(res.data.applicant_number);
@@ -395,7 +395,7 @@ const ApplicantDashboard = (props) => {
   const fetchPersonData = async (id) => {
     if (!id) return console.warn("fetchPersonData called with empty id");
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data || {});
 
       const profileSchedule = normalizeSchedule(res.data);
@@ -417,7 +417,7 @@ const ApplicantDashboard = (props) => {
 
       if (qExam === null && qInterview === null && ex === null && applicantNumber) {
         try {
-          const st = await axios.get(`${API_BASE_URL}/api/person_status_by_applicant/${applicantNumber}`);
+          const st = await axios.get(`${API_BASE_URL}/api/person_status_by_applicant/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           console.info("person_status_by_applicant response:", st.data);
           qExam = qExam ?? st.data?.qualifying_result ?? null;
           qInterview = qInterview ?? st.data?.interview_result ?? null;
@@ -495,7 +495,7 @@ const ApplicantDashboard = (props) => {
   const fetchEntranceExamScores = async (applicantNumber) => {
     if (!applicantNumber) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicants-with-number`);
+      const res = await axios.get(`${API_BASE_URL}/api/applicants-with-number`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const applicant = res.data.data.find((a) => a.applicant_number === applicantNumber);
       if (applicant) {
         setExamScores({
@@ -530,7 +530,7 @@ const ApplicantDashboard = (props) => {
   const fetchInterviewSchedule = async (applicantNumber) => {
     if (!applicantNumber) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicant-interview-schedule/${applicantNumber}`);
+      const res = await axios.get(`${API_BASE_URL}/api/applicant-interview-schedule/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.info("Interview schedule + scores:", res.data);
       if (Number(res.data?.email_sent ?? 0) !== 1) {
         setInterviewSchedule(null);
@@ -558,7 +558,7 @@ const ApplicantDashboard = (props) => {
 
   const fetchCollegeApproval = async (applicantNumber) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/interview_applicants/${applicantNumber}`);
+      const res = await axios.get(`${API_BASE_URL}/api/interview_applicants/${applicantNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCollegeApproval(normalizeCollegeApproval(res.data?.status));
     } catch (err) {
       console.error("❌ Failed to fetch college approval:", err);
@@ -611,8 +611,8 @@ const ApplicantDashboard = (props) => {
     if (!person_id) return;
     try {
       const [reqRes, upRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/requirements/${person_id}`),
-        axios.get(`${API_BASE_URL}/api/uploads/${person_id}`),
+        axios.get(`${API_BASE_URL}/api/requirements/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/uploads/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       ]);
 
       const reqData = Array.isArray(reqRes.data) ? reqRes.data : [];
@@ -641,7 +641,7 @@ const ApplicantDashboard = (props) => {
 
   const fetchRegistrarStatus = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/submitted-status/${person_id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/submitted-status/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRegistrarApproved(Number(res.data.submitted_documents) === 1);
     } catch (err) {
       console.error("❌ Failed fetching registrar status:", err);
@@ -651,7 +651,7 @@ const ApplicantDashboard = (props) => {
   const fetchApplicationRegisteredStatus = async () => {
     if (!person_id) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicant-status/${person_id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/applicant-status/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAllRequirementsCompleted(Number(res.data?.requirements) === 1);
     } catch (err) {
       console.error("❌ Failed fetching applicant-status:", err);
@@ -713,7 +713,7 @@ const ApplicantDashboard = (props) => {
   useEffect(() => {
     const fetchHolidays = async () => {
       try {
-        const res = await axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`);
+        const res = await axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const lookup = {};
         res.data.forEach((h) => { lookup[h.date] = h; });
         setHolidays(lookup);
@@ -729,7 +729,7 @@ const ApplicantDashboard = (props) => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/announcements/applicant`);
+        const res = await axios.get(`${API_BASE_URL}/api/announcements/applicant`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setAnnouncements(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error(err);
@@ -776,8 +776,8 @@ const ApplicantDashboard = (props) => {
       const formData = new FormData();
       formData.append("profile_picture", file);
       formData.append("person_id", person_id);
-      await axios.post(`${API_BASE_URL}/form/upload-profile-picture`, formData);
-      const updated = await axios.get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`);
+      await axios.post(`${API_BASE_URL}/form/upload-profile-picture`, formData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+      const updated = await axios.get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(updated.data);
       fetchPersonData(person_id, role);
       const baseUrl = `${API_BASE_URL}/uploads/Applicant1by1/${updated.data.profile_image}`;
@@ -845,7 +845,7 @@ const ApplicantDashboard = (props) => {
 
   const checkStudentNumber = async (personId) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/student_status/${personId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/student_status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data.hasStudentNumber) {
         setHasStudentNumber(true);
         setStudentNumber(res.data.student_number);
@@ -1254,7 +1254,7 @@ const ApplicantDashboard = (props) => {
 
 
   useEffect(() => {
-    const socket = io(API_BASE_URL, { path: "/api/socket.io", transports: ["websocket", "polling"] });
+    const socket = createAppSocket();
     socket.on("schedule_updated", () => {
       if (applicantNumber) fetchVerifyDocumentSchedule(applicantNumber);
     });

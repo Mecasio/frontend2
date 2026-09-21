@@ -116,7 +116,7 @@ const SuperAdminApplicantResetPassword = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -129,7 +129,7 @@ const SuperAdminApplicantResetPassword = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data?.page_privilege === 1) {
         setHasAccess(true);
@@ -156,7 +156,7 @@ const SuperAdminApplicantResetPassword = () => {
       try {
         const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-applicant`, {
           email: searchQuery,
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setUserInfo(res.data);
       } catch (err) {
         setSearchError(err.response?.data?.message || "No applicant found.");
@@ -179,7 +179,7 @@ const SuperAdminApplicantResetPassword = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -187,7 +187,7 @@ const SuperAdminApplicantResetPassword = () => {
     const fetchApplicants = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/superadmin-get-all-applicants`);
+        const res = await axios.get(`${API_BASE_URL}/api/superadmin-get-all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setApplicants(res.data);
       } catch (err) {
         console.error("Failed to fetch applicants", err);
@@ -289,7 +289,7 @@ const SuperAdminApplicantResetPassword = () => {
     try {
       const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-applicant`, {
         email: applicant.email,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setUserInfo(res.data);
     } catch (err) {
       setSearchError(err.response?.data?.message || "No applicant found.");

@@ -78,7 +78,7 @@ const AdmissionAnnouncement = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         });
 
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -93,7 +93,7 @@ const AdmissionAnnouncement = () => {
     useEffect(() => {
         const storedRole = localStorage.getItem("role");
         const storedEmployeeID = localStorage.getItem("employee_id");
-        if (storedRole === "registrar") {
+        if (["administrator", "superadmin", "technical"].includes(storedRole)) {
             setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
             checkAccess(storedEmployeeID);
@@ -110,7 +110,7 @@ const AdmissionAnnouncement = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (res.data?.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(res.data?.can_create) === 1);
@@ -137,7 +137,7 @@ const AdmissionAnnouncement = () => {
 
     const fetchAnnouncements = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/announcements`);
+            const res = await axios.get(`${API_BASE_URL}/api/announcements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const data = res.data.data.filter(a => a.target_role === "applicant" || a.target_role === "all");
 
             setAnnouncements(data);
@@ -172,7 +172,7 @@ const AdmissionAnnouncement = () => {
 
             if (editingId) {
                 await axios.put(`${API_BASE_URL}/api/announcements/${editingId}`, formData, {
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         "Content-Type": "multipart/form-data",
                         ...getPermissionHeaders().headers,
                     },
@@ -180,7 +180,7 @@ const AdmissionAnnouncement = () => {
                 setSnackbar({ open: true, message: "Announcement updated!", severity: "success" });
             } else {
                 await axios.post(`${API_BASE_URL}/api/announcements`, formData, {
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         "Content-Type": "multipart/form-data",
                         ...getPermissionHeaders().headers,
                     },

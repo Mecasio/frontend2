@@ -174,7 +174,7 @@ const CollegeEntranceExamScore = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -192,9 +192,9 @@ const CollegeEntranceExamScore = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -205,7 +205,7 @@ const CollegeEntranceExamScore = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -247,7 +247,7 @@ const CollegeEntranceExamScore = () => {
 
   const fetchPersonData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAdminData(res.data);
       syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
@@ -272,7 +272,7 @@ const CollegeEntranceExamScore = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -330,7 +330,7 @@ const CollegeEntranceExamScore = () => {
   // ⬇️ Add this inside ApplicantList component, before useEffect
   const fetchApplicants = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/api-applicant-scoring`);
+      const res = await axios.get(`${API_BASE_URL}/api/api-applicant-scoring`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       // ✅ NEW: extract properly
       const { data, subjects } = res.data;
@@ -360,7 +360,7 @@ const CollegeEntranceExamScore = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/subjects`);
+      const res = await axios.get(`${API_BASE_URL}/api/active-subjects`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setSubjects(res.data);
     } catch (err) {
@@ -377,13 +377,13 @@ const CollegeEntranceExamScore = () => {
       if (searchQuery.trim() === "") return; // Don't search empty
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
+        const res = await axios.get(`${API_BASE_URL}/api/search-person`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query: searchQuery },
         });
 
         if (res.data && res.data.person_id) {
           const details = await axios.get(
-            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`,
+            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           setPerson(details.data);
 
@@ -423,7 +423,7 @@ const CollegeEntranceExamScore = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
 
@@ -461,7 +461,7 @@ const CollegeEntranceExamScore = () => {
 
     if (departmentIds.length) return;
 
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
+    axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }).then((res) => {
       const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
       setAllCurriculums(restrictedCurriculums);
       setCurriculumOptions(restrictedCurriculums);
@@ -502,21 +502,21 @@ const CollegeEntranceExamScore = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -739,7 +739,7 @@ const CollegeEntranceExamScore = () => {
 
     try {
       const details = await axios.get(
-        `${API_BASE_URL}/api/person_with_applicant/${applicant.person_id}`,
+        `${API_BASE_URL}/api/person_with_applicant/${applicant.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPerson(details.data);
       sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
@@ -778,7 +778,7 @@ const CollegeEntranceExamScore = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -892,7 +892,7 @@ const CollegeEntranceExamScore = () => {
       if (macAddress) fd.append("user_mac_address", macAddress);
 
       const res = await axios.post(`${API_BASE_URL}/api/exam/import`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
       });
 
       const errors = res.data.errors || [];

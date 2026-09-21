@@ -213,7 +213,7 @@ function Settings({ onUpdate }) {
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
     const storedEmployeeID = localStorage.getItem("employee_id");
-    if (storedRole === "registrar") {
+    if (["administrator", "superadmin", "technical"].includes(storedRole)) {
       checkAccess(storedEmployeeID);
     } else {
       window.location.href = "/login";
@@ -223,7 +223,7 @@ function Settings({ onUpdate }) {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -233,7 +233,7 @@ function Settings({ onUpdate }) {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/settings`)
+      .get(`${API_BASE_URL}/api/settings`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(({ data }) => {
         setCompanyName(data.company_name || "");
         setShortTerm(data.short_term || "");
@@ -280,20 +280,20 @@ function Settings({ onUpdate }) {
     );
     formData.append(
       "audit_actor_role",
-      localStorage.getItem("role") || "registrar",
+      localStorage.getItem("role") || "administrator",
     );
     const mac = getStoredUserMacAddress();
     if (mac) formData.append("user_mac_address", mac);
 
     try {
       await axios.post(`${API_BASE_URL}/api/settings`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           ...getFlatAuditHeaders(),
           "Content-Type": "multipart/form-data",
           "x-employee-id": localStorage.getItem("employee_id") || "",
           "x-page-id": pageId,
           "x-audit-actor-id": localStorage.getItem("employee_id") || "",
-          "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+          "x-audit-actor-role": localStorage.getItem("role") || "administrator",
         },
       });
       onUpdate?.();

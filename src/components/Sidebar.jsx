@@ -663,7 +663,7 @@ const SideBar = ({
     const determineScope = async (eid) => {
       try {
         const { data: emp } = await axios.get(
-          `${API_BASE_URL}/api/employee/${eid}`,
+          `${API_BASE_URL}/api/employee/${eid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         syncRegistrarScopeFromEmployeeResponse(emp);
         const mc = (emp?.accessList ?? []).filter((pid) =>
@@ -675,7 +675,7 @@ const SideBar = ({
           return;
         }
         const { data: adm } = await axios.get(
-          `${API_BASE_URL}/api/admin_data/${localStorage.getItem("email")}`,
+          `${API_BASE_URL}/api/admin_data/${localStorage.getItem("email")}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const hasDepartmentScope =
           adm?.dprtmnt_id ||
@@ -692,7 +692,7 @@ const SideBar = ({
     if (userRole === "faculty") return;
     if (!employeeID) return;
     axios
-      .get(`${API_BASE_URL}/api/access_level/${employeeID}`)
+      .get(`${API_BASE_URL}/api/access_level/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((r) => setAccessDescription(r.data?.access_description || ""))
       .catch(() => { });
   }, [employeeID, userRole]);
@@ -714,7 +714,7 @@ const SideBar = ({
         const endpoint = profID
           ? `/api/get_prof_data_by_prof/${profID}`
           : `/api/get_prof_data_by_employee/${employeeID || id}`;
-        const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+        const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const faculty = res.data[0] || {};
         localStorage.setItem("prof_id", faculty.prof_id || "");
         localStorage.setItem(
@@ -726,7 +726,7 @@ const SideBar = ({
         setPersonData(faculty);
         return;
       }
-      const res = await axios.get(`${API_BASE_URL}/api/person_data/${id}/${r}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_data/${id}/${r}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPersonData(res.data);
     } catch { }
   };
@@ -734,14 +734,17 @@ const SideBar = ({
   const fetchUserAccessList = async (eid) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${eid}`,
+        `${API_BASE_URL}/api/page_access/${eid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
-      setUserAccessList(
-        data.reduce((a, i) => {
-          a[i.page_id] = i.page_privilege === 1;
-          return a;
-        }, {}),
-      );
+      const accessMap = (data || []).reduce((a, i) => {
+        a[i.page_id] = i.page_privilege === 1;
+        return a;
+      }, {});
+      const role = String(localStorage.getItem("role") || "").trim().toLowerCase();
+      if (role === "superadmin" || role === "technical") {
+        accessMap[69] = true;
+      }
+      setUserAccessList(accessMap);
     } catch { }
   };
 
@@ -768,13 +771,13 @@ const SideBar = ({
       fd.append("profile_picture", file);
       if (r === "faculty") fd.append("employee_id", employeeID);
       else fd.append("person_id", pid);
-      await axios.post(`${API_BASE_URL}${endpoint}`, fd);
+      await axios.post(`${API_BASE_URL}${endpoint}`, fd, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const upd =
         r === "faculty"
           ? await axios.get(
-            `${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`,
+            `${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           )
-          : await axios.get(`${API_BASE_URL}/api/person_data/${pid}/${r}`);
+          : await axios.get(`${API_BASE_URL}/api/person_data/${pid}/${r}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const updatedData = r === "faculty" ? upd.data[0] : upd.data;
       setPersonData(updatedData);
       const updatedProfileImage = `${API_BASE_URL}/uploads/${uploadDir}/${updatedData.profile_image}?t=${Date.now()}`;
@@ -831,7 +834,9 @@ const SideBar = ({
       ? `${API_BASE_URL}/uploads/${dir}/${personData.profile_image}?t=${Date.now()}`
       : null);
   const showUploadFor = [
-    "registrar",
+    "administrator",
+    "superadmin",
+    "technical",
     "applicant",
     "faculty",
     "student",
@@ -849,7 +854,7 @@ const SideBar = ({
         ? "/faculty_reset_password"
         : role === "student"
           ? "/student_reset_password"
-          : role === "registrar"
+          : ["administrator", "superadmin", "technical"].includes(role)
             ? "/registrar_reset_password"
             : null;
 
@@ -1578,6 +1583,12 @@ const SideBar = ({
           page_id: 121,
         },
         {
+          title: "Student Balance List",
+          link: "/student_balance_list",
+          icon: HelpOutline,
+          page_id: 175,
+        },
+        {
           title: "TOSF Management",
           link: "/tosf_crud",
           icon: HelpOutline,
@@ -1655,19 +1666,6 @@ const SideBar = ({
           link: "/application_process_super_admin",
           icon: School,
           page_id: 147,
-        },
-      ],
-    },
-    {
-      key: "facultyManagement",
-      label: "Faculty Management",
-      icon: SupervisorAccount,
-      items: [
-        {
-          title: "Professor Education",
-          link: "/superadmin_professor_education",
-          icon: School,
-          page_id: 109,
         },
       ],
     },
@@ -1761,7 +1759,7 @@ const SideBar = ({
           title: "User Page Access",
           link: "/user_page_access",
           icon: Security,
-          page_id: 72,
+          page_id: 69,
         },  
       ],
     },
@@ -2127,7 +2125,7 @@ const SideBar = ({
                       maxWidth: "100%",
                     }}
                   >
-                    {role === "registrar"
+                    {["administrator", "superadmin", "technical"].includes(role)
                       ? `${accessDescription} · ${personData?.employee_id || ""}`
                       : role === "student"
                         ? `Student · ${personData?.student_number || ""}`
@@ -2211,7 +2209,7 @@ const SideBar = ({
                         ════════════════════════════════════════════════════ */
             <>
               {/* REGISTRAR */}
-              {role === "registrar" && (
+              {["administrator", "superadmin", "technical"].includes(role) && (
                 <>
                   <div className="sb-section-label">Navigation</div>
                   <NavItem

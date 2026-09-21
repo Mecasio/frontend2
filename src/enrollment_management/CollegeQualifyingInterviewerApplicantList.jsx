@@ -140,7 +140,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -153,7 +153,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -199,7 +199,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
       const params = new URLSearchParams(location.search);
       const selectedScheduleId = scheduleId || params.get("schedule");
 
-      const { data } = await axios.get(`${API_BASE_URL}/api/interviewers`, {
+      const { data } = await axios.get(`${API_BASE_URL}/api/interviewers`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           query,
           schedule: selectedScheduleId, // keep the clicked schedule filter
@@ -235,7 +235,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         console.log("✅ curriculumOptions:", response.data); // <--- add this
         setCurriculumOptions(restrictToRegistrarCurriculum(response.data));
       } catch (error) {
@@ -368,7 +368,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
           title: "INTERVIEWER APPLICANT LIST",
           fileNamePrefix: "Interviewer_Applicant_List",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blobUrl = window.URL.createObjectURL(
@@ -947,7 +947,7 @@ const CollegeQualifyingInterviewerApplicantList = () => {
                   `${API_BASE_URL}/api/interview/remove_applicant`,
                   {
                     applicant_id: applicantToDelete.applicant_number,
-                  },
+                  }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
                 );
                 setSnack({
                   open: true,

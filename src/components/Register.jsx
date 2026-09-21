@@ -17,8 +17,6 @@ import {
   Typography,
   Button,
   Checkbox,
-  FormControlLabel,
-  MenuItem,
   CircularProgress,
   IconButton,
 } from "@mui/material";
@@ -51,17 +49,27 @@ import {
   fetchAndStoreUserMacAddress,
   getLoginMacPayload,
 } from "../utils/userMacAddress";
+import {
+  FALLBACK_DETAIL_THEME,
+  buildDetailThemesForSlides,
+} from "../utils/announcementDetailColor";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Autocomplete from "@mui/material/Autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
 import MuiLink from "@mui/material/Link";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
 import Popover from "@mui/material/Popover";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import {
+  UNIFORM_BORDER,
+  UNIFORM_RADIUS,
+  UNIFORM_FONT_SIZE,
+  fieldBorder,
+} from "../styles/formTokens";
 
 dayjs.extend(customParseFormat);
+
 /* ─── Device breakpoint hooks ───────────────────────────────────────────────
    Three tiers instead of one: phones get their own compact layout, tablets
    get a wider single-column layout (previously tablets fell into whichever
@@ -209,13 +217,15 @@ const FormattedContent = ({ text, style = {} }) => {
 };
 
 /* ─── Fullscreen Announcement Viewer Modal (mobile) ─── */
-const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
+const AnnouncementViewerModal = ({ slides, startIndex, onClose, detailThemes = {} }) => {
   const [index, setIndex] = useState(startIndex || 0);
   const [scale, setScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
   const current = slides[index];
+  const theme =
+    detailThemes[current?.id ?? current?.file_path] || FALLBACK_DETAIL_THEME;
 
   const goNext = () => {
     setIndex((prev) => (prev + 1) % slides.length);
@@ -526,8 +536,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
             flex: hasImage ? "0 0 auto" : "1 1 auto",
             maxHeight: hasImage ? "48%" : "100%",
             overflowY: "auto",
-            background:
-              "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)",
+            background: theme.panel,
             padding: "16px 18px 20px",
             borderTop: "1px solid rgba(255,255,255,0.1)",
             scrollbarWidth: "thin",
@@ -549,7 +558,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
             style={{
               width: 28,
               height: 2,
-              background: "rgba(255,255,255,0.3)",
+              background: theme.divider,
               borderRadius: 2,
               marginBottom: 12,
             }}
@@ -611,7 +620,8 @@ const MobileAnnouncementBanner = ({ slides }) => {
   const [index, setIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(true);
-  const [expandedContent, setExpandedContent] = useState(true);
+  const [expandedContent, setExpandedContent] = useState(false);
+  const [detailThemes, setDetailThemes] = useState({});
 
   useEffect(() => {
     if (slides.length <= 1) return;
@@ -623,12 +633,25 @@ const MobileAnnouncementBanner = ({ slides }) => {
   }, [index, slides.length]);
 
   useEffect(() => {
-    setExpandedContent(true);
-  }, [index]);
+    let cancelled = false;
+    if (!slides?.length) {
+      setDetailThemes({});
+      return undefined;
+    }
+    buildDetailThemesForSlides(slides, API_BASE_URL).then((map) => {
+      if (!cancelled) setDetailThemes(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slides]);
 
   if (!slides.length) return null;
   const current = slides[index];
   if (!current) return null;
+
+  const theme =
+    detailThemes[current?.id ?? current?.file_path] || FALLBACK_DETAIL_THEME;
 
   const hasImage = !!current.file_path;
   const hasContent = !!current.content?.trim();
@@ -659,6 +682,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
           slides={slides}
           startIndex={viewerStartIndex}
           onClose={() => setOpenViewer(false)}
+          detailThemes={detailThemes}
         />
       )}
 
@@ -900,8 +924,8 @@ const MobileAnnouncementBanner = ({ slides }) => {
                 justifyContent: "space-between",
                 padding: "10px 14px",
                 background: expandedContent
-                  ? "linear-gradient(135deg, #1a1a2e, #16213e)"
-                  : "linear-gradient(135deg, #1a1a2e, #0f3460)",
+                  ? theme.panelCompactExpanded
+                  : theme.panelCompact,
                 border: "none",
                 cursor: "pointer",
                 borderTop: hasImage
@@ -945,8 +969,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
           {hasContent && expandedContent && (
             <div
               style={{
-                background:
-                  "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)",
+                background: theme.panel,
                 padding: "14px 16px 18px",
                 maxHeight: "260px",
                 overflowY: "auto",
@@ -972,7 +995,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
                     style={{
                       width: 28,
                       height: 2,
-                      background: "rgba(255,255,255,0.3)",
+                      background: theme.divider,
                       borderRadius: 2,
                       marginBottom: 12,
                     }}
@@ -989,17 +1012,18 @@ const MobileAnnouncementBanner = ({ slides }) => {
 };
 
 const SectionHeader = ({ icon, label, color }) => (
-  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1.25 }}>
+  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.75, mb: 0.75, px: 1, py: 0.5, borderRadius: "6px", border: "1px solid #eadede", backgroundColor: label === "Personal Information" ? color : "#fff" }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
     <Box
       sx={{
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         borderRadius: "6px",
-        backgroundColor: `${color}1a`, // ~10% tint of mainButtonColor
+        backgroundColor: label === "Personal Information" ? "rgba(255,255,255,0.18)" : `${color}1a`, // ~10% tint of mainButtonColor
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 12,
+        fontSize: 10,
         flexShrink: 0,
       }}
     >
@@ -1007,15 +1031,21 @@ const SectionHeader = ({ icon, label, color }) => (
     </Box>
     <Typography
       sx={{
-        fontSize: 12.5,
+        fontSize: 10.5,
         fontWeight: 700,
-        color,
+        color: label === "Personal Information" ? "#fff" : color,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
       }}
     >
       {label}
     </Typography>
+    </Box>
+    {label === "Personal Information" && (
+      <Box sx={{ color: "#fff", backgroundColor: color, borderRadius: "5px", px: 0.75, py: 0.25, fontSize: 9, fontWeight: 700 }}>
+        🔒 Cannot be changed
+      </Box>
+    )}
   </Box>
 );
 /* ═══════════════════════════════════════════════════════════
@@ -1029,7 +1059,25 @@ const parseDateValue = (value) => {
   return parsed.isValid() ? parsed : null;
 };
 
+const formatDateInput = (value) => {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const BIRTH_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+const calendarGridStart = (month) => {
+  const start = month.startOf("month");
+  const offset = (start.day() + 6) % 7;
+  return start.subtract(offset, "day");
+};
+
 const DateField = React.forwardRef(function DateField(props, ref) {
+  const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const mainButtonColor = colors.mainButton || "#1976d2";
   const {
     value,
     onChange,
@@ -1037,15 +1085,21 @@ const DateField = React.forwardRef(function DateField(props, ref) {
     format = "MM/DD/YYYY",
     style = {},
     disabled,
-    minDate,
-    maxDate,
+    minDate = dayjs().subtract(100, "year").startOf("year"),
+    maxDate = dayjs(),
     placeholder = "MM/DD/YYYY",
     ...rest
   } = props;
 
   const [anchorEl, setAnchorEl] = useState(null);
   const [text, setText] = useState("");
+  const [viewMonth, setViewMonth] = useState(() =>
+    dayjs().startOf("month"),
+  );
+  const [monthAnchor, setMonthAnchor] = useState(null);
+  const [yearAnchor, setYearAnchor] = useState(null);
   const internalRef = useRef(null);
+  const headerColor = colors.header || mainButtonColor;
 
   useEffect(() => {
     const parsed = parseDateValue(value);
@@ -1054,33 +1108,33 @@ const DateField = React.forwardRef(function DateField(props, ref) {
 
   const openCalendar = (e) => {
     if (disabled) return;
+    const parsed = parseDateValue(value);
+    setViewMonth(
+      (parsed || dayjs()).startOf("month"),
+    );
     setAnchorEl(e.currentTarget.closest("[data-datefield-root]"));
   };
-  const closeCalendar = () => setAnchorEl(null);
+  const closeCalendar = () => {
+    setMonthAnchor(null);
+    setYearAnchor(null);
+    setAnchorEl(null);
+  };
 
-  const handleSelect = (newValue, selectionState) => {
-    if (newValue && dayjs(newValue).isValid()) {
-      const formatted = dayjs(newValue).format("YYYY-MM-DD");
-      setText(dayjs(newValue).format(format));
-      onChange?.({ target: { name, value: formatted } });
-    }
-
-    // Only close the picker once the FULL date (year + month + day) is chosen.
-    // DateCalendar fires onChange with selectionState "partial" after just
-    // picking a year or month, and "finish" only after the final day pick —
-    // closing on every step was forcing you to reopen the picker between steps.
-    if (selectionState === "finish") {
-      closeCalendar();
-    }
+  const selectDate = (date) => {
+    if (!date || !date.isValid()) return;
+    if (date.isBefore(minDate, "day") || date.isAfter(maxDate, "day")) return;
+    setText(date.format(format));
+    onChange?.({ target: { name, value: date.format("YYYY-MM-DD") } });
+    closeCalendar();
   };
 
   const handleTextChange = (e) => {
-    const raw = e.target.value;
-    setText(raw);
-    const parsed = dayjs(raw, format, true);
+    const formatted = formatDateInput(e.target.value);
+    setText(formatted);
+    const parsed = dayjs(formatted, format, true);
     if (parsed.isValid()) {
       onChange?.({ target: { name, value: parsed.format("YYYY-MM-DD") } });
-    } else if (raw === "") {
+    } else if (formatted === "") {
       onChange?.({ target: { name, value: "" } });
     }
   };
@@ -1105,6 +1159,7 @@ const DateField = React.forwardRef(function DateField(props, ref) {
         value={text}
         placeholder={placeholder}
         disabled={disabled}
+        maxLength={10}
         onChange={handleTextChange}
         onClick={openCalendar}
         style={{
@@ -1114,7 +1169,7 @@ const DateField = React.forwardRef(function DateField(props, ref) {
           fontSize: style.fontSize,
           paddingLeft: style.paddingLeft ?? "14px",
           paddingRight: "40px",
-          border: style.border || "2px solid black",
+          border: style.border || UNIFORM_BORDER,
           borderRadius: style.borderRadius ?? 0,
           backgroundColor: disabled ? "#f0f0f0" : "#fff",
           outline: "none",
@@ -1131,6 +1186,7 @@ const DateField = React.forwardRef(function DateField(props, ref) {
           right: 4,
           top: "50%",
           transform: "translateY(-50%)",
+          color: mainButtonColor,
         }}
       >
         <CalendarTodayIcon fontSize="small" />
@@ -1141,15 +1197,302 @@ const DateField = React.forwardRef(function DateField(props, ref) {
         anchorEl={anchorEl}
         onClose={closeCalendar}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.75,
+              width: 288,
+              p: 1,
+              borderRadius: "16px",
+              bgcolor: "#f4f5f7",
+              border: `1px solid ${headerColor}`,
+              boxShadow: "0 16px 40px rgba(0,0,0,0.12)",
+              overflow: "visible",
+            },
+          },
+        }}
       >
-        <DateCalendar
-          value={parseDateValue(value)}
-          onChange={handleSelect}
-          minDate={minDate}
-          maxDate={maxDate}
-          views={["year", "month", "day"]} // explicit, so behavior is consistent everywhere
-          openTo="year" // nice UX bonus for birthdays — start at year picker
-        />
+        {(() => {
+          const selected = parseDateValue(value);
+          const gridStart = calendarGridStart(viewMonth);
+          const days = Array.from({ length: 42 }, (_, index) =>
+            gridStart.add(index, "day"),
+          );
+          const years = [];
+          for (let year = maxDate.year(); year >= minDate.year(); year -= 1) {
+            years.push(year);
+          }
+          const pillSx = {
+            display: "flex",
+            alignItems: "center",
+            gap: 0.25,
+            height: 28,
+            px: 1,
+            border: `1px solid ${headerColor}`,
+            borderRadius: "8px",
+            bgcolor: headerColor,
+            color: "#fff",
+            fontFamily: "Poppins, sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            lineHeight: 1,
+          };
+          const arrowSx = {
+            width: 28,
+            height: 28,
+            color: headerColor,
+          };
+
+          return (
+            <Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 0.75,
+                }}
+              >
+                <IconButton
+                  size="small"
+                  aria-label="Previous month"
+                  sx={arrowSx}
+                  onClick={() =>
+                    setViewMonth((month) => month.subtract(1, "month"))
+                  }
+                >
+                  <ArrowBackIosNewIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  <Box sx={{ position: "relative" }}>
+                    <Box
+                      component="button"
+                      type="button"
+                      sx={pillSx}
+                      onClick={() => {
+                        setYearAnchor(null);
+                        setMonthAnchor((open) => !open);
+                      }}
+                    >
+                      {viewMonth.format("MMMM")}
+                      <KeyboardArrowDownIcon sx={{ fontSize: 14, color: "#fff" }} />
+                    </Box>
+                    {monthAnchor && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: "calc(100% + 4px)",
+                          left: 0,
+                          zIndex: 2,
+                          minWidth: "100%",
+                          maxHeight: 180,
+                          overflowY: "auto",
+                          bgcolor: "#fff",
+                          border: `1px solid ${headerColor}`,
+                          borderRadius: "8px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        {Array.from({ length: 12 }, (_, monthIndex) => {
+                          const selectedMonth = viewMonth.month() === monthIndex;
+                          return (
+                            <Box
+                              key={monthIndex}
+                              component="button"
+                              type="button"
+                              onClick={() => {
+                                setViewMonth((month) => month.month(monthIndex));
+                                setMonthAnchor(null);
+                              }}
+                              sx={{
+                                display: "block",
+                                width: "100%",
+                                px: 1.25,
+                                py: 0.6,
+                                border: "none",
+                                textAlign: "left",
+                                fontFamily: "Poppins, sans-serif",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                bgcolor: selectedMonth ? mainButtonColor : "#fff",
+                                color: selectedMonth ? "#fff" : "#1a1a1a",
+                                "&:hover": {
+                                  bgcolor: selectedMonth
+                                    ? mainButtonColor
+                                    : `${headerColor}14`,
+                                },
+                              }}
+                            >
+                              {dayjs().month(monthIndex).format("MMMM")}
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ position: "relative" }}>
+                    <Box
+                      component="button"
+                      type="button"
+                      sx={pillSx}
+                      onClick={() => {
+                        setMonthAnchor(null);
+                        setYearAnchor((open) => !open);
+                      }}
+                    >
+                      {viewMonth.format("YYYY")}
+                      <KeyboardArrowDownIcon sx={{ fontSize: 14, color: "#fff" }} />
+                    </Box>
+                    {yearAnchor && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: "calc(100% + 4px)",
+                          left: 0,
+                          zIndex: 2,
+                          minWidth: "100%",
+                          maxHeight: 180,
+                          overflowY: "auto",
+                          bgcolor: "#fff",
+                          border: `1px solid ${headerColor}`,
+                          borderRadius: "8px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        {years.map((year) => {
+                          const selectedYear = viewMonth.year() === year;
+                          return (
+                            <Box
+                              key={year}
+                              component="button"
+                              type="button"
+                              onClick={() => {
+                                setViewMonth((month) => month.year(year));
+                                setYearAnchor(null);
+                              }}
+                              sx={{
+                                display: "block",
+                                width: "100%",
+                                px: 1.25,
+                                py: 0.6,
+                                border: "none",
+                                textAlign: "left",
+                                fontFamily: "Poppins, sans-serif",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                bgcolor: selectedYear ? mainButtonColor : "#fff",
+                                color: selectedYear ? "#fff" : "#1a1a1a",
+                                "&:hover": {
+                                  bgcolor: selectedYear
+                                    ? mainButtonColor
+                                    : `${headerColor}14`,
+                                },
+                              }}
+                            >
+                              {year}
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+                <IconButton
+                  size="small"
+                  aria-label="Next month"
+                  sx={arrowSx}
+                  onClick={() => setViewMonth((month) => month.add(1, "month"))}
+                >
+                  <ArrowForwardIosIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: "4px",
+                  mb: 0.5,
+                }}
+              >
+                {BIRTH_WEEKDAYS.map((label) => (
+                  <Box
+                    key={label}
+                    sx={{
+                      textAlign: "center",
+                      fontFamily: "Poppins, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#8b909a",
+                    }}
+                  >
+                    {label}
+                  </Box>
+                ))}
+              </Box>
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: "4px",
+                }}
+              >
+                {days.map((day) => {
+                  const inMonth = day.month() === viewMonth.month();
+                  const isSelected = selected?.isSame(day, "day");
+                  const isToday = dayjs().isSame(day, "day");
+                  const outOfRange =
+                    day.isBefore(minDate, "day") || day.isAfter(maxDate, "day");
+                  return (
+                    <Box
+                      key={day.format("YYYY-MM-DD")}
+                      component="button"
+                      type="button"
+                      disabled={outOfRange}
+                      onClick={() => selectDate(day)}
+                      sx={{
+                        height: 32,
+                        border: "none",
+                        borderRadius: "8px",
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: outOfRange ? "default" : "pointer",
+                        bgcolor: isSelected
+                          ? mainButtonColor
+                          : isToday
+                            ? `${mainButtonColor}22`
+                            : inMonth
+                              ? "#fff"
+                              : "transparent",
+                        color: isSelected
+                          ? "#fff"
+                          : outOfRange
+                            ? "#c5c8ce"
+                            : inMonth
+                              ? "#1a1a1a"
+                              : "#b0b4bc",
+                        "&:hover": outOfRange
+                          ? {}
+                          : {
+                              bgcolor: isSelected
+                                ? mainButtonColor
+                                : `${headerColor}18`,
+                            },
+                      }}
+                    >
+                      {day.date()}
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          );
+        })()}
       </Popover>
     </div>
   );
@@ -1248,7 +1591,7 @@ const PasswordRulesNotice = ({
       {/* Bilingual "important notice" explaining WHY, in plain terms */}
       <Box
         sx={{
-          display: "flex",
+          display: "none",
           gap: 1.25,
           alignItems: "flex-start",
           bgcolor: "#fff8e6",
@@ -1286,7 +1629,6 @@ const PasswordRulesNotice = ({
       </Box>
 
       {/* Live checklist */}
-      {showChecklist && (
         <Box
           sx={{
             border: "1.5px solid #ddd",
@@ -1297,7 +1639,7 @@ const PasswordRulesNotice = ({
         >
           <Typography
             sx={{
-              fontSize: isMobile ? "14px" : "16px",
+              fontSize: isMobile ? "12px" : "14px",
               color: "#666",
               fontWeight: 700,
               mb: 1,
@@ -1316,7 +1658,7 @@ const PasswordRulesNotice = ({
                   style={{
                     flexShrink: 0,
                     marginTop: 1,
-                    fontSize: 14,
+                    fontSize: 12,
                     color: rule.passed ? "#2e7d32" : "#bdbdbd",
                   }}
                 >
@@ -1325,7 +1667,7 @@ const PasswordRulesNotice = ({
                 <Box>
                   <Typography
                     sx={{
-                      fontSize: isMobile ? "15px" : "15.5px",
+                      fontSize: isMobile ? "13px" : "13.5px",
                       color: rule.passed ? "#2e7d32" : "#000000",
                       fontWeight: rule.passed ? 700 : 500,
                       lineHeight: 1.45,
@@ -1335,7 +1677,7 @@ const PasswordRulesNotice = ({
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: isMobile ? "14px" : "15px",
+                      fontSize: isMobile ? "12px" : "13px",
                       color: rule.passed ? "#2e7d32" : "#000000",
                       fontStyle: "italic",
                       lineHeight: 1.45,
@@ -1346,7 +1688,6 @@ const PasswordRulesNotice = ({
             ))}
           </Box>
         </Box>
-      )}
     </Box>
   );
 };
@@ -1398,7 +1739,7 @@ const TotpSetupModal = ({
     setSetupId(""); // reset
 
     axios
-      .post(`${API_BASE_URL}/api/register-totp-setup`, { email })
+      .post(`${API_BASE_URL}/api/register-totp-setup`, { email }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.success) {
           setQrDataUrl(res.data.qrDataUrl);
@@ -1456,7 +1797,7 @@ const TotpSetupModal = ({
         ...registrationPayload,
         otp: code,
         setupId, // NEW
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (!response.data.success) {
         setError(response.data.message || "Registration failed.");
@@ -2086,9 +2427,9 @@ const ReviewApplicationModal = ({
 }) => {
   if (!open) return null;
 
-  const Field = ({ label, value, size = 14 }) => (
+  const Field = ({ label, value, size = 12 }) => (
     <Box>
-      <Typography sx={{ fontSize: 11, color: "#666" }}>{label}</Typography>
+      <Typography sx={{ fontSize: 9, color: "#666" }}>{label}</Typography>
       <Typography sx={{ fontSize: size, fontWeight: 700, color: "#1a1a1a" }}>
         {value?.toString().trim() ? value : "—"}
       </Typography>
@@ -2115,10 +2456,11 @@ const ReviewApplicationModal = ({
           bgcolor: mainButtonColor,
           color: "white",
           display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
           fontWeight: "bold",
-          px: 3,
-          py: 2,
+          px: 2,
+          py: 0.75,
         }}
       >
         <Box display="flex" alignItems="center" gap={1.5}>
@@ -2126,8 +2468,8 @@ const ReviewApplicationModal = ({
             sx={{
               backgroundColor: "rgba(255,255,255,0.2)",
               borderRadius: "50%",
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -2139,14 +2481,14 @@ const ReviewApplicationModal = ({
           <Box>
             <Typography
               fontWeight="bold"
-              fontSize={16}
+              fontSize={14}
               color="white"
               lineHeight={1.2}
             >
               Review Your Information
             </Typography>
             <Typography
-              fontSize={13}
+              fontSize={11}
               color="rgba(255,255,255,0.85)"
               lineHeight={1.2}
             >
@@ -2154,11 +2496,20 @@ const ReviewApplicationModal = ({
             </Typography>
           </Box>
         </Box>
+        <IconButton
+          onClick={onClose}
+          disabled={isSubmitting}
+          sx={{ color: "white", p: 0.5 }}
+          aria-label="Close review information"
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
+      <DialogContent sx={{ px: { xs: 1.5, sm: 2 }, pt: 0.75, pb: 0.5, backgroundColor: "#fff" }}>
+        <br />
         {/* Icon, same visual language as the success modal */}
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 2, mt: 4 }}>
+        <Box sx={{ display: "none", justifyContent: "center", mb: 2, mt: 4 }}>
           <Box
             sx={{
               width: 64,
@@ -2181,17 +2532,17 @@ const ReviewApplicationModal = ({
             display: "flex",
             gap: 1,
             alignItems: "flex-start",
-            bgcolor: "#fffbf2",
-            border: "1px solid #f5a623",
+            bgcolor: "#fff8e6",
+            border: "1px solid #f5c36a",
             borderRadius: "8px",
-            p: 1.5,
-            mb: 2,
+            p: 1,
+            mb: 1,
           }}
         >
           <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-          <Typography fontSize={13.5} color="#5d4037" lineHeight={1.5}>
+          <Typography fontSize={9.5} color="#6d4c1d" lineHeight={1.4}>
             After you confirm, you'll be asked to set up Google Authenticator to
-            secure your account. Some fields below cannot be changed later —
+            secure your account. Some fields below cannot be changed later,
             please check them carefully.
           </Typography>
         </Box>
@@ -2200,19 +2551,19 @@ const ReviewApplicationModal = ({
         {/* Single summary card, now organized into three clear sections */}
         <Box
           sx={{
-            border: `1.5px solid ${mainButtonColor}`,
-            borderRadius: "12px",
+            border: "none",
+            borderRadius: "0",
             overflow: "hidden",
             mb: 1,
           }}
         >
-          <Box sx={{ backgroundColor: mainButtonColor, px: 2, py: 1 }}>
+          <Box sx={{ display: "none", backgroundColor: mainButtonColor, px: 2, py: 1 }}>
             <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
               Application Summary
             </Typography>
           </Box>
 
-          <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+          <Box sx={{ p: 0, backgroundColor: "#fff" }}>
             {/* ══════════════ PERSONAL INFORMATION ══════════════ */}
             <SectionHeader
               icon="🧑"
@@ -2220,14 +2571,11 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1.5 }}>
-              <Field label="Campus" value={data.campusLabel} size={14.5} />
+            <Box sx={{ mb: 1 }}>
+              <Field label="Campus" value={data.campusLabel} size={12.5} />
             </Box>
 
-            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.25 }}>
-              Applicant Name
-            </Typography>
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1 }}>
               <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
                 <Field label="First Name" value={data.firstName} />
               </Box>
@@ -2241,10 +2589,10 @@ const ReviewApplicationModal = ({
 
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ flex: "1 1 45%", minWidth: 130 }}>
-                <Field label="Birth Date" value={data.birthday} size={13.5} />
+                <Field label="Birth Date" value={data.birthday} size={11.5} />
               </Box>
               <Box sx={{ flex: "1 1 45%", minWidth: 100 }}>
-                <Field label="Age" value={data.age} size={13.5} />
+                <Field label="Age" value={data.age} size={11.5} />
               </Box>
             </Box>
 
@@ -2254,24 +2602,24 @@ const ReviewApplicationModal = ({
                 display: "flex",
                 gap: 1,
                 alignItems: "flex-start",
-                backgroundColor: "#fff3cd",
-                border: "1px solid #d4a017",
+                backgroundColor: "#fff0f3",
+                border: "1px solid #f1ccd5",
                 borderRadius: "8px",
-                p: 1.1,
-                mt: 1,
+                p: 0.9,
+                mt: 0.75,
               }}
             >
               <span style={{ fontSize: 13, flexShrink: 0 }}>🎂</span>
               <Typography
-                sx={{ fontSize: 11.5, color: "#5d4500", lineHeight: 1.45 }}
+                sx={{ fontSize: 9.5, color: "#5d4500", lineHeight: 1.4 }}
               >
-                Double-check your <strong>Birth Date</strong> and computed{" "}
-                <strong>Age</strong> — used for eligibility checks and cannot be
+                Double-check your <strong>Birth Date</strong> and{" "}
+                <strong>Age</strong>, It used for eligibility checks and cannot be
                 edited after submission.
               </Typography>
             </Box>
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1 }} />
 
             {/* ══════════════ ACADEMIC INFORMATION ══════════════ */}
             <SectionHeader
@@ -2280,32 +2628,41 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1 }}>
-              <Field
-                label="Program Level"
-                value={data.academicProgramLabel}
-                size={13.5}
-              />
-            </Box>
-            <Box sx={{ mb: 1.5 }}>
-              <Field
-                label="Applying As"
-                value={data.applyingAsLabel}
-                size={13.5}
-              />
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                mb: 1,
+              }}
+            >
+              <Box sx={{ flex: "1 1 45%", minWidth: 150 }}>
+                <Field
+                  label="Program Level"
+                  value={data.academicProgramLabel}
+                  size={11.5}
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 45%", minWidth: 150 }}>
+                <Field
+                  label="Applying As"
+                  value={data.applyingAsLabel}
+                  size={11.5}
+                />
+              </Box>
             </Box>
 
             <Box
               sx={{
-                backgroundColor: "#fff3cd",
-                border: "1.5px dashed #d4a017",
+                backgroundColor: "#fff0f3",
+                border: "1.5px dashed #f1ccd5",
                 borderRadius: "8px",
-                p: 1.25,
+                p: 1,
               }}
             >
               <Typography
                 sx={{
-                  fontSize: 11,
+                  fontSize: 9,
                   color: "#7a5c00",
                   fontWeight: 700,
                   letterSpacing: "0.04em",
@@ -2315,7 +2672,7 @@ const ReviewApplicationModal = ({
               </Typography>
               <Typography
                 sx={{
-                  fontSize: 13.5,
+                  fontSize: 11.5,
                   fontWeight: 700,
                   color: "#5d4500",
                   mt: 0.25,
@@ -2325,7 +2682,7 @@ const ReviewApplicationModal = ({
               </Typography>
             </Box>
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1 }} />
 
             {/* ══════════════ ACCOUNT INFORMATION ══════════════ */}
             <SectionHeader
@@ -2334,8 +2691,8 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1.5 }}>
-              <Field label="Email Address" value={data.email} size={13.5} />
+            <Box sx={{ mb: 1 }}>
+              <Field label="Email Address" value={data.email} size={11.5} />
             </Box>
 
             <Box
@@ -2346,12 +2703,12 @@ const ReviewApplicationModal = ({
                 backgroundColor: "#f0f7ff",
                 border: "1px solid #b3d4ff",
                 borderRadius: "8px",
-                p: 1.25,
+                p: 1,
               }}
             >
               <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
               <Typography
-                sx={{ fontSize: 12, color: "#1a237e", lineHeight: 1.5 }}
+                sx={{ fontSize: 10, color: "#1a237e", lineHeight: 1.4 }}
               >
                 Your <strong>Applicant Number</strong> will be generated after
                 you complete the next step (Google Authenticator setup). You'll
@@ -2362,9 +2719,9 @@ const ReviewApplicationModal = ({
 
             <Typography
               sx={{
-                fontSize: 11.5,
+                fontSize: 9.5,
                 color: "#888",
-                mt: 2,
+                mt: 1,
                 fontStyle: "italic",
                 lineHeight: 1.5,
               }}
@@ -2385,6 +2742,7 @@ const ReviewApplicationModal = ({
             borderRadius: "8px",
             p: 1.25,
             mt: 1.5,
+            display: "none",
           }}
         >
           <span style={{ fontSize: 14, flexShrink: 0 }}>🎂</span>
@@ -2398,10 +2756,10 @@ const ReviewApplicationModal = ({
 
       <DialogActions
         sx={{
-          px: { xs: 2, sm: 3 },
-          pb: 2.5,
-          pt: 1.5,
-          gap: 1.5,
+          px: { xs: 1.5, sm: 2 },
+          pb: 1.25,
+          pt: 0.75,
+          gap: 1,
           display: "flex",
           flexDirection: isMobile ? "column-reverse" : "row",
         }}
@@ -2413,14 +2771,14 @@ const ReviewApplicationModal = ({
           disabled={isSubmitting}
           onClick={onClose}
           sx={{
-            height: 46,
+            height: 40,
             borderRadius: "10px",
             fontWeight: 600,
-            fontSize: 15,
+            fontSize: 13,
             textTransform: "none",
           }}
         >
-          ← Edit My Information
+          Edit My Information
         </Button>
         <Button
           fullWidth
@@ -2428,12 +2786,12 @@ const ReviewApplicationModal = ({
           disabled={isSubmitting}
           onClick={onConfirm}
           sx={{
-            height: 46,
+            height: 40,
             borderRadius: "10px",
             backgroundColor: mainButtonColor,
             color: "#fff",
             fontWeight: 700,
-            fontSize: 15,
+            fontSize: 13,
             textTransform: "none",
             boxShadow: "none",
             "&:hover": {
@@ -2449,7 +2807,7 @@ const ReviewApplicationModal = ({
               Checking Your Details…
             </Box>
           ) : (
-            "Looks Good — Set Up Security"
+            "Submit"
           )}
         </Button>
       </DialogActions>
@@ -2770,6 +3128,7 @@ const Register = () => {
   const assets = settings?.assets || {};
   const mainButtonColor = colors.mainButton || "#1976d2";
   const headerColor = colors.header || "#1976d2";
+  const borderColor = colors.border || "#e6e6e6";
   const companyName = branding.companyName || "Company Name";
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -2778,6 +3137,7 @@ const Register = () => {
   const isCompact = isMobile || isTablet;
 
   const [openReminder, setOpenReminder] = useState(true);
+  const [registerStep, setRegisterStep] = useState(1);
 
   const getBranchLabel = (branchId) => {
     const branch = branches.find(
@@ -2917,7 +3277,7 @@ const Register = () => {
 
     setEmailDomainStatus("checking");
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/check-domain-mx`, {
+      const res = await axios.get(`${API_BASE_URL}/api/check-domain-mx`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { domain },
       });
       setEmailDomainStatus(res.data.valid ? "valid" : "invalid");
@@ -2990,7 +3350,7 @@ const Register = () => {
   useEffect(() => {
     if (!isCompact) return;
     axios
-      .get(`${API_BASE_URL}/api/announcements`)
+      .get(`${API_BASE_URL}/api/announcements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (Array.isArray(res.data.data)) setMobileSlides(res.data.data);
       })
@@ -3009,7 +3369,7 @@ const Register = () => {
   useEffect(() => {
     const fetchBranchesList = () => {
       axios
-        .get(`${API_BASE_URL}/api/branches`)
+        .get(`${API_BASE_URL}/api/branches`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setBranches(res.data))
         .catch((err) => console.error(err));
     };
@@ -3020,7 +3380,7 @@ const Register = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/applied_program`)
+      .get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setCurriculumOptions(res.data))
       .catch((err) => console.error("Error fetching curriculum options:", err));
   }, []);
@@ -3034,7 +3394,7 @@ const Register = () => {
 
   useEffect(() => {
     const fetchActiveYearAndAvailability = async () => {
-      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const activeYear = yearRes.data[0];
       if (activeYear) {
         setActiveSchoolYearId(activeYear.school_year_id);
@@ -3042,7 +3402,7 @@ const Register = () => {
         setActiveSemesterId(activeYear.semester_id);
         const availRes = await axios.get(
           `${API_BASE_URL}/api/programs/availability`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: {
               year_id: activeYear.year_id,
               semester_id: activeYear.semester_id,
@@ -3130,7 +3490,151 @@ const Register = () => {
     return isValid;
   };
 
-  const getIconTop = (hasError) => (hasError ? "55%" : "70%");
+  // Icons sit inside the input row. A fixed offset keeps them centered even
+  // when validation text is rendered below the field.
+  const getIconTop = () => "25px";
+
+  const validateStep1 = () => {
+    const newErrors = {
+      campus: !branchId,
+      lastName: !lastName,
+      firstName: !firstName,
+      birthday: !birthday,
+    };
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    return !newErrors.campus && !newErrors.lastName && !newErrors.firstName && !newErrors.birthday;
+  };
+
+  const validateStep2 = () => {
+    const newErrors = {
+      academicProgram: !academicProgram,
+      applyingAs: !applyingAs,
+      selectedCurriculum: !selectedCurriculum,
+      email: !usersData.email,
+    };
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    return (
+      !newErrors.academicProgram &&
+      !newErrors.applyingAs &&
+      !newErrors.selectedCurriculum &&
+      !newErrors.email
+    );
+  };
+
+  const validatePasswordStep = () => {
+    const newErrors = {
+      password: !usersData.password,
+      passwordRules: !!(usersData.password && !allPasswordRulesPassed),
+      confirmPassword: !confirmPassword || usersData.password !== confirmPassword,
+    };
+    if (usersData.password && !allPasswordRulesPassed) {
+      newErrors.password = true;
+    }
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    return (
+      !newErrors.password &&
+      !newErrors.passwordRules &&
+      !newErrors.confirmPassword
+    );
+  };
+
+  const goToStep2 = () => {
+    if (!branchSelected) {
+      setSnack({
+        open: true,
+        message: "Please select a branch first!",
+        severity: "warning",
+      });
+      return;
+    }
+    if (!registrationOpen) {
+      setSnack({
+        open: true,
+        message: "Registration is currently closed for this campus.",
+        severity: "error",
+      });
+      return;
+    }
+    if (!validateStep1()) {
+      setSnack({
+        open: true,
+        message: "Please fill up all required fields!",
+        severity: "warning",
+      });
+      return;
+    }
+    setRegisterStep(2);
+  };
+
+  const goToStep3 = () => {
+    const chosenProgram = selectedBranch?.academicPrograms?.find(
+      (p) => String(p.id) === String(academicProgram),
+    );
+    if (chosenProgram && Number(chosenProgram.open) !== 1) {
+      const hours = formatProgramHours(chosenProgram);
+      setSnack({
+        open: true,
+        message: `${chosenProgram.name} registration is currently closed.${hours ? ` Hours: ${hours}.` : ""}`,
+        severity: "error",
+      });
+      return;
+    }
+    if (emailDomainSuggestion || emailDomainStatus === "invalid") {
+      setSnack({
+        open: true,
+        message: "Please correct the email address typo before continuing.",
+        severity: "warning",
+      });
+      return;
+    }
+    if (!validateStep2()) {
+      setSnack({
+        open: true,
+        message: "Please fill up all required fields!",
+        severity: "warning",
+      });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(usersData.email)) {
+      setSnack({
+        open: true,
+        message: "Please enter a valid email address!",
+        severity: "error",
+      });
+      return;
+    }
+    setRegisterStep(3);
+  };
+
+  const goToStep4 = () => {
+    if (usersData.password && !allPasswordRulesPassed) {
+      setSnack({
+        open: true,
+        message:
+          "Your password doesn't meet all the requirements yet. Please check the checklist below the password field.",
+        severity: "warning",
+      });
+      return;
+    }
+    if (!validatePasswordStep()) {
+      setSnack({
+        open: true,
+        message: "Please fill up all required fields!",
+        severity: "warning",
+      });
+      return;
+    }
+    if (usersData.password !== confirmPassword) {
+      setSnack({
+        open: true,
+        message: "Passwords do not match!",
+        severity: "error",
+      });
+      return;
+    }
+    setRegisterStep(4);
+  };
 
   // ── Human-readable labels for the review modal ─────────────────────────────
   const selectedBranchForReview = branches.find(
@@ -3276,7 +3780,7 @@ const Register = () => {
         firstName,
         lastName,
         birthday,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       // Step 2: Build and stash the full registration payload
       // The `otp` field will be filled in by TotpSetupModal when the user
@@ -3338,10 +3842,20 @@ const Register = () => {
 
   const handleBranchSelect = (e) => {
     const selectedId = e.target.value;
+    const campusChanged = String(selectedId) !== String(branchId);
+
     setBranchId(selectedId);
     setAcademicProgram("");
     setApplyingAs("");
     setSelectedCurriculum("");
+
+    // A campus change invalidates the later campus-specific steps. Always
+    // return the applicant to the first step so the name and birth details
+    // can be reviewed before continuing with the new campus.
+    if (campusChanged) {
+      setRegisterStep(1);
+      setErrors({});
+    }
   };
 
   useEffect(() => {
@@ -3349,7 +3863,7 @@ const Register = () => {
     const fetchRegistrationStatus = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/registration-status/${branchId}`,
+          `${API_BASE_URL}/api/registration-status/${branchId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const isOpen = res.data.registration_open === 1;
         setRegistrationOpen(isOpen);
@@ -3364,6 +3878,52 @@ const Register = () => {
   const branchSelected = !!branchId;
   const fieldDisabled = !branchSelected || !registrationOpen;
   const selectedBranch = branches.find((b) => b.id.toString() === branchId);
+
+  const primaryActionStyle = {
+    opacity:
+      reminderChecked &&
+      registrationOpen &&
+      branchSelected &&
+      !emailDomainSuggestion &&
+      emailDomainStatus !== "invalid"
+        ? 1
+        : 0.5,
+    cursor:
+      !reminderChecked ||
+      emailDomainSuggestion ||
+      emailDomainStatus === "invalid"
+        ? "not-allowed"
+        : "pointer",
+    marginTop: isMobile ? "20px" : "18px",
+    backgroundColor: mainButtonColor,
+    height: isMobile ? "48px" : "44px",
+    border: "none",
+    borderRadius: UNIFORM_RADIUS,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "white",
+    fontWeight: 700,
+    fontSize: "14px",
+    textTransform: "none",
+  };
+
+  const nextActionStyle = {
+    opacity: registrationOpen && branchSelected ? 1 : 0.5,
+    cursor: !registrationOpen || !branchSelected ? "not-allowed" : "pointer",
+    marginTop: isMobile ? "32px" : "30px",
+    backgroundColor: mainButtonColor,
+    height: isMobile ? "48px" : "44px",
+    border: "none",
+    borderRadius: UNIFORM_RADIUS,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "white",
+    fontWeight: 700,
+    fontSize: "14px",
+    textTransform: "none",
+  };
 
   // ── NEW: hours note for whichever program is currently selected, shown
   //     under the Academic Program / Applying As row for transparency. ──────
@@ -3403,6 +3963,18 @@ const Register = () => {
 
   const handleKeyDownRegister = (e) => {
     if (e.key === "Enter" && !isSubmitting) {
+      if (registerStep === 1) {
+        goToStep2();
+        return;
+      }
+      if (registerStep === 2) {
+        goToStep3();
+        return;
+      }
+      if (registerStep === 3) {
+        goToStep4();
+        return;
+      }
       if (!branchId) {
         setSnack({
           open: true,
@@ -3423,7 +3995,8 @@ const Register = () => {
     }
   };
 
-  const backgroundImage = assets.backgroundImage || "url(/default-bg.jpg)";
+  const backgroundBase = assets.backgroundImage || "url(/default-bg.jpg)";
+  const backgroundImage = `linear-gradient(to bottom, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.15)), ${backgroundBase}`;
 
   // 🔒 Right-click / DevTools-shortcut blocking — desktop (mouse + keyboard)
   // only. Previously this ran on every render with no cleanup (piling up
@@ -3453,65 +4026,106 @@ const Register = () => {
       <RedirectLoading message="Account created! Redirecting to login..." />
     );
 
-  const inputH = isMobile ? "52px" : "54px";
+  const inputH = isMobile ? "42px" : "38px";
 
   return (
     <>
       <Box
         sx={{
           backgroundImage,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover, cover",
+          backgroundPosition: "center, center",
+          backgroundRepeat: "no-repeat, no-repeat",
           width: "100%",
-          minHeight: "100vh",
+          height: "calc(100vh - 100px)",
+          minHeight: 0,
           display: "flex",
-          alignItems: isCompact ? "flex-start" : "center",
+          alignItems: "center",
           justifyContent: "center",
-          overflowY: isCompact ? "auto" : "hidden",
+          overflowY: "hidden",
           overflowX: "hidden",
-          py: isCompact ? 2 : 0,
+          py: 0,
+          px: isCompact ? 0 : 2,
+          boxSizing: "border-box",
         }}
       >
         <Container
           style={{
+            width: "100%",
+            maxWidth: isCompact ? 672 : 1400,
+            margin: "0 auto",
             display: "flex",
+            flexDirection: isCompact ? "column" : "row",
             alignItems: "center",
             justifyContent: "center",
-            flexDirection: isCompact ? "column" : "row",
-            padding: isCompact ? "0" : undefined,
+            gap: isCompact ? 16 : 28,
+            padding: isCompact ? "0 16px" : "0 24px",
+            boxSizing: "border-box",
           }}
           maxWidth={false}
         >
-          {!isCompact && (
-            <AnnouncementSlider campusId={branchId} targetRole="applicant" />
-          )}
+          {!isCompact && <Box
+            sx={{
+              width: isCompact ? "100%" : "auto",
+              flex: "1 1 auto",
+              minWidth: 0,
+              position: "relative",
+              height: isCompact ? "auto" : "min(690px, calc(100vh - 100px))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <AnnouncementSlider
+              campusId={branchId}
+              targetRole="applicant"
+              alignCenter={!isCompact}
+              stack={isCompact}
+            />
+          </Box>}
 
           <div
             style={{
-              border: isCompact ? "3px solid black" : "5px solid black",
-              marginLeft: isCompact ? 0 : -100,
-              marginTop: isCompact ? 0 : "-50px",
-              width: isCompact ? "calc(100% - 32px)" : undefined,
-              maxWidth: isCompact ? (isTablet ? 640 : 520) : undefined,
+              border: `1px solid ${borderColor}`,
+              marginLeft: 0,
+              marginTop: 0,
+              width: isCompact ? "100%" : 460,
+              maxWidth: isCompact ? 640 : 460,
+              minWidth: 0,
+              flex: isCompact ? "none" : "0 0 460px",
+              transform: "none",
               boxSizing: "border-box",
             }}
-            className="Container"
+            className="Container registration-card uniform-card"
           >
             {/* Header */}
-            <div
+            {isCompact ? (
+              <AnnouncementSlider campusId={branchId} targetRole="applicant" stack embedded />
+            ) : <div
               className="Header"
               style={{
                 backgroundColor: headerColor,
-                padding: isMobile ? "12px 10px" : "1rem 0",
-                borderBottom: "3px solid black",
+                padding: isMobile ? "8px 10px" : "0.4rem 0",
+                borderBottom: "none",
               }}
             >
               <div className="HeaderTitle">
-                <div className="CircleCon">
+                <div
+                  className="CircleCon"
+                  style={
+                    isCompact
+                      ? undefined
+                      : { borderWidth: "3px" }
+                  }
+                >
                   <img
                     src={assets.logoUrl || Logo}
                     alt="Logo"
+                    style={
+                      isCompact
+                        ? undefined
+                        : { width: 52, height: 52 }
+                    }
                   />
                 </div>
               </div>
@@ -3520,25 +4134,30 @@ const Register = () => {
                   {companyName
                     .split(" ")
                     .reduce((acc, word, i) => {
-                      if (i % 4 === 0 && i !== 0)
+                      if (i % 5 === 0 && i !== 0)
                         acc.push(<br key={`br-${i}`} />);
                       acc.push(word + " ");
                       return acc;
                     }, [])}
                 </strong>
-                <p>Academic Information System</p>
+                <p>Academic Portal System</p>
               </div>
-            </div>
+            </div>}
 
             {/* Body */}
-            <div className="Body">
-              {isCompact && mobileSlides.length > 0 && (
-                <MobileAnnouncementBanner slides={mobileSlides} />
-              )}
-
+            <div
+              className="Body"
+              style={
+                isCompact
+                  ? undefined
+                  : {
+                      padding: "8px 14px 0 14px",
+                    }
+              }
+            >
               {/* Campus */}
-              <div className="TextField">
-                <label style={{ color: "black" }}>
+              <div className="TextField" style={{ marginTop: "12px" }}>
+                <label style={{ color: "#333" }}>
                   Campus<span style={{ color: "red" }}> *</span>
                 </label>
                 <select
@@ -3549,12 +4168,14 @@ const Register = () => {
                   style={{
                     height: inputH,
                     fontSize: "16px",
-                    border: errors.campus ? "2px solid red" : "2px solid black",
+                    border: fieldBorder(errors.campus),
+                    borderRadius: UNIFORM_RADIUS,
                     width: "100%",
                     appearance: "none",
                     WebkitAppearance: "none",
                     MozAppearance: "none",
                     paddingRight: "2.2rem",
+                    outline: "none",
                   }}
                 >
                   <option value="">Select Campus</option>
@@ -3568,7 +4189,7 @@ const Register = () => {
                   sx={{
                     position: "absolute",
                     right: "10px",
-                    top: "70%",
+                    top: "25px",
                     transform: "translateY(-50%)",
                     fontSize: "30px",
                     color: "black",
@@ -3577,41 +4198,10 @@ const Register = () => {
                 />
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  margin: "1.2rem 0",
-                }}
-              >
-                <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-                <span
-                  style={{
-                    margin: "0 0.8rem",
-                    fontWeight: "600",
-                    color: "#555",
-                    fontSize: isMobile ? "15px" : "16px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Personal Information
-                </span>
-                <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                  gap: isMobile ? "0" : "1rem",
-                }}
-              >
+              {registerStep === 1 && (
+              <>
                 <div className="TextField" style={{ position: "relative" }}>
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     Last Name<span style={{ color: "red" }}> *</span>
                   </label>
                   <input
@@ -3627,16 +4217,15 @@ const Register = () => {
                       paddingLeft: "2.80rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.lastName
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.lastName),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                     }}
                   />
                   <BadgeIcon
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                      top: "25px",
                       left: "0.7rem",
                       fontSize: "20px",
                     }}
@@ -3649,7 +4238,7 @@ const Register = () => {
                 </div>
 
                 <div className="TextField" style={{ position: "relative" }}>
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     First Name<span style={{ color: "red" }}> *</span>
                   </label>
                   <input
@@ -3665,16 +4254,15 @@ const Register = () => {
                       paddingLeft: "2.80rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.firstName
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.firstName),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                     }}
                   />
                   <PersonIcon
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                      top: "25px",
                       left: "0.7rem",
                       fontSize: "20px",
                     }}
@@ -3685,278 +4273,135 @@ const Register = () => {
                     </span>
                   )}
                 </div>
-              </div>
-              <div className="TextField" style={{ position: "relative" }}>
+
+                <div className="TextField" style={{ position: "relative" }}>
+                  <label style={{ color: "#333" }}>
+                    Middle Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter your middle name"
+                    value={middleName}
+                    disabled={fieldDisabled}
+                    onChange={(e) =>
+                      setMiddleName(e.target.value.toUpperCase())
+                    }
+                    onKeyDown={handleKeyDownRegister}
+                    className="border"
+                    style={{
+                      paddingLeft: "2.80rem",
+                      height: inputH,
+                      fontSize: "16px",
+                      border: UNIFORM_BORDER,
+                      borderRadius: UNIFORM_RADIUS,
+                      width: "100%",
+                    }}
+                  />
+                  <PersonIcon
+                    style={{
+                      position: "absolute",
+                      top: "25px",
+                      left: "0.7rem",
+                      fontSize: "20px",
+                    }}
+                  />
+                </div>
+
                 <div
                   style={{
                     display: "flex",
-                    flexDirection: isMobile ? "column" : "row",
-                    gap: isMobile ? "1rem" : "0.75rem",
+                    gap: "0.75rem",
                   }}
                 >
-                  {/* Middle Name — full width on mobile, shares row on desktop */}
                   <div
+                    className="TextField"
                     style={{
-                      flex: isMobile ? "none" : 2.2,
+                      flex: 2.3,
                       position: "relative",
-                      display: "flex",
-                      flexDirection: "column",
                     }}
                   >
-                    <label
-                      style={{
-                        color: "black",
-                        height: "20px",
-                        display: "flex",
-                        alignItems: "center",
-                        whiteSpace: "nowrap",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Middle Name (Optional)
+                    <label style={{ color: "#333" }}>
+                      Birth Date<span style={{ color: "red" }}> *</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Enter your middle name"
-                      value={middleName}
+                    <DateField
+                      required
+                      value={birthday}
                       disabled={fieldDisabled}
-                      onChange={(e) =>
-                        setMiddleName(e.target.value.toUpperCase())
-                      }
-                      onKeyDown={handleKeyDownRegister}
-                      className="border"
+                      onChange={(e) => setBirthday(e.target.value)}
                       style={{
-                        paddingLeft: "2.80rem",
+                        paddingLeft: "1rem",
                         height: inputH,
+                        borderRadius: UNIFORM_RADIUS,
                         fontSize: "16px",
-                        border: "2px solid black",
+                        border: fieldBorder(errors.birthday),
                         width: "100%",
                       }}
                     />
-                    <PersonIcon
+                    {errors.birthday && (
+                      <span style={{ color: "red", fontSize: "15px" }}>
+                        This field is required
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="TextField"
+                    style={{
+                      flex: 1,
+                      position: "relative",
+                    }}
+                  >
+                    <label style={{ color: "#333" }}>Age</label>
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={age}
+                      placeholder="—"
+                      className="border"
                       style={{
-                        position: "absolute",
-                        top: "calc(20px + 1.3rem)",
-                        left: "0.7rem",
-                        fontSize: "20px",
+                        height: inputH,
+                        fontSize: "16px",
+                        textAlign: "center",
+                        border: UNIFORM_BORDER,
+                        borderRadius: UNIFORM_RADIUS,
+                        width: "100%",
+                        backgroundColor: "#f5f5f5",
+                        color: "#333",
                       }}
                     />
                   </div>
-
-                  {isMobile ? (
-                    // ── MOBILE: Birth Date + Age nested together, sharing their own row ──
-                    <div style={{ display: "flex", gap: "0.75rem" }}>
-                      <div
-                        style={{
-                          flex: 2.3,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        <label
-                          style={{
-                            color: "black",
-                            height: "20px",
-                            display: "flex",
-                            alignItems: "center",
-                            whiteSpace: "nowrap",
-                            fontSize: "14px",
-                          }}
-                        >
-                          Birth Date<span style={{ color: "red" }}> *</span>
-                        </label>
-                        <DateField
-                          required
-                          value={birthday}
-                          disabled={fieldDisabled}
-                          onChange={(e) => setBirthday(e.target.value)}
-                          style={{
-                            paddingLeft: "1rem",
-                            height: inputH,
-                            borderRadius: "10px",
-                            fontSize: "14px",
-                            border: errors.birthday
-                              ? "2px solid red"
-                              : "2px solid black",
-                            width: "100%",
-                          }}
-                        />
-                        {errors.birthday && (
-                          <span style={{ color: "red", fontSize: "15px" }}>
-                            This field is required
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        <label
-                          style={{
-                            color: "black",
-                            height: "20px",
-                            display: "flex",
-                            alignItems: "center",
-                            whiteSpace: "nowrap",
-                            fontSize: "14px",
-                          }}
-                        >
-                          Age
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          disabled
-                          value={age}
-                          placeholder="—"
-                          className="border"
-                          style={{
-                            height: inputH,
-                            fontSize: "16px",
-                            textAlign: "center",
-                            border: "2px solid black",
-                            borderRadius: "10px",
-                            width: "100%",
-                            backgroundColor: "#f0f0f0",
-                            color: "#333",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    // ── DESKTOP: Birth Date and Age are flat siblings of Middle Name,
-                    //    same as the original working layout — no extra wrapper div,
-                    //    so their flex ratios (1.5 / 0.7) are relative to the full row,
-                    //    not squeezed by a content-sized "auto" wrapper. ──
-                    <>
-                      <div
-                        style={{
-                          flex: 1.5,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        <label
-                          style={{
-                            color: "black",
-                            height: "20px",
-                            display: "flex",
-                            alignItems: "center",
-                            whiteSpace: "nowrap",
-                            fontSize: "14px",
-                          }}
-                        >
-                          Birth Date<span style={{ color: "red" }}> *</span>
-                        </label>
-                        <DateField
-                          required
-                          value={birthday}
-                          disabled={fieldDisabled}
-                          onChange={(e) => setBirthday(e.target.value)}
-                          style={{
-                            paddingLeft: "1rem",
-                            height: inputH,
-                            borderRadius: "10px",
-                            fontSize: "16px",
-                            border: errors.birthday
-                              ? "2px solid red"
-                              : "2px solid black",
-                            width: "100%",
-                          }}
-                        />
-                        {errors.birthday && (
-                          <span style={{ color: "red", fontSize: "15px" }}>
-                            This field is required
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        style={{
-                          flex: 0.7,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
-                      >
-                        <label
-                          style={{
-                            color: "black",
-                            height: "20px",
-                            display: "flex",
-                            alignItems: "center",
-                            whiteSpace: "nowrap",
-                            fontSize: "14px",
-                          }}
-                        >
-                          Age
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          disabled
-                          value={age}
-                          placeholder="—"
-                          className="border"
-                          style={{
-                            height: inputH,
-                            fontSize: "16px",
-                            textAlign: "center",
-                            border: "2px solid black",
-                            borderRadius: "10px",
-                            width: "100%",
-                            backgroundColor: "#f0f0f0",
-                            color: "#333",
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
                 </div>
-              </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  margin: "1.2rem 0",
-                }}
-              >
                 <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-                <span
-                  style={{
-                    margin: "0 0.8rem",
-                    fontWeight: "600",
-                    color: "#555",
-                    fontSize: isMobile ? "15px" : "16px",
-                    whiteSpace: "nowrap",
+                  tabIndex={0}
+                  onClick={goToStep2}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") goToStep2();
                   }}
+                  style={nextActionStyle}
                 >
-                  Academic Information
-                </span>
-                <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-              </div>
+                  NEXT
+                </div>
+              </>
+              )}
+
+              {registerStep === 2 && (
+              <>
 
               <div
                 style={{
                   display: "flex",
-                  gap: "1rem",
+                  gap: "0",
                   flexWrap: "wrap",
-                  flexDirection: isMobile ? "column" : "row",
+                  flexDirection: "column",
                 }}
               >
                 <div
                   className="TextField"
                   style={{ position: "relative", flex: 1 }}
                 >
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     Academic Program<span style={{ color: "red" }}> *</span>
                   </label>
                   <select
@@ -3985,10 +4430,11 @@ const Register = () => {
                       paddingLeft: "1rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.academicProgram
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.academicProgram),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
+                      outline: "none",
+                      boxShadow: "none",
                       appearance: "none",
                       paddingRight: "2.2rem",
                     }}
@@ -4032,7 +4478,7 @@ const Register = () => {
                   className="TextField"
                   style={{ position: "relative", flex: 1 }}
                 >
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     Applying As<span style={{ color: "red" }}> *</span>
                   </label>
                   <select
@@ -4056,10 +4502,11 @@ const Register = () => {
                       paddingLeft: "1rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.applyingAs
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.applyingAs),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
+                      outline: "none",
+                      boxShadow: "none",
                       appearance: "none",
                       paddingRight: "2.2rem",
                     }}
@@ -4170,7 +4617,7 @@ const Register = () => {
               )}
 
               <div className="TextField" style={{ position: "relative" }}>
-                <label style={{ color: "black" }}>
+                <label style={{ color: "#333" }}>
                   Course Applied<span style={{ color: "red" }}> *</span>
                 </label>
                 <Autocomplete
@@ -4208,22 +4655,69 @@ const Register = () => {
                   getOptionDisabled={(option) =>
                     availabilityMap[option.curriculum_id]?.isFull
                   }
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.5,
+                        border: `1px solid ${headerColor}`,
+                        borderRadius: "8px",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        overflow: "hidden",
+                        fontFamily: "Poppins, sans-serif",
+                      },
+                    },
+                    listbox: {
+                      sx: {
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 12,
+                        py: 0.5,
+                        maxHeight: 240,
+                        "& .MuiAutocomplete-option": {
+                          fontSize: 12,
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                          borderRadius: "6px",
+                          mx: 0.5,
+                          my: 0.25,
+                          alignItems: "flex-start",
+                        },
+                        "& .MuiAutocomplete-option.Mui-focused": {
+                          bgcolor: `${headerColor}14`,
+                        },
+                        "& .MuiAutocomplete-option[aria-selected='true']": {
+                          bgcolor: `${mainButtonColor} !important`,
+                          color: "#fff",
+                        },
+                      },
+                    },
+                  }}
                   renderOption={(props, option) => {
                     const availability = availabilityMap[option.curriculum_id];
                     const remaining = availability?.remaining ?? 0;
                     const isFull = availability?.isFull;
+                    const selected = props["aria-selected"];
                     return (
                       <li
                         {...props}
                         style={{
-                          color: isFull ? "red" : "green",
-                          fontSize: isMobile ? "15px" : "16px",
+                          ...props.style,
+                          fontFamily: "Poppins, sans-serif",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: selected ? "#fff" : isFull ? "#c62828" : "#1a1a1a",
                         }}
                       >
                         {`(${option.program_code}): ${option.program_description}${option.major ? ` (${option.major})` : ""} (${getBranchLabel(option.components)})`}
-                        {isFull
-                          ? " — FULL (0 slots left)"
-                          : ` — (${remaining} slots left)`}
+                        <span
+                          style={{
+                            color: selected ? "#fff" : isFull ? "#c62828" : "#2e7d32",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {isFull
+                            ? " — FULL (0 slots left)"
+                            : ` — (${remaining} slots left)`}
+                        </span>
                       </li>
                     );
                   }}
@@ -4241,22 +4735,16 @@ const Register = () => {
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           height: inputH,
-                          fontSize: "16px",
-                          borderRadius: "10px",
+                          fontSize: UNIFORM_FONT_SIZE,
+                          borderRadius: UNIFORM_RADIUS,
                           "& fieldset": {
-                            border: errors.selectedCurriculum
-                              ? "2px solid red"
-                              : "2px solid black",
+                            border: fieldBorder(errors.selectedCurriculum),
                           },
                           "&:hover fieldset": {
-                            border: errors.selectedCurriculum
-                              ? "2px solid red"
-                              : "2px solid black",
+                            border: fieldBorder(errors.selectedCurriculum),
                           },
                           "&.Mui-focused fieldset": {
-                            border: errors.selectedCurriculum
-                              ? "2px solid red"
-                              : "2px solid black",
+                            border: fieldBorder(errors.selectedCurriculum),
                           },
                         },
                       }}
@@ -4265,35 +4753,19 @@ const Register = () => {
                 />
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  margin: "1.2rem 0",
-                }}
-              >
-                <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-                <span
-                  style={{
-                    margin: "0 0.8rem",
-                    fontWeight: "600",
-                    color: "#555",
-                    fontSize: isMobile ? "15px" : "16px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Account Information
-                </span>
-                <div
-                  style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }}
-                />
-              </div>
-
               <div className="TextField" style={{ position: "relative" }}>
-                <label style={{ color: "black" }}>
-              Email Address<span style={{ color: "red" }}> *</span>
+                <label style={{ color: "#333" }}>
+                  Email Address<span style={{ color: "red" }}> *</span>
+                  <span
+                    style={{
+                      color: "red",
+                      fontSize: "8px",
+                      fontWeight: 500,
+                      marginLeft: "6px",
+                    }}
+                  >
+                    Each email can only be used once.
+                  </span>
                 </label>
                 <input
                   required
@@ -4315,16 +4787,16 @@ const Register = () => {
                     paddingLeft: "2.80rem",
                     height: inputH,
                     fontSize: "16px",
-                    border:
-                      errors.email || emailDomainStatus === "invalid"
-                        ? "2px solid red"
-                        : "2px solid black",
+                    border: fieldBorder(
+                      errors.email || emailDomainStatus === "invalid",
+                    ),
+                    borderRadius: UNIFORM_RADIUS,
                   }}
                 />
                 <EmailIcon
                   style={{
                     position: "absolute",
-                    top: "2.80rem",
+                    top: "25px",
                     left: "0.7rem",
                     color: "rgba(0,0,0,0.4)",
                     fontSize: "20px",
@@ -4403,28 +4875,38 @@ const Register = () => {
                     ?
                   </span>
                 )}
-                <span
-                  style={{
-                    fontSize: "16px",
-                    color: "red",
-                    marginTop: "4px",
-                    display: "block",
-                  }}
-                >
-                  Note: Each email can only be used once. Use a valid and unused
-                  email address.
-                </span>
               </div>
 
+                <div
+                  tabIndex={0}
+                  onClick={goToStep3}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") goToStep3();
+                  }}
+                  style={nextActionStyle}
+                >
+                  NEXT
+                </div>
+                <div
+                  onClick={() => setRegisterStep(1)}
+                  style={{
+                    textAlign: "center",
+                    marginTop: "12px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    color: mainButtonColor,
+                    fontSize: UNIFORM_FONT_SIZE,
+                  }}
+                >
+                  ← Back
+                </div>
+              </>
+              )}
+
+              {registerStep === 3 && (
+              <>
               {/* Bilingual password requirements notice — shown BEFORE the fields
                   so applicants get familiar with the rule before they start typing */}
-              <PasswordRulesNotice
-                password={usersData.password}
-                isMobile={isMobile}
-                mainButtonColor={mainButtonColor}
-                showChecklist={passwordTouched}
-              />
-
               <div
                 style={{
                   display: "flex",
@@ -4436,7 +4918,7 @@ const Register = () => {
                   className="TextField"
                   style={{ position: "relative", flex: 1 }}
                 >
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     Password<span style={{ color: "red" }}> *</span>
                   </label>
                   <input
@@ -4456,16 +4938,15 @@ const Register = () => {
                       paddingLeft: "2.80rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.password
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.password),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                     }}
                   />
                   <LockIcon
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                      top: "25px",
                       left: "0.7rem",
                       color: "rgba(0,0,0,0.4)",
                       fontSize: "22px",
@@ -4476,7 +4957,7 @@ const Register = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                      top: "25px",
                       right: "1rem",
                       background: "none",
                       border: "none",
@@ -4501,7 +4982,7 @@ const Register = () => {
                   className="TextField"
                   style={{ position: "relative", flex: 1 }}
                 >
-                  <label style={{ color: "black" }}>
+                  <label style={{ color: "#333" }}>
                     Confirm Password<span style={{ color: "red" }}> *</span>
                   </label>
                   <input
@@ -4519,12 +5000,11 @@ const Register = () => {
                       paddingLeft: "2.80rem",
                       height: inputH,
                       fontSize: "16px",
-                      border: errors.confirmPassword
-                        ? "2px solid red"
-                        : "2px solid black",
+                      border: fieldBorder(errors.confirmPassword),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                       backgroundColor: !usersData.password
-                        ? "#f0f0f0"
+                        ? "#f5f5f5"
                         : "white",
                       cursor: !usersData.password ? "not-allowed" : "text",
                     }}
@@ -4532,7 +5012,7 @@ const Register = () => {
                   <LockIcon
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                    top: "25px",
                       left: "0.7rem",
                       color: "rgba(0,0,0,0.4)",
                       fontSize: "22px",
@@ -4543,7 +5023,7 @@ const Register = () => {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     style={{
                       position: "absolute",
-                      top: "2.80rem",
+                      top: "25px",
                       right: "1rem",
                       background: "none",
                       border: "none",
@@ -4560,29 +5040,66 @@ const Register = () => {
                 </div>
               </div>
 
+              <PasswordRulesNotice
+                password={usersData.password}
+                isMobile={isMobile}
+                mainButtonColor={mainButtonColor}
+                showChecklist={true}
+              />
+
+                <div
+                  tabIndex={0}
+                  onClick={goToStep4}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") goToStep4();
+                  }}
+                  style={nextActionStyle}
+                >
+                  NEXT
+                </div>
+                <div
+                  onClick={() => setRegisterStep(2)}
+                  style={{
+                    textAlign: "center",
+                    marginTop: "12px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    color: mainButtonColor,
+                    fontSize: UNIFORM_FONT_SIZE,
+                  }}
+                >
+                  ← Back
+                </div>
+              </>
+              )}
+
+              {registerStep === 4 && (
+              <>
               {/* Google Authenticator notice */}
               <Box
                 sx={{
                   display: "flex",
-                  gap: 1.5,
+                  gap: 1.25,
                   alignItems: "flex-start",
-                  bgcolor: "#f0f7ff",
-                  border: "1px solid #b3d4ff",
-                  borderRadius: "10px",
-                  p: 1.5,
-                  mt: 2,
+                  bgcolor: "#fffaf3",
+                  border: UNIFORM_BORDER,
+                  borderRadius: "12px",
+                  p: 2,
+                  mt: 1,
                 }}
               >
                 <PhoneAndroidIcon
                   sx={{
-                    color: "#1565c0",
-                    fontSize: 20,
+                    color: mainButtonColor,
+                    fontSize: 18,
                     flexShrink: 0,
                     mt: 0.2,
                   }}
                 />
                 <Box>
-                  <Typography fontSize={15.5} color="#1a237e" lineHeight={1.6}>
+                  <Typography
+                    sx={{ fontSize: 13, color: "#333", lineHeight: 1.45 }}
+                  >
                     <strong>Two-factor authentication required.</strong> After
                     clicking Submit, you will be asked to scan a QR code using{" "}
                     <strong>Google Authenticator</strong> on your phone. Please
@@ -4592,29 +5109,47 @@ const Register = () => {
               </Box>
 
               <Box
+                component="label"
+                htmlFor="reminderCheck"
                 sx={{
                   display: "flex",
-                  justifyContent: "center",
-                  marginTop: "20px",
+                  alignItems: "flex-start",
+                  gap: 1.25,
+                  backgroundColor: "#fff",
+                  border: UNIFORM_BORDER,
+                  borderRadius: "12px",
+                  px: 1.75,
+                  py: 1.5,
+                  mt: 2,
+                  cursor: "pointer",
                 }}
               >
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={reminderChecked}
-                      onChange={(e) => setReminderChecked(e.target.checked)}
-                    />
-                  }
-                  label={
-                    <Typography sx={{ fontSize: isMobile ? "15px" : "16px" }}>
-                      I have read and understood the admission rules and
-                      application guidelines. I confirm that I have never taken
-                      the University's admission examination before and that I
-                      will select the correct application type and "Applying As"
-                      category based on my qualifications.{" "}
-                    </Typography>
-                  }
+                <Checkbox
+                  id="reminderCheck"
+                  checked={reminderChecked}
+                  onChange={(e) => setReminderChecked(e.target.checked)}
+                  size="small"
+                  sx={{
+                    p: 0,
+                    mt: 0.15,
+                    color: "#b0b8c8",
+                    "&.Mui-checked": { color: mainButtonColor },
+                  }}
                 />
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    color: "#333",
+                    lineHeight: 1.55,
+                    userSelect: "none",
+                  }}
+                >
+                  I have read and understood the admission rules and application
+                  guidelines. I confirm that I have never taken the University's
+                  admission examination before and that I will select the correct
+                  application type and "Applying As" category based on my
+                  qualifications.
+                </Typography>
               </Box>
 
               <div
@@ -4626,33 +5161,7 @@ const Register = () => {
                   if (e.key !== "Enter") return;
                   if (!isSubmitting) handleOpenReview();
                 }}
-                style={{
-                  opacity:
-                    reminderChecked &&
-                    registrationOpen &&
-                    branchSelected &&
-                    !emailDomainSuggestion &&
-                    emailDomainStatus !== "invalid"
-                      ? 1
-                      : 0.5,
-                  cursor:
-                    !reminderChecked ||
-                    emailDomainSuggestion ||
-                    emailDomainStatus === "invalid"
-                      ? "not-allowed"
-                      : "pointer",
-                  marginTop: isMobile ? "24px" : "40px",
-                  backgroundColor: mainButtonColor,
-                  height: "50px",
-                  border: "2px solid black",
-                  borderRadius: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontWeight: "bold",
-                  fontSize: "16px",
-                }}
+                style={primaryActionStyle}
               >
                 {!registrationOpen
                   ? "REGISTRATION CLOSED"
@@ -4664,26 +5173,74 @@ const Register = () => {
                         ? "VALIDATING..."
                         : "SUBMIT APPLICATION"}
               </div>
+                <div
+                  onClick={() => setRegisterStep(3)}
+                  style={{
+                    textAlign: "center",
+                    marginTop: "12px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    color: mainButtonColor,
+                    fontSize: UNIFORM_FONT_SIZE,
+                  }}
+                >
+                  ← Back
+                </div>
+              </>
+              )}
 
               <div
-                className="LinkContainer RegistrationLink"
                 style={{
-                  margin: "0.1rem 0rem",
-                  fontSize: isMobile ? "15px" : undefined,
+                  width: "100%",
+                  margin: "10px 0 0",
+                  padding: "9px 10px",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  backgroundColor: "#fff1f1",
+                  borderRadius: "6px",
+                  border: "1px solid #f4d2d2",
                 }}
               >
-                <p>Already Have an Account?</p>
-                <span>
-                  <Link to={"/login_applicant"}>Sign In here</Link>
-                </span>
+                <div style={{ textAlign: "left", lineHeight: 1.15 }}>
+                  <div style={{ color: "#7a0000", fontWeight: 700, fontSize: isMobile ? "12px" : "11px" }}>
+                    Already have an account?
+                  </div>
+                  <div style={{ color: "#777", fontSize: isMobile ? "10px" : "9px", marginTop: "3px" }}>
+                    Login to continue your application.
+                  </div>
+                </div>
+                <Link
+                  to="/login_applicant"
+                  style={{
+                    flexShrink: 0,
+                    padding: "6px 14px",
+                    border: "1px solid #b40000",
+                    borderRadius: "5px",
+                    color: "#8b0000",
+                    backgroundColor: "#fff",
+                    fontSize: isMobile ? "10px" : "9px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Login here <span aria-hidden="true">➜</span>
+                </Link>
               </div>
             </div>
 
-            <div className="Footer">
+            <div
+              className="Footer"
+              style={{
+                backgroundColor: headerColor,
+                borderTop: "none",
+                color: "white",
+              }}
+            >
               <div className="FooterText">
-                &copy; {currentYear} {companyName || ""} <br />
-                Academic Information System. <br />
-                All rights reserved.
               </div>
             </div>
           </div>
@@ -4736,29 +5293,37 @@ const Register = () => {
           <Alert
             severity={snack.severity}
             onClose={handleClose}
-            sx={{ width: "100%" }}
+            sx={{
+              width: "100%",
+              fontSize: "12px",
+              "& .MuiAlert-message": {
+                fontSize: "12px",
+              },
+            }}
           >
             {snack.message}
           </Alert>
         </Snackbar>
 
         {/* Dialog: Important Reminder */}
-        {/* Dialog: Important Reminder */}
         <Dialog
           open={openReminder}
           onClose={() => setOpenReminder(false)}
-          maxWidth="sm"
+          maxWidth="md"
           fullWidth
           PaperProps={{
             sx: {
               borderRadius: "16px",
               overflow: "hidden",
               mx: isMobile ? 2 : "auto",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+              maxWidth: 980,
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.18)",
             },
           }}
         >
-          {/* Dialog Header */}
           <DialogTitle
             sx={{
               bgcolor: mainButtonColor,
@@ -4766,8 +5331,9 @@ const Register = () => {
               display: "flex",
               alignItems: "center",
               fontWeight: "bold",
-              px: 3,
+              px: { xs: 2.5, sm: 3 },
               py: 2,
+              flexShrink: 0,
             }}
           >
             <Box display="flex" alignItems="center" gap={1.5}>
@@ -4785,7 +5351,6 @@ const Register = () => {
               >
                 <WarningAmberIcon sx={{ color: "white", fontSize: 22 }} />
               </Box>
-
               <Box>
                 <Typography
                   fontWeight="bold"
@@ -4795,7 +5360,6 @@ const Register = () => {
                 >
                   Important Reminder for Applicants
                 </Typography>
-
                 <Typography
                   fontSize={12}
                   color="rgba(255,255,255,0.8)"
@@ -4807,48 +5371,43 @@ const Register = () => {
             </Box>
           </DialogTitle>
 
-          {/* Dialog Content */}
           <DialogContent
             sx={{
-              px: { xs: 2, sm: 3 },
-              pt: 2.5,
-              pb: 1,
+              px: { xs: 2.5, sm: 4 },
+              pb: 1.5,
+              overflowY: "auto",
+              zoom: 0.9,
+              "&.MuiDialogContent-root": {
+                paddingTop: "20px",
+              },
             }}
           >
-            {/* Warning Icon */}
             <Box
               sx={{
                 display: "flex",
                 justifyContent: "center",
-                mb: 2.5,
-                mt: 1,
+                mb: 2,
               }}
             >
               <Box
                 sx={{
-                  width: 76,
-                  height: 76,
+                  width: 56,
+                  height: 56,
                   borderRadius: "50%",
-                  backgroundColor: "rgba(255,255,255,0.9)",
-                  border: `3px solid ${mainButtonColor}`,
+                  border: "1.5px solid #e8c4c4",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 34,
-                  mt: 1,
                 }}
               >
-                ⚠️
+                <WarningAmberIcon sx={{ color: "#e6a23c", fontSize: 28 }} />
               </Box>
             </Box>
 
-            {/* =========================================================
-        MAIN REMINDER
-    ========================================================= */}
-            <Box sx={{ textAlign: "center", mb: 2 }}>
+            <Box sx={{ textAlign: "center", mb: 3, maxWidth: 620, mx: "auto" }}>
               <Typography
                 sx={{
-                  fontSize: "13.5px",
+                  fontSize: 14,
                   color: "#333",
                   lineHeight: 1.7,
                 }}
@@ -4857,288 +5416,336 @@ const Register = () => {
                 <strong style={{ color: mainButtonColor }}>
                   first-time applicants
                 </strong>
-                . Applicants who have previously taken the University's
-                admission examination are no longer eligible to register for a
-                new applicant account.
+                .
+                <br />
+                Applicants who have previously taken the University's admission
+                examination are no longer eligible to register for a new
+                applicant account.
               </Typography>
             </Box>
 
-            {/* =========================================================
-        ADMISSION RULES
-    ========================================================= */}
             <Box
               sx={{
-                border: `1.5px solid ${mainButtonColor}`,
-                borderRadius: "12px",
-                overflow: "hidden",
-                mb: 2,
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 2.5,
+                alignItems: "stretch",
               }}
             >
-              {/* Section Header */}
               <Box
                 sx={{
-                  backgroundColor: mainButtonColor,
-                  px: 2,
-                  py: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
                 }}
               >
-                <Typography
+                <Box
                   sx={{
-                    color: "#fff",
-                    fontWeight: 700,
-                    fontSize: 13,
+                    border: "1px solid #e6e6e6",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    backgroundColor: "#fff",
                   }}
                 >
-                  Admission Rules
-                </Typography>
-              </Box>
+                  <Box
+                    sx={{
+                      backgroundColor: mainButtonColor,
+                      px: 2,
+                      py: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: 13,
+                      }}
+                    >
+                      Admission Rules
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2 }}>
+                    {[
+                      <>
+                        Register only if you have <strong>never taken</strong>{" "}
+                        the University's admission examination.
+                      </>,
+                      <>
+                        Applicants who have previously taken the admission
+                        examination are <strong>not eligible</strong> to create
+                        another applicant account or submit a new application.
+                      </>,
+                      <>
+                        The University reserves the right to verify all
+                        applicant records. Any duplicate or invalid application
+                        may be rejected or disqualified.
+                      </>,
+                    ].map((item, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: "flex",
+                          gap: 1,
+                          alignItems: "flex-start",
+                          mb: index === 2 ? 0 : 0.6,
+                        }}
+                      >
+                        <Typography
+                          component="span"
+                          sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}
+                        >
+                          •
+                        </Typography>
+                        <Typography
+                          sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}
+                        >
+                          {item}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
 
-              {/* Section Content */}
-              <Box
-                sx={{
-                  p: 2,
-                  backgroundColor: "#fafcff",
-                }}
-              >
-                <Typography
+                <Box
                   sx={{
-                    fontSize: "12.5px",
-                    color: "#333",
-                    lineHeight: 1.7,
+                    border: "1px solid #e6e6e6",
+                    borderRadius: "12px",
+                    backgroundColor: "#fff",
+                    p: 2,
+                    flex: 1,
                   }}
                 >
-                  • Register only if you have <strong>never taken</strong> the
-                  University's admission examination.
-                  <br />
-                  <br />• Applicants who have previously taken the admission
-                  examination are <strong>not eligible</strong> to create
-                  another applicant account or submit a new application.
-                  <br />
-                  <br />• The University reserves the right to verify all
-                  applicant records. Any duplicate or invalid application may be
-                  rejected or disqualified.
-                </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "#1a1a1a",
+                      mb: 1,
+                    }}
+                  >
+                    Application Types
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      color: "#333",
+                      lineHeight: 1.45,
+                      mb: 0.4,
+                    }}
+                  >
+                    Before continuing, determine which application type matches
+                    the program you intend to pursue.
+                  </Typography>
+                  {[
+                    <>
+                      <strong>Undergraduate</strong> — For applicants applying
+                      to bachelor's degree programs.
+                    </>,
+                    <>
+                      <strong>Graduate</strong> — For applicants pursuing
+                      graduate studies, including master's or doctoral degree
+                      programs.
+                    </>,
+                    <>
+                      <strong>TechVoc</strong> — For applicants enrolling in
+                      Technical-Vocational Education and Training (TVET)
+                      programs focused on practical and industry-based skills.
+                    </>,
+                  ].map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        alignItems: "flex-start",
+                        mb: index === 2 ? 0 : 0.55,
+                      }}
+                    >
+                      <Typography
+                        component="span"
+                        sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}
+                      >
+                        •
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}
+                      >
+                        {item}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
-            </Box>
-
-            {/* =========================================================
-        APPLICATION TYPES
-    ========================================================= */}
-            <Box
-              sx={{
-                border: "1px solid #d7e6ff",
-                backgroundColor: "#f8fbff",
-                borderRadius: "12px",
-                p: 2,
-                mb: 2,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: mainButtonColor,
-                  mb: 1,
-                }}
-              >
-                Application Types
-              </Typography>
-
-              <Typography
-                sx={{
-                  fontSize: "12.5px",
-                  color: "#333",
-                  lineHeight: 1.7,
-                }}
-              >
-                Before continuing, determine which application type matches the
-                program you intend to pursue.
-                <br />
-                <br />• <strong>Undergraduate</strong> — For applicants applying
-                to bachelor's degree programs.
-                <br />
-                <br />• <strong>Graduate</strong> — For applicants pursuing
-                graduate studies, including master's or doctoral degree
-                programs.
-                <br />
-                <br />• <strong>TechVoc</strong> — For applicants enrolling in
-                Technical-Vocational Education and Training (TVET) programs
-                focused on practical and industry-based skills.
-              </Typography>
-            </Box>
-
-            {/* =========================================================
-        APPLYING AS CATEGORY
-    ========================================================= */}
-            <Box
-              sx={{
-                border: "1px solid #ffe08a",
-                backgroundColor: "#fffaf0",
-                borderRadius: "12px",
-                p: 2,
-                mb: 2,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "#9a6700",
-                  mb: 1,
-                }}
-              >
-                Select the Correct "Applying As" Category
-              </Typography>
-
-              <Typography
-                sx={{
-                  fontSize: "12.5px",
-                  color: "#333",
-                  lineHeight: 1.7,
-                  mb: 2,
-                }}
-              >
-                After choosing your application type, select the{" "}
-                <strong>"Applying As"</strong> option that best describes your
-                educational background.
-              </Typography>
 
               <Box
                 sx={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 1.5,
+                  gap: 2,
                 }}
               >
-                {/* Undergraduate Applicants */}
-                <Typography
+                <Box
                   sx={{
-                    fontSize: "12.5px",
-                    lineHeight: 1.65,
-                    color: "#333",
+                    backgroundColor: "#fffaf3",
+                    borderRadius: "12px",
+                    p: 2.25,
+                    flex: 1,
                   }}
                 >
-                  <strong style={{ color: mainButtonColor }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: mainButtonColor,
+                      letterSpacing: "0.02em",
+                      mb: 0.4,
+                    }}
+                  >
                     UNDERGRADUATE APPLICANTS
-                  </strong>
-                  <br />
-                  • Senior High School Graduate
-                  <br />
-                  • Senior High School Graduating Student
-                  <br />
-                  • ALS Passer
-                  <br />
-                  • Transferee
-                  <br />• Second-Course Applicant
-                </Typography>
+                  </Typography>
+                  {[
+                    "Senior High School Graduate",
+                    "Senior High School Graduating Student",
+                    "ALS Passer",
+                    "Transferee",
+                    "Second-Course Applicant",
+                  ].map((item) => (
+                    <Box
+                      key={item}
+                      sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
+                    >
+                      <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                        •
+                      </Typography>
+                      <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                        {item}
+                      </Typography>
+                    </Box>
+                  ))}
 
-                {/* Undergraduate or Graduate */}
-                <Typography
-                  sx={{
-                    fontSize: "12.5px",
-                    lineHeight: 1.65,
-                    color: "#333",
-                  }}
-                >
-                  <strong style={{ color: mainButtonColor }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: mainButtonColor,
+                      letterSpacing: "0.02em",
+                      mt: 1.15,
+                      mb: 0.4,
+                    }}
+                  >
                     UNDERGRADUATE OR GRADUATE
-                  </strong>
-                  <br />• Cross Enrollee
-                </Typography>
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                    <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                      •
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                      Cross Enrollee
+                    </Typography>
+                  </Box>
 
-                {/* Graduate Applicants */}
-                <Typography
-                  sx={{
-                    fontSize: "12.5px",
-                    lineHeight: 1.65,
-                    color: "#333",
-                  }}
-                >
-                  <strong style={{ color: mainButtonColor }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: mainButtonColor,
+                      letterSpacing: "0.02em",
+                      mt: 1.15,
+                      mb: 0.4,
+                    }}
+                  >
                     GRADUATE APPLICANTS
-                  </strong>
-                  <br />
-                  • Baccalaureate Graduate
-                  <br />• Master Degree Graduate
-                </Typography>
+                  </Typography>
+                  {["Baccalaureate Graduate", "Master Degree Graduate"].map(
+                    (item) => (
+                      <Box
+                        key={item}
+                        sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
+                      >
+                        <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                          •
+                        </Typography>
+                        <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}>
+                          {item}
+                        </Typography>
+                      </Box>
+                    ),
+                  )}
 
-                {/* Foreign Applicants */}
-                <Typography
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#c62828",
+                      letterSpacing: "0.02em",
+                      mt: 1.15,
+                      mb: 0.4,
+                    }}
+                  >
+                    FOREIGN APPLICANTS
+                  </Typography>
+                  <Typography
+                    sx={{ fontSize: 13, lineHeight: 1.45, color: "#333" }}
+                  >
+                    Foreign Applicant/Student registration is currently available
+                    only for <strong>Baccalaureate Graduate</strong> and{" "}
+                    <strong>Master Degree Graduate</strong> applicants.
+                    Undergraduate foreign admissions are not yet available
+                    through this online portal.
+                  </Typography>
+                </Box>
+
+                <Box
+                  component="label"
+                  htmlFor="agreeCheck"
                   sx={{
-                    fontSize: "12.5px",
-                    lineHeight: 1.65,
-                    color: "#333",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1.25,
+                    backgroundColor: "#fff",
+                    border: "1px solid #e6e6e6",
+                    borderRadius: "12px",
+                    px: 1.75,
+                    py: 1.5,
+                    cursor: "pointer",
                   }}
                 >
-                  <strong style={{ color: "#c62828" }}>
-                    FOREIGN APPLICANTS
-                  </strong>
-                  <br />
-                  Foreign Applicant/Student registration is currently available
-                  only for <strong>Baccalaureate Graduate</strong> and{" "}
-                  <strong>Master Degree Graduate</strong> applicants.
-                  Undergraduate foreign admissions are not yet available through
-                  this online portal.
-                </Typography>
+                  <Checkbox
+                    id="agreeCheck"
+                    checked={agreeChecked}
+                    onChange={(e) => setAgreeChecked(e.target.checked)}
+                    sx={{
+                      p: 0,
+                      mt: 0.15,
+                      color: "#b0b8c8",
+                      "&.Mui-checked": {
+                        color: mainButtonColor,
+                      },
+                    }}
+                    size="small"
+                  />
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      color: "#333",
+                      lineHeight: 1.55,
+                      userSelect: "none",
+                    }}
+                  >
+                    I have read and understood the admission rules. I confirm
+                    that I have never taken the admission examination before and
+                    that the information I provide is true and accurate.
+                  </Typography>
+                </Box>
               </Box>
-            </Box>
-
-            {/* =========================================================
-        AGREEMENT
-    ========================================================= */}
-            <Box
-              component="label"
-              htmlFor="agreeCheck"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                backgroundColor: "#f0f7ff",
-                borderLeft: `3px solid ${mainButtonColor}`,
-                borderRadius: "0 9px 9px 0",
-                px: 1.5,
-                py: 1.25,
-                mb: 1,
-                cursor: "pointer",
-              }}
-            >
-              <Checkbox
-                id="agreeCheck"
-                checked={agreeChecked}
-                onChange={(e) => setAgreeChecked(e.target.checked)}
-                sx={{
-                  p: 0,
-                  color: mainButtonColor,
-                  "&.Mui-checked": {
-                    color: mainButtonColor,
-                  },
-                }}
-                size="small"
-              />
-
-              <Typography
-                sx={{
-                  fontSize: 12.5,
-                  color: "#333",
-                  lineHeight: 1.5,
-                  userSelect: "none",
-                }}
-              >
-                I have read and understood the admission rules. I confirm that I
-                have never taken the admission examination before and that the
-                information I provide is true and accurate.
-              </Typography>
             </Box>
           </DialogContent>
 
-          {/* =========================================================
-      DIALOG ACTIONS
-  ========================================================= */}
           <DialogActions
             sx={{
-              px: { xs: 2, sm: 3 },
-              pb: 2.5,
-              pt: 1.5,
+              px: { xs: 2.5, sm: 4 },
+              pb: 3,
+              pt: 2,
             }}
           >
             <Button
@@ -5155,13 +5762,11 @@ const Register = () => {
                 fontSize: 14,
                 textTransform: "none",
                 boxShadow: "none",
-
                 "&:hover": {
                   backgroundColor: agreeChecked ? mainButtonColor : "#b0b8c8",
                   opacity: 0.9,
                   boxShadow: "none",
                 },
-
                 "&.Mui-disabled": {
                   backgroundColor: "#b0b8c8",
                   color: "#fff",
@@ -5169,7 +5774,7 @@ const Register = () => {
                 },
               }}
             >
-              I Agree — Continue to Registration
+              Continue to Registration
             </Button>
           </DialogActions>
         </Dialog>

@@ -64,7 +64,7 @@ const ExamSubjectManagement = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
 
     useEffect(() => {
@@ -77,7 +77,7 @@ const ExamSubjectManagement = () => {
             setUserRole(storedRole);
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -89,7 +89,7 @@ const ExamSubjectManagement = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(response.data?.can_create) === 1);
@@ -129,7 +129,7 @@ const ExamSubjectManagement = () => {
 
     const fetchSubjects = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/subjects/all`);
+            const res = await axios.get(`${API_BASE_URL}/api/subjects/all`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setSubjects(res.data || []);
         } catch {
             setSubjects([]);

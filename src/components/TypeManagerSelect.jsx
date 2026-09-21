@@ -80,7 +80,7 @@ const TypeManagerSelect = ({
   const fetchOptions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(apiUrl);
+      const res = await axios.get(apiUrl, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setOptions(res.data || []);
     } catch (err) {
       console.error(`Error fetching ${label} options:`, err);

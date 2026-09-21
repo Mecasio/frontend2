@@ -45,7 +45,7 @@ const DepartmentManagement = () => {
       setUserID(personID);
       setEmployeeID(empID);
 
-      if (role === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(role)) {
         checkAccess(empID);
         fetchUserAccessList(empID);
       } else {
@@ -60,7 +60,7 @@ const DepartmentManagement = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(res.data?.page_privilege === 1);
     } catch (err) {
@@ -74,7 +74,7 @@ const DepartmentManagement = () => {
   const fetchUserAccessList = async (employeeID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}`
+        `${API_BASE_URL}/api/page_access/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const accessMap = data.reduce((acc, row) => {

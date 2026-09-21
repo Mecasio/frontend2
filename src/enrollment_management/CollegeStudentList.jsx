@@ -26,7 +26,7 @@ import {
     Tooltip,
 } from '@mui/material';
 import API_BASE_URL from "../apiConfig";
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import { Snackbar, Alert } from '@mui/material';
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
@@ -148,10 +148,7 @@ const CollegeStudentList = () => {
     }, [settings]);
 
     useEffect(() => {
-        socket.current = io(API_BASE_URL, {
-            path: "/api/socket.io",
-            transports: ["websocket", "polling"],
-        });
+        socket.current = createAppSocket();
 
         return () => {
             socket.current.disconnect();
@@ -216,9 +213,9 @@ const CollegeStudentList = () => {
             setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
-            } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+            } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
                 window.location.href = "/login";
             }
         } else {
@@ -229,7 +226,7 @@ const CollegeStudentList = () => {
     const checkAccess = async (employeeID) => {
         setAccessLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setHasAccess(response.data?.page_privilege === 1);
         } catch (err) {
             console.error("Error checking access:", err);
@@ -264,7 +261,7 @@ const CollegeStudentList = () => {
         setUser(storedUser);
         setUserRole(storedRole);
 
-        const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
         if (!allowedRoles.includes(storedRole)) {
             window.location.href = "/login";
             return;
@@ -292,7 +289,7 @@ const CollegeStudentList = () => {
 
     const fetchPersonData = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+            const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setAdminData(res.data);
             syncRegistrarScopeFromAdminData(res.data);
         } catch (err) {
@@ -471,7 +468,7 @@ const CollegeStudentList = () => {
 
             const listRes = await fetch(
                 `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
-                { signal: controller.signal },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, signal: controller.signal },
             );
 
             if (!listRes.ok) {
@@ -525,7 +522,7 @@ const CollegeStudentList = () => {
                 limit: MAX_LIMIT,
             });
             const listRes = await fetch(
-                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (!listRes.ok) throw new Error("Failed to fetch students for export");
             const payload = await listRes.json();
@@ -548,8 +545,8 @@ const CollegeStudentList = () => {
         (async () => {
             try {
                 const [yearsRes, activeRes] = await Promise.all([
-                    axios.get(`${API_BASE_URL}/api/get_school_year/`),
-                    axios.get(`${API_BASE_URL}/api/active_school_year`),
+                    axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
                 ]);
                 if (cancelled) return;
 
@@ -578,7 +575,7 @@ const CollegeStudentList = () => {
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, []);
@@ -696,7 +693,7 @@ const CollegeStudentList = () => {
             try {
                 const responses = await Promise.all(
                     departmentIds.map((departmentId) =>
-                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
                     ),
                 );
                 const mergedDepartments = restrictDepartmentsToScope(
@@ -724,7 +721,7 @@ const CollegeStudentList = () => {
             try {
                 const responses = await Promise.all(
                     departmentIds.map((departmentId) =>
-                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
                     ),
                 );
                 const merged = responses.flatMap((response) => response.data || []);
@@ -751,7 +748,7 @@ const CollegeStudentList = () => {
 
         const fetchDepartments = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/departments`);
+                const response = await axios.get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setDepartment(response.data);
             } catch (error) {
                 console.error("Error fetching departments:", error);
@@ -760,7 +757,7 @@ const CollegeStudentList = () => {
 
         fetchDepartments();
 
-        axios.get(`${API_BASE_URL}/api/applied_program`)
+        axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then(res => {
                 // ✅ Same program_code+major dedupe for the fallback
                 // ("all programs") path.
@@ -970,7 +967,7 @@ const CollegeStudentList = () => {
                 { html: innerHtml },
                 {
                     responseType: "blob",
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         "x-employee-id": employeeID,
                         "x-audit-actor-id": employeeID,
                         "x-audit-actor-role": userRole,

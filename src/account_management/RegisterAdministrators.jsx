@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -81,7 +81,7 @@ const getRegistrarSuggestionValue = (registrar) =>
   cleanSuggestionValue(registrar?.employee_id) ||
   cleanSuggestionValue(registrar?.email);
 
-const RegisterRegistrar = () => {
+const RegisterAdministrators = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
@@ -151,7 +151,7 @@ const RegisterRegistrar = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -167,7 +167,7 @@ const RegisterRegistrar = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -180,7 +180,7 @@ const RegisterRegistrar = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -235,11 +235,59 @@ const RegisterRegistrar = () => {
     profile_picture: null,
     preview: "",
     curriculum_id: "",
+    role: "",
   });
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [scopes, setScopes] = useState([]);
   const [scopeDeptPick, setScopeDeptPick] = useState("");
   const [scopeProgramPick, setScopeProgramPick] = useState("");
+  const leftFormRef = useRef(null);
+  const columnHeightObserverRef = useRef(null);
+  const [departmentColumnHeight, setDepartmentColumnHeight] = useState(null);
+
+  const updateDepartmentColumnHeight = useCallback(() => {
+    const leftForm = leftFormRef.current;
+    if (!leftForm) return;
+    const nextHeight = Math.round(leftForm.offsetHeight);
+    if (nextHeight <= 0) return;
+    setDepartmentColumnHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+  }, []);
+
+  const setLeftFormNode = useCallback((node) => {
+    if (columnHeightObserverRef.current) {
+      columnHeightObserverRef.current.disconnect();
+      columnHeightObserverRef.current = null;
+    }
+
+    leftFormRef.current = node;
+    if (!node) return;
+
+    updateDepartmentColumnHeight();
+    const observer = new ResizeObserver(updateDepartmentColumnHeight);
+    observer.observe(node);
+    const dialogPaper = node.closest(".MuiDialog-paper");
+    if (dialogPaper) observer.observe(dialogPaper);
+    columnHeightObserverRef.current = observer;
+  }, [updateDepartmentColumnHeight]);
+
+  useLayoutEffect(() => {
+    if (!openDialog) {
+      setDepartmentColumnHeight(null);
+      return undefined;
+    }
+
+    updateDepartmentColumnHeight();
+    const frame = requestAnimationFrame(() => {
+      updateDepartmentColumnHeight();
+      requestAnimationFrame(updateDepartmentColumnHeight);
+    });
+    window.addEventListener("resize", updateDepartmentColumnHeight);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateDepartmentColumnHeight);
+    };
+  }, [openDialog, form.password, updateDepartmentColumnHeight]);
 
   const resetScopePicker = () => {
     setScopeDeptPick("");
@@ -381,7 +429,7 @@ const RegisterRegistrar = () => {
 
   const fetchPrograms = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applied_program`);
+      const res = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPrograms(res.data || []);
     } catch (err) {
       console.error("❌ Program fetch error:", err);
@@ -391,7 +439,7 @@ const RegisterRegistrar = () => {
   // 📥 Fetch Departments
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartment(res.data);
     } catch (err) {
       console.error("❌ Department fetch error:", err);
@@ -401,17 +449,17 @@ const RegisterRegistrar = () => {
 
   const fetchRegistrars = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/registrars`);
+      const res = await axios.get(`${API_BASE_URL}/api/registrars`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRegistrars(res.data);
     } catch (err) {
       console.error("❌ Registrar fetch error:", err);
-      setErrorMessage("Failed to load registrar accounts");
+      setErrorMessage("Failed to load administrator accounts");
     }
   };
 
   const fetchAccessLevels = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/access_table`);
+      const res = await axios.get(`${API_BASE_URL}/api/access_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAccessLevels(res.data || []);
     } catch (err) {
       console.error("❌ Access level fetch error:", err);
@@ -583,7 +631,7 @@ const RegisterRegistrar = () => {
         employee_id: employeeId,
         email,
         password,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       return true;
     } catch (err) {
       console.error("Failed to send registrar password email:", err);
@@ -623,14 +671,14 @@ const RegisterRegistrar = () => {
     if (e && typeof e.preventDefault === "function") e.preventDefault();
 
     if (editData && !canEdit) {
-      setSnackbarMessage("You do not have permission to edit registrars.");
+      setSnackbarMessage("You do not have permission to edit administrators.");
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
       return false;
     }
 
     if (!editData && !canCreate) {
-      setSnackbarMessage("You do not have permission to create registrars.");
+      setSnackbarMessage("You do not have permission to create administrators.");
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
       return false;
@@ -659,7 +707,7 @@ const RegisterRegistrar = () => {
           `${API_BASE_URL}/api/update_registrar/${editData.id}`,
           fd,
           {
-            headers: {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
               "Content-Type": "multipart/form-data",
               ...permissionHeaders.headers,
             },
@@ -683,20 +731,20 @@ const RegisterRegistrar = () => {
         }
 
         if (!silent) {
-          setSnackbarMessage("Registrar updated successfully.");
+          setSnackbarMessage("Administrator updated successfully.");
           setSnackbarSeverity("success");
         }
       } else {
         // ADD registrar
         await axios.post(`${API_BASE_URL}/api/register_registrar`, fd, {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "Content-Type": "multipart/form-data",
             ...permissionHeaders.headers,
           },
         });
 
         if (!silent) {
-          setSnackbarMessage("Registrar added successfully.");
+          setSnackbarMessage("Administrator added successfully.");
           setSnackbarSeverity("success");
         }
       }
@@ -706,6 +754,9 @@ const RegisterRegistrar = () => {
       }
 
       fetchRegistrars();
+      if (!silent) {
+        handleCloseDialog();
+      }
       return true;
     } catch (err) {
       console.error("❌ Submit error:", err);
@@ -773,7 +824,7 @@ const RegisterRegistrar = () => {
 
   const handleEdit = (r) => {
     if (!canEdit) {
-      setSnackbarMessage("You do not have permission to edit registrars.");
+      setSnackbarMessage("You do not have permission to edit administrators.");
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
       return;
@@ -803,6 +854,7 @@ const RegisterRegistrar = () => {
       dprtmnt_id: "",
       access_level: r.access_level || "",
       curriculum_id: "",
+      role: r.role || "",
     });
     setOpenDialog(true);
   };
@@ -822,7 +874,7 @@ const RegisterRegistrar = () => {
       r.employee_id,
       `${r.first_name} ${r.middle_name || ""} ${r.last_name}`,
       r.email,
-      r.dprtmnt_name || "N/A",
+      r.dprtmnt_name || "-",
       r.status === 1 ? "Active" : "Inactive",
     ]);
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
@@ -859,7 +911,7 @@ const RegisterRegistrar = () => {
         permissionHeaders,
       );
 
-      setSnackbarMessage("Registrar deleted successfully.");
+      setSnackbarMessage("Administrator deleted successfully.");
       setSnackbarSeverity("success");
       setOpenSnackbar(true);
       setOpenDeleteDialog(false);
@@ -870,7 +922,7 @@ const RegisterRegistrar = () => {
       setSnackbarMessage(
         err.response?.data?.message ||
         err.response?.data?.error ||
-        "Failed to delete registrar",
+        "Failed to delete administrator",
       );
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
@@ -937,13 +989,13 @@ const RegisterRegistrar = () => {
             fontSize: "36px",
           }}
         >
-          REGISTRAR ACCOUNTS
+          ADMINISTRATOR ACCOUNTS
         </Typography>
 
         <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
           <TextField
             size="small"
-            placeholder="Search registrar..."
+            placeholder="Search administrator..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -975,7 +1027,7 @@ const RegisterRegistrar = () => {
                 const name = [registrar.first_name, registrar.middle_name, registrar.last_name].map(cleanSuggestionValue).filter(Boolean).join(" ");
                 return (
                   <Box key={`${employeeId}-${registrar.email}`} onMouseDown={(e) => { e.preventDefault(); setSearchTerm(getRegistrarSuggestionValue(registrar)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{employeeId || "N/A"}</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{employeeId || "-"}</Typography>
                     <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
                     <Typography sx={{ fontSize: 14 }} noWrap>{name || cleanSuggestionValue(registrar.email) || "Unnamed Registrar"}</Typography>
                   </Box>
@@ -1017,7 +1069,7 @@ const RegisterRegistrar = () => {
                 >
                   {/* Left: Registrar List Count */}
                   <Typography fontSize="14px" fontWeight="bold" color="white">
-                    Total Registrar's Records : {filteredRegistrar.length}{" "}
+                    Total Administrator Records : {filteredRegistrar.length}{" "}
        
                   </Typography>
 
@@ -1220,6 +1272,7 @@ const RegisterRegistrar = () => {
                         curriculum_id: "",
                         profile_picture: null,
                         preview: "",
+                        role: "",
                       });
                       setScopes([]);
                       resetScopePicker();
@@ -1234,7 +1287,7 @@ const RegisterRegistrar = () => {
                       "&:hover": { backgroundColor: "#000" },
                     }}
                   >
-                    Add Registrar
+                    Add Administrator
                   </Button>
 
                   {/* ⚙️ Right: Filter, Sort, Export */}
@@ -1316,7 +1369,7 @@ const RegisterRegistrar = () => {
                 "Email",
                 "Department",
                 "Program",
-                "Access Level",
+                "Role",
                 "Status",
                 "Actions",
               ].map((header, idx) => (
@@ -1402,7 +1455,7 @@ const RegisterRegistrar = () => {
                       border: `1px solid ${borderColor}`,
                     }}
                   >
-                    {r.dprtmnt_name || "N/A"}
+                    {r.dprtmnt_name || "-"}
                   </TableCell>
                   <TableCell
                     sx={{
@@ -1413,7 +1466,7 @@ const RegisterRegistrar = () => {
                     {r.scopes_summary ||
                       (r.program_description
                         ? `${r.program_description}${r.major ? ` — ${r.major}` : ""} (${r.program_code}${r.current_year ? `, ${r.current_year}-${r.next_year}` : ""})`
-                        : "N/A")}
+                        : "-")}
                   </TableCell>
 
                   <TableCell
@@ -1422,7 +1475,7 @@ const RegisterRegistrar = () => {
                       border: `1px solid ${borderColor}`,
                     }}
                   >
-                    {r.access_description || "N/A"}
+                    {r.role || "-"}
                   </TableCell>
 
                   {/* ℹ️ Status is now changed from inside the Edit modal — this is a
@@ -1490,7 +1543,7 @@ const RegisterRegistrar = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={9} align="center">
-                  No registrar accounts found.
+                  No administrator accounts found.
                 </TableCell>
               </TableRow>
             )}
@@ -1522,7 +1575,7 @@ const RegisterRegistrar = () => {
                 >
                   {/* Left: Registrar List Count */}
                   <Typography fontSize="14px" fontWeight="bold" color="white">
-                    Total Registrar's Records : {filteredRegistrar.length}{" "}
+                    Total Administrator Records : {filteredRegistrar.length}{" "}
       
                   </Typography>
 
@@ -1689,7 +1742,10 @@ const RegisterRegistrar = () => {
         open={openDialog}
         onClose={handleCloseDialog}
         fullWidth
-        maxWidth="sm"
+        maxWidth="lg"
+        slotProps={{
+          transition: { onEntered: updateDepartmentColumnHeight },
+        }}
         PaperProps={{
           sx: {
             borderRadius: 3,
@@ -1706,483 +1762,648 @@ const RegisterRegistrar = () => {
             fontWeight: 700,
             fontSize: "1.1rem",
             py: 2,
-            mb: 2,
+            mb: 0,
           }}
         >
-          Registrar Registration
+          Administrator Registration
         </DialogTitle>
 
         {/* CONTENT */}
-        <DialogContent sx={{ p: 3 }}>
-          {/* 📸 Registrar 2x2 Profile Picture — same circular upload
-              concept as the Faculty Accounts modal */}
-          <Box display="flex" flexDirection="column" alignItems="center" mb={3} mt={1}>
-            <Box position="relative" component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
-              <Avatar
-                src={
-                  form.preview ||
-                  (editData?.profile_picture
-                    ? `${API_BASE_URL}/uploads/Admin1by1/${editData.profile_picture}`
-                    : "")
-                }
+        <DialogContent
+          sx={{
+            p: { xs: 2, md: 2.5 },
+            pt: { xs: 3, md: 3 },
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) minmax(0, 1fr)" },
+              gap: 3,
+              mt: 2,
+              alignItems: "start",
+            }}
+          >
+            {/* ============ LEFT COLUMN ============ */}
+            <Box ref={setLeftFormNode} sx={{ alignSelf: "start" }}>
+              {/* User's Account Information includes the profile photo and account fields. */}
+              <Box
                 sx={{
-                  width: 110,
-                  height: 110,
-                  border: "1.5px solid black",
-                  boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                  width: "100%",
+                  "& .MuiTextField-root .MuiInputBase-root": {
+                    minHeight: 40,
+                  },
                 }}
               >
-                {!form.preview && !editData?.profile_picture && (
-                  <ImageIcon sx={{ fontSize: 40, color: "#999" }} />
-                )}
-              </Avatar>
-
-              <label
-                htmlFor="registrar-avatar-upload"
-                style={{
-                  position: "absolute",
-                  bottom: 2,
-                  right: 2,
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: "white",
-                  display: "flex",
+              <Box
+                sx={{
+                  display: { xs: "block", md: "grid" },
+                  gridTemplateColumns: { md: "110px minmax(0, 1fr)" },
+                  columnGap: { md: 2 },
                   alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  boxShadow: "0 1px 4px rgba(0,0,0,.3)",
                 }}
               >
-                <AddCircleIcon sx={{ fontSize: 26, color: mainButtonColor }} />
-              </label>
-
-              <input
-                hidden
-                id="registrar-avatar-upload"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    setForm({
-                      ...form,
-                      profile_picture: file,
-                      preview: URL.createObjectURL(file),
-                    });
-                  }
+              {/* 📸 Registrar 2x2 Profile Picture (1) */}
+              <Box
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                mb={0}
+                mt={2}
+                sx={{
+                  gridColumn: { md: "1" },
+                  gridRow: { md: "2" },
+                  position: "relative",
                 }}
-              />
-            </Box>
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    position: "absolute",
+                    top: { md: -28, xs: -28 },
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 160,
+                    textAlign: "center",
+                    whiteSpace: "nowrap",
+                    fontSize: "11px",
+                    lineHeight: 1.15,
+                  }}
+                >
+                  Click to upload 2x2  < br/>
+                  profile picture
+                </Typography>
+                <Box position="relative" component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
+                  <Avatar
+                    src={
+                      form.preview ||
+                      (editData?.profile_picture
+                        ? `${API_BASE_URL}/uploads/Admin1by1/${editData.profile_picture}`
+                        : "")
+                    }
+                    sx={{
+                      width: 78,
+                      height: 78,
+                      border: "1.5px solid black",
+                      boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                    }}
+                  >
+                    {!form.preview && !editData?.profile_picture && (
+                      <ImageIcon sx={{ fontSize: 36, color: "#999" }} />
+                    )}
+                  </Avatar>
 
-            <Typography variant="caption" color="text.secondary" mt={1}>
-              Click to upload 2x2 profile picture
-            </Typography>
-          </Box>
+                  <label
+                    htmlFor="registrar-avatar-upload"
+                    style={{
+                      position: "absolute",
+                      bottom: 2,
+                      right: 2,
+                      width: 26,
+                      height: 26,
+                      borderRadius: "50%",
+                      background: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                    }}
+                  >
+                    <AddCircleIcon sx={{ fontSize: 24, color: mainButtonColor }} />
+                  </label>
 
-          {/* REGISTRAR INFO */}
-          <Typography fontWeight={700} mt={2} mb={2}>
-            Registrar Information
-          </Typography>
+                  <input
+                    hidden
+                    id="registrar-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setForm({
+                          ...form,
+                          profile_picture: file,
+                          preview: URL.createObjectURL(file),
+                        });
+                      }
+                    }}
+                  />
+                </Box>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                size="small"
-                label="Employee ID"
-                name="employee_id"
-                value={form.employee_id}
-                onChange={handleChange}
-                fullWidth
-              />
-            </Grid>
+              </Box>
 
-            <Grid item xs={6}>
-              <TextField
-                size="small"
-                label="First Name"
-                name="first_name"
-                value={form.first_name}
-                onChange={handleChange}
-                fullWidth
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <TextField
-                size="small"
-                label="Last Name"
-                name="last_name"
-                value={form.last_name}
-                onChange={handleChange}
-                fullWidth
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                size="small"
-                label="Middle Name"
-                name="middle_name"
-                value={form.middle_name}
-                onChange={handleChange}
-                fullWidth
-              />
-            </Grid>
-          </Grid>
-
-          {/* ACCOUNT */}
-          <Typography fontWeight={700} mt={3} mb={2}>
-            Account Details
-          </Typography>
-
-          <Stack spacing={2}>
-            <TextField
-              size="small"
-              label="Email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              type="email"
-              fullWidth
-            />
-
-            {/* PASSWORD FIELD — typable, matches the Faculty Accounts form.
-                Use the Send button below to email it to the registrar. */}
-            <TextField
-              size="small"
-              label={
-                editData
-                  ? "New Password (leave blank to keep current)"
-                  : "Password"
-              }
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              type={showPassword ? "text" : "password"}
-              fullWidth
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      edge="end"
-                      size="small"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              helperText={
-                editData
-                  ? "Leave blank to keep the current password unchanged. Use Send below to email a new password to the registrar."
-                  : "Generate a password or type one here before saving."
-              }
-            />
-          </Stack>
-
-          {/* ✅ Generated Password preview — same concept as the Faculty
-              and Student Accounts modals */}
-          {form.password && (
-            <Box
-              mt={3}
-              p={3}
-              sx={{ border: "2px dashed #1976d2", borderRadius: 2, textAlign: "center", backgroundColor: "#f9f9f9" }}
-            >
-              <Typography variant="h6" gutterBottom>
-                Generated Password
+              {/* REGISTRAR INFO — (2) Employee ID / (3) First Name row,
+                  (4) Middle Name / (5) Last Name row */}
+              <Typography
+                fontWeight={700}
+                mb={1.5}
+                sx={{ gridColumn: { md: "1 / -1" }, gridRow: { md: "1" } }}
+              >
+                User's Account Information
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: "bold", letterSpacing: 2, color: "#d32f2f" }}>
-                {form.password}
-              </Typography>
-              <Typography variant="body2" mt={1}>
-                Please print or save this password.
-              </Typography>
-            </Box>
-          )}
 
+              <Grid
+                container
+                spacing={1}
+                sx={{
+                  gridColumn: { md: "2" },
+                  gridRow: { md: "2" },
+                  mt: { md: 2 },
+                }}
+              >
+                <Grid item xs={6}>
+                  <TextField
+                    size="small"
+                    label="Employee ID"
+                    name="employee_id"
+                    value={form.employee_id}
+                    onChange={handleChange}
+                    fullWidth
+                  />
+                </Grid>
 
+                <Grid item xs={6}>
+                  <TextField
+                    size="small"
+                    label="First Name"
+                    name="first_name"
+                    value={form.first_name}
+                    onChange={handleChange}
+                    fullWidth
+                  />
+                </Grid>
 
-          <Stack spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    size="small"
+                    label="Middle Name"
+                    name="middle_name"
+                    value={form.middle_name}
+                    onChange={handleChange}
+                    fullWidth
+                  />
+                </Grid>
 
-            {/* DEPARTMENT / PROGRAM SCOPES */}
-            <Typography fontWeight={700} mt={3} mb={1} mt={2}>
-              Department & Program Scopes
-            </Typography>
-            <Typography fontSize="13px" color="text.secondary" mb={1}>
-              Use the search to quickly find programs, or expand departments to check individually.
-            </Typography>
+                <Grid item xs={6}>
+                  <TextField
+                    size="small"
+                    label="Last Name"
+                    name="last_name"
+                    value={form.last_name}
+                    onChange={handleChange}
+                    fullWidth
+                  />
+                </Grid>
+              </Grid>
 
-            {/* Autocomplete quick-add */}
-            <Autocomplete
-              size="small"
-              options={programs.filter((p) => {
-                // dedupe by program_id
-                const seen = new Set(scopes.map((s) => `${s.dprtmnt_id}:${s.program_id}`));
-                return !seen.has(`${p.dprtmnt_id}:${p.program_id}`);
-              })}
-              getOptionLabel={(p) =>
-                `${p.program_code} - ${p.program_description}${p.major ? ` (${p.major})` : ""}`
-              }
-              groupBy={(p) => {
-                const dept = department.find((d) => String(d.dprtmnt_id) === String(p.dprtmnt_id));
-                return dept ? `${dept.dprtmnt_name} (${dept.dprtmnt_code})` : "Unknown";
-              }}
-              onChange={(_, value) => {
-                if (!value) return;
-                const deptMeta = department.find((d) => String(d.dprtmnt_id) === String(value.dprtmnt_id));
-                const alreadyAdded = scopes.some(
-                  (s) =>
-                    String(s.dprtmnt_id) === String(value.dprtmnt_id) &&
-                    String(s.program_id) === String(value.program_id)
-                );
-                if (!alreadyAdded) {
-                  setScopes((prev) => [
-                    ...prev,
-                    {
-                      dprtmnt_id: Number(value.dprtmnt_id),
-                      program_id: Number(value.program_id),
-                      dprtmnt_name: deptMeta?.dprtmnt_name || "",
-                      program_code: value.program_code || "",
-                      program_description: value.program_description || "",
-                    },
-                  ]);
-                }
-              }}
-              renderInput={(params) => (
+              {/* ACCOUNT — (6) email, (7) password */}
+              </Box>
+
+              <Stack spacing={1} mt={1}>
                 <TextField
-                  {...params}
-                  placeholder="Search and select a program…"
+                  size="small"
+                  label="Email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  type="email"
+                  fullWidth
                   InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <>
-                        <SearchIcon sx={{ ml: 0.5, mr: 0.5, color: "gray", fontSize: 18 }} />
-                        {params.InputProps.startAdornment}
-                      </>
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Box
+                          component="span"
+                          sx={{ display: "flex", color: "text.disabled" }}
+                        >
+                          <ImageIcon sx={{ display: "none" }} />
+                        </Box>
+                      </InputAdornment>
                     ),
                   }}
                 />
-              )}
-              sx={{ mb: 2 }}
-              value={null}
-              blurOnSelect
-              clearOnBlur
-            />
 
-            {/* Collapsible dept checkboxes */}
-            {department.map((dept) => {
-              const progs = uniqueProgramsForDept(dept.dprtmnt_id);
-              if (progs.length === 0) return null;
+                {/* PASSWORD FIELD — typable, matches the Faculty Accounts form.
+                    Use the Send button below to email it to the registrar. */}
+                <TextField
+                  size="small"
+                  label={
+                    editData
+                      ? "New Password (leave blank to keep current)"
+                      : "Password"
+                  }
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  type={showPassword ? "text" : "password"}
+                  fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          edge="end"
+                          size="small"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    editData
+                      ? "Leave blank to keep the current password unchanged."
+                      : "Generate a password or type one here before saving."
+                  }
+                />
+              </Stack>
 
-              const checkedCount = progs.filter((p) =>
-                scopes.some(
-                  (s) =>
-                    String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
-                    String(s.program_id) === String(p.program_id)
-                )
-              ).length;
-              const allChecked = checkedCount === progs.length && progs.length > 0;
-              const isOpen = openDepts.has(dept.dprtmnt_id);
-
-              return (
-                <Box
-                  key={dept.dprtmnt_id}
-                  sx={{ border: "1px solid #e0e0e0", borderRadius: 2, mb: 1, overflow: "hidden" }}
-                >
-                  {/* Dept header row */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      px: 1.5,
-                      py: 0.75,
-                      backgroundColor: "#f5f5f5",
-                      cursor: "pointer",
-                      userSelect: "none",
-                    }}
-                  >
-                    {/* Check-all checkbox — stop propagation so it doesn't toggle collapse */}
-                    <Checkbox
-                      size="small"
-                      checked={allChecked}
-                      indeterminate={checkedCount > 0 && !allChecked}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        if (e.target.checked) {
-                          const toAdd = progs
-                            .filter(
-                              (p) =>
-                                !scopes.some(
-                                  (s) =>
-                                    String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
-                                    String(s.program_id) === String(p.program_id)
-                                )
-                            )
-                            .map((p) => ({
-                              dprtmnt_id: Number(dept.dprtmnt_id),
-                              program_id: Number(p.program_id),
-                              dprtmnt_name: dept.dprtmnt_name,
-                              program_code: p.program_code,
-                              program_description: p.program_description,
-                            }));
-                          setScopes((prev) => [...prev, ...toAdd]);
-                        } else {
-                          setScopes((prev) =>
-                            prev.filter((s) => String(s.dprtmnt_id) !== String(dept.dprtmnt_id))
-                          );
-                        }
-                      }}
-                    />
-
-                    {/* Clickable area for collapse toggle */}
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}
-                      onClick={() =>
-                        setOpenDepts((prev) => {
-                          const next = new Set(prev);
-                          next.has(dept.dprtmnt_id) ? next.delete(dept.dprtmnt_id) : next.add(dept.dprtmnt_id);
-                          return next;
-                        })
-                      }
+              {/* (8) Generated Password display box */}
+              <Box
+                mt={1}
+                p={2.5}
+                  sx={{
+                  border: "2px dashed #1976d2",
+                  borderRadius: 2,
+                  textAlign: "center",
+                  backgroundColor: "#f9f9f9",
+                  minHeight: 96,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {form.password ? (
+                  <>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Generated Password
+                    </Typography>
+                    <Typography
+                      variant="h5"
+                      sx={{ fontWeight: "bold", letterSpacing: 2, color: "#d32f2f" }}
                     >
-                      <Typography fontSize="13px" fontWeight={600} sx={{ flex: 1 }}>
-                        {dept.dprtmnt_name}
-                      </Typography>
-                      <Chip label={dept.dprtmnt_code} size="small" />
-                      {checkedCount > 0 && (
-                        <Chip label={`${checkedCount}/${progs.length}`} size="small" color="primary" />
-                      )}
-                      {isOpen ? (
-                        <ExpandLessIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      ) : (
-                        <ExpandMoreIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                      )}
-                    </Box>
-                  </Box>
+                      {form.password}
+                    </Typography>
+                    <Typography variant="caption" mt={0.5}>
+                      Please print or save this password.
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No password generated yet.
+                  </Typography>
+                )}
+              </Box>
 
-                  {/* Program checkboxes — only shown when expanded */}
-                  {isOpen && (
-                    <Box sx={{ px: 2, py: 1, display: "grid", gap: 0.25 }}>
-                      {progs.map((p) => {
-                        const isChecked = scopes.some(
-                          (s) =>
-                            String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
-                            String(s.program_id) === String(p.program_id)
-                        );
-                        return (
-                          <FormControlLabel
-                            key={p.program_id}
-                            sx={{ m: 0 }}
-                            control={
-                              <Checkbox
-                                size="small"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setScopes((prev) => [
-                                      ...prev,
-                                      {
-                                        dprtmnt_id: Number(dept.dprtmnt_id),
-                                        program_id: Number(p.program_id),
-                                        dprtmnt_name: dept.dprtmnt_name,
-                                        program_code: p.program_code,
-                                        program_description: p.program_description,
-                                      },
-                                    ]);
-                                  } else {
-                                    setScopes((prev) =>
-                                      prev.filter(
-                                        (s) =>
-                                          !(
-                                            String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
-                                            String(s.program_id) === String(p.program_id)
-                                          )
-                                      )
-                                    );
-                                  }
-                                }}
-                              />
-                            }
-                            label={
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Typography fontSize="13px">{p.program_description}</Typography>
-                                <Typography fontSize="11px" color="text.secondary">
-                                  {p.program_code}
-                                </Typography>
-                              </Box>
-                            }
-                          />
-                        );
-                      })}
-                    </Box>
-                  )}
-                </Box>
-              );
-            })}
+              {/* (12) Generate / (13) Print buttons */}
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LockResetIcon />}
+                  onClick={handleGeneratePassword}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Generate
+                </Button>
 
-            {/* Selected scopes chips */}
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 }}>
-              {scopes.length === 0 ? (
-                <Typography fontSize="13px" color="text.secondary">
-                  No scopes selected yet.
-                </Typography>
-              ) : (
-                scopes.map((scope, index) => (
-                  <Chip
-                    key={`${scope.dprtmnt_id}-${scope.program_id}-${index}`}
-                    label={`${scope.dprtmnt_name || scope.dprtmnt_id}: ${scope.program_code || scope.program_id}`}
-                    onDelete={() => handleRemoveScope(index)}
-                    color="primary"
-                    variant="outlined"
-                    size="small"
-                  />
-                ))
-              )}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<PrintIcon />}
+                  disabled={!form.password}
+                  onClick={() =>
+                    printRegistrarSlip(form, form.password, form.email)
+                  }
+                  sx={{ fontWeight: 600 }}
+                >
+                  Print
+                </Button>
+              </Box>
+
+              {/* (9) Role select — NEW: superadmin / administrator / technical */}
+              <Stack spacing={1} mt={3.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Role</InputLabel>
+                  <Select
+                    name="role"
+                    value={form.role}
+                    label="Role"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="">Select Role</MenuItem>
+                    <MenuItem value="superadmin">Superadmin</MenuItem>
+                    <MenuItem value="administrator">Administrator</MenuItem>
+                    <MenuItem value="technical">Technical</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* (10) Access role select */}
+                <FormControl fullWidth size="small">
+                  <InputLabel>Access Level</InputLabel>
+                  <Select
+                    value={form.access_level}
+                    label="Access Level"
+                    onChange={(e) =>
+                      setForm({ ...form, access_level: e.target.value })
+                    }
+                  >
+                    <MenuItem value="">Select Access Level</MenuItem>
+                    {accessLevels.map((access) => (
+                      <MenuItem key={access.access_id} value={access.access_id}>
+                        {access.access_description}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth size="small">
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    name="status"
+                    value={form.status}
+                    label="Status"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value="">Select Status</MenuItem>
+                    <MenuItem value={1}>Active</MenuItem>
+                    <MenuItem value={0}>Inactive</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+              </Box>
             </Box>
 
+            {/* ============ RIGHT COLUMN ============ */}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                minWidth: 0,
+                overflow: { md: "hidden" },
+                height: {
+                  md: departmentColumnHeight ? `${departmentColumnHeight}px` : 0,
+                },
+                maxHeight: {
+                  md: departmentColumnHeight ? `${departmentColumnHeight}px` : 0,
+                },
+              }}
+            >
+              <Typography fontWeight={700} mb={0.5} sx={{ mt: 2 }}>
+                Department & Program Scopes
+              </Typography>
+              <Typography fontSize="13px" color="text.secondary" mb={1.5}>
+                Use the search to quickly find programs, or expand departments to check individually.
+              </Typography>
 
-
-            <FormControl fullWidth size="small">
-              <InputLabel>Access Level</InputLabel>
-              <Select
-                value={form.access_level}
-                label="Access Level"
-                onChange={(e) =>
-                  setForm({ ...form, access_level: e.target.value })
+              {/* (17) Search bar */}
+              <Autocomplete
+                size="small"
+                options={programs.filter((p) => {
+                  // dedupe by program_id
+                  const seen = new Set(scopes.map((s) => `${s.dprtmnt_id}:${s.program_id}`));
+                  return !seen.has(`${p.dprtmnt_id}:${p.program_id}`);
+                })}
+                getOptionLabel={(p) =>
+                  `${p.program_code} - ${p.program_description}${p.major ? ` (${p.major})` : ""}`
                 }
-              >
-                <MenuItem value="">Select Access Level</MenuItem>
-                {accessLevels.map((access) => (
-                  <MenuItem key={access.access_id} value={access.access_id}>
-                    {access.access_description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                groupBy={(p) => {
+                  const dept = department.find((d) => String(d.dprtmnt_id) === String(p.dprtmnt_id));
+                  return dept ? `${dept.dprtmnt_name} (${dept.dprtmnt_code})` : "Unknown";
+                }}
+                onChange={(_, value) => {
+                  if (!value) return;
+                  const deptMeta = department.find((d) => String(d.dprtmnt_id) === String(value.dprtmnt_id));
+                  const alreadyAdded = scopes.some(
+                    (s) =>
+                      String(s.dprtmnt_id) === String(value.dprtmnt_id) &&
+                      String(s.program_id) === String(value.program_id)
+                  );
+                  if (!alreadyAdded) {
+                    setScopes((prev) => [
+                      ...prev,
+                      {
+                        dprtmnt_id: Number(value.dprtmnt_id),
+                        program_id: Number(value.program_id),
+                        dprtmnt_name: deptMeta?.dprtmnt_name || "",
+                        program_code: value.program_code || "",
+                        program_description: value.program_description || "",
+                      },
+                    ]);
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Search and select a program…"
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: (
+                        <>
+                          <SearchIcon sx={{ ml: 0.5, mr: 0.5, color: "gray", fontSize: 18 }} />
+                          {params.InputProps.startAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+                sx={{ mb: 1.5 }}
+                value={null}
+                blurOnSelect
+                clearOnBlur
+              />
 
-            {editData && (
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={form.status}
-                  label="Status"
-                  onChange={handleChange}
-                >
-                  <MenuItem value={1}>Active</MenuItem>
-                  <MenuItem value={0}>Inactive</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-          </Stack>
+              {/* (16) Scrollable scope list — selected chips + department checkboxes */}
+              <Box
+                sx={{
+                  border: "1px solid #e0e0e0",
+                  borderRadius: 2,
+                  p: 1.5,
+                  flex: 1,
+                  minHeight: { xs: 220, md: 0 },
+                  maxHeight: { xs: 280, md: "none" },
+                  overflowY: "auto",
+                }}
+              >
+                {/* Collapsible dept checkboxes */}
+                {department.map((dept) => {
+                  const progs = uniqueProgramsForDept(dept.dprtmnt_id);
+                  if (progs.length === 0) return null;
+
+                  const checkedCount = progs.filter((p) =>
+                    scopes.some(
+                      (s) =>
+                        String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
+                        String(s.program_id) === String(p.program_id)
+                    )
+                  ).length;
+                  const allChecked = checkedCount === progs.length && progs.length > 0;
+                  const isOpen = openDepts.has(dept.dprtmnt_id);
+
+                  return (
+                    <Box
+                      key={dept.dprtmnt_id}
+                      sx={{ border: "1px solid #e0e0e0", borderRadius: 2, mb: 1, overflow: "hidden" }}
+                    >
+                      {/* Dept header row */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          px: 1.5,
+                          py: 0.75,
+                          backgroundColor: "#f5f5f5",
+                          cursor: "pointer",
+                          userSelect: "none",
+                        }}
+                      >
+                        {/* Check-all checkbox — stop propagation so it doesn't toggle collapse */}
+                        <Checkbox
+                          size="small"
+                          checked={allChecked}
+                          indeterminate={checkedCount > 0 && !allChecked}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.checked) {
+                              const toAdd = progs
+                                .filter(
+                                  (p) =>
+                                    !scopes.some(
+                                      (s) =>
+                                        String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
+                                        String(s.program_id) === String(p.program_id)
+                                    )
+                                )
+                                .map((p) => ({
+                                  dprtmnt_id: Number(dept.dprtmnt_id),
+                                  program_id: Number(p.program_id),
+                                  dprtmnt_name: dept.dprtmnt_name,
+                                  program_code: p.program_code,
+                                  program_description: p.program_description,
+                                }));
+                              setScopes((prev) => [...prev, ...toAdd]);
+                            } else {
+                              setScopes((prev) =>
+                                prev.filter((s) => String(s.dprtmnt_id) !== String(dept.dprtmnt_id))
+                              );
+                            }
+                          }}
+                        />
+
+                        {/* Clickable area for collapse toggle */}
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}
+                          onClick={() =>
+                            setOpenDepts((prev) => {
+                              const next = new Set(prev);
+                              next.has(dept.dprtmnt_id) ? next.delete(dept.dprtmnt_id) : next.add(dept.dprtmnt_id);
+                              return next;
+                            })
+                          }
+                        >
+                          <Typography fontSize="13px" fontWeight={600} sx={{ flex: 1 }}>
+                            {dept.dprtmnt_name}
+                          </Typography>
+                          <Chip label={dept.dprtmnt_code} size="small" />
+                          {checkedCount > 0 && (
+                            <Chip label={`${checkedCount}/${progs.length}`} size="small" color="primary" />
+                          )}
+                          {isOpen ? (
+                            <ExpandLessIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                          ) : (
+                            <ExpandMoreIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                          )}
+                        </Box>
+                      </Box>
+
+                      {/* Program checkboxes — only shown when expanded */}
+                      {isOpen && (
+                        <Box sx={{ px: 2, py: 1, display: "grid", gap: 0.25 }}>
+                          {progs.map((p) => {
+                            const isChecked = scopes.some(
+                              (s) =>
+                                String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
+                                String(s.program_id) === String(p.program_id)
+                            );
+                            return (
+                              <FormControlLabel
+                                key={p.program_id}
+                                sx={{ m: 0 }}
+                                control={
+                                  <Checkbox
+                                    size="small"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setScopes((prev) => [
+                                          ...prev,
+                                          {
+                                            dprtmnt_id: Number(dept.dprtmnt_id),
+                                            program_id: Number(p.program_id),
+                                            dprtmnt_name: dept.dprtmnt_name,
+                                            program_code: p.program_code,
+                                            program_description: p.program_description,
+                                          },
+                                        ]);
+                                      } else {
+                                        setScopes((prev) =>
+                                          prev.filter(
+                                            (s) =>
+                                              !(
+                                                String(s.dprtmnt_id) === String(dept.dprtmnt_id) &&
+                                                String(s.program_id) === String(p.program_id)
+                                              )
+                                          )
+                                        );
+                                      }
+                                    }}
+                                  />
+                                }
+                                label={
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    <Typography fontSize="13px">{p.program_description}</Typography>
+                                    <Typography fontSize="11px" color="text.secondary">
+                                      {p.program_code}
+                                    </Typography>
+                                  </Box>
+                                }
+                              />
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+                {/* Selected scopes are shown below the college list. */}
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1.5 }}>
+                  {scopes.length === 0 ? (
+                    <Typography fontSize="13px" color="text.secondary">
+                      No scopes selected yet.
+                    </Typography>
+                  ) : (
+                    scopes.map((scope, index) => (
+                      <Chip
+                        key={`${scope.dprtmnt_id}-${scope.program_id}-${index}`}
+                        label={`${scope.dprtmnt_name || scope.dprtmnt_id}: ${scope.program_code || scope.program_id}`}
+                        onDelete={() => handleRemoveScope(index)}
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                      />
+                    ))
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          </Box>
         </DialogContent>
 
-        {/* ACTIONS — same layout as the Faculty Accounts modal:
-            Cancel on the left, Generate / Print / Save / Send on the right */}
+        {/* ACTIONS — (11) Cancel on the left, (14) Save / (15) Save and Send Email on the right */}
         <DialogActions
           sx={{
             px: 3,
@@ -2211,29 +2432,6 @@ const RegisterRegistrar = () => {
             }}
           >
             <Button
-              variant="outlined"
-              size="small"
-              startIcon={<LockResetIcon />}
-              onClick={handleGeneratePassword}
-              sx={{ fontWeight: 600 }}
-            >
-              Generate
-            </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<PrintIcon />}
-              disabled={!form.password}
-              onClick={() =>
-                printRegistrarSlip(form, form.password, form.email)
-              }
-              sx={{ fontWeight: 600 }}
-            >
-              Print
-            </Button>
-
-            <Button
               variant="contained"
               size="small"
               startIcon={<SaveIcon />}
@@ -2258,7 +2456,7 @@ const RegisterRegistrar = () => {
                 px: 2.5,
               }}
             >
-              Send Email
+              Save & Send Email
             </Button>
           </Box>
         </DialogActions>
@@ -2285,7 +2483,7 @@ const RegisterRegistrar = () => {
             py: 2,
           }}
         >
-          Delete Registrar
+          Delete Administrator Account
         </DialogTitle>
 
         <DialogContent sx={{ p: 3, mt: 2 }}>
@@ -2343,4 +2541,4 @@ const RegisterRegistrar = () => {
   );
 };
 
-export default RegisterRegistrar;
+export default RegisterAdministrators;

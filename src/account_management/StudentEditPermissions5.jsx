@@ -119,7 +119,7 @@ const StudentEditPermissions5 = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
       "x-audit-change-section": "Other Information",
     });
 
@@ -137,7 +137,7 @@ const StudentEditPermissions5 = () => {
     const employeeId = localStorage.getItem("employee_id");
     if (!role || !employeeId) { window.location.href = "/login"; return; }
     setUserRole(role);
-    const allowed = ["registrar", "superadmin"];
+    const allowed = ["administrator", "superadmin", "technical"];
     if (!allowed.includes(role)) { window.location.href = "/login"; return; }
     checkAccess(employeeId);
     fetchPermissions();
@@ -145,7 +145,7 @@ const StudentEditPermissions5 = () => {
 
   const checkAccess = async (employeeId) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeId}/${pageId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeId}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setHasAccess(res.data?.page_privilege === 1);
     } catch {
       setHasAccess(false);
@@ -156,7 +156,7 @@ const StudentEditPermissions5 = () => {
   const fetchPermissions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/student_edit_permissions`);
+      const res = await axios.get(`${API_BASE_URL}/api/student_edit_permissions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data && typeof res.data === "object") {
         const pageFieldIds = new Set(
           SECTIONS.flatMap((sec) =>

@@ -65,7 +65,7 @@ const MigrationDataPanel = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
 
     /* ── settings ── */
@@ -90,14 +90,14 @@ const MigrationDataPanel = () => {
         const empID = localStorage.getItem("employee_id");
         if (email && role && id) {
             setUserRole(role); setUserID(id); setEmployeeID(empID);
-            if (role === "registrar") checkAccess(empID);
+            if (["administrator", "superadmin", "technical"].includes(role)) checkAccess(empID);
             else window.location.href = "/login";
         } else window.location.href = "/login";
     }, []);
 
     const checkAccess = async (empID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setHasAccess(res.data?.page_privilege === 1);
         } catch { setHasAccess(false); }
     };
@@ -106,7 +106,7 @@ const MigrationDataPanel = () => {
     const displayValue = (v) => (v === null || v === undefined || v === "" ? "—" : v);
 
     const getBase64FromUrl = async (url) => {
-        const blob = await (await fetch(url)).blob();
+        const blob = await (await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })).blob();
         return new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
     };
 
@@ -128,13 +128,20 @@ const MigrationDataPanel = () => {
             fd.append("file", selectedFile);
             fd.append("campus", campusFilter);
             const res = await axios.post(`${API_BASE_URL}/api/import-xlsx`, fd, {
-                headers: {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                     "Content-Type": "multipart/form-data",
                     ...getAuditHeaders(),
                 }
             });
             if (res.data.success) {
-                setSnack1({ open: true, message: res.data.message || "Grades imported successfully!", severity: "success" });
+                const qrNote = res.data.qrGenerated
+                    ? " QR code generated."
+                    : " (QR code generation skipped or failed — check server logs.)";
+                setSnack1({
+                    open: true,
+                    message: (res.data.message || "Grades imported successfully!") + qrNote,
+                    severity: "success",
+                });
                 setSelectedFile(null);
             } else {
                 setSnack1({ open: true, message: res.data.error || "Failed to import", severity: "error" });
@@ -159,7 +166,7 @@ const MigrationDataPanel = () => {
         formData.append("file", excelFile);
         try {
             const res = await axios.post(`${API_BASE_URL}/api/person/import`, formData, {
-                headers: {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                     "Content-Type": "multipart/form-data",
                     ...getAuditHeaders(),
                 }
@@ -187,7 +194,7 @@ const MigrationDataPanel = () => {
 
     /* ── export excel ── */
     const exportExcel = async () => {
-        const { data: students } = await axios.get(`${API_BASE_URL}/api/get_students_grouped`);
+        const { data: students } = await axios.get(`${API_BASE_URL}/api/get_students_grouped`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const wb = new ExcelJS.Workbook();
         const grouped = students.reduce((acc, s) => { (acc[s.program_code] ||= []).push(s); return acc; }, {});
         for (const program in grouped) {
@@ -208,7 +215,7 @@ const MigrationDataPanel = () => {
     /* ── export pdf ── */
     const exportPDF = async () => {
         try {
-            const { data: students } = await axios.get(`${API_BASE_URL}/api/get_students_grouped`);
+            const { data: students } = await axios.get(`${API_BASE_URL}/api/get_students_grouped`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (!students.length) return alert("No students found");
             const doc = new jsPDF("landscape", "mm", "a4");
             const grouped = students.reduce((acc, s) => { (acc[s.program_code] ||= []).push(s); return acc; }, {});

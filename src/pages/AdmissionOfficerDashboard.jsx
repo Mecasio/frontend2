@@ -104,7 +104,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       setUserRole(role);
       setUserID(id);
       setEmployeeID(empID);
-      if (role === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(role)) {
         checkAccess(empID);
         fetchUserAccessList(empID);
       } else {
@@ -119,7 +119,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -132,7 +132,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const fetchUserAccessList = async (empID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}`,
+        `${API_BASE_URL}/api/page_access/${empID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const accessMap = data.reduce((acc, item) => {
         acc[item.page_id] = item.page_privilege === 1;
@@ -189,7 +189,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // ── Reference data loads ────────────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/applied_program`)
+      .get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const deduped = dedupeByProgramCode(res.data);
         setAllCurriculums(deduped);
@@ -199,22 +199,22 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/departments`)
+      .get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setDepartment(res.data))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -224,14 +224,14 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/professors`)
+      .get(`${API_BASE_URL}/api/professors`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) =>
         setProfessorCount(Array.isArray(res.data) ? res.data.length : 0),
       )
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/registrar_count`)
+      .get(`${API_BASE_URL}/api/registrar_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setRegistrarCount(res.data.count || 0))
       .catch(console.error);
   }, []);
@@ -239,7 +239,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // ── Fetch all applicants once ───────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/all-applicants`)
+      .get(`${API_BASE_URL}/api/all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setAllApplicants(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Failed to fetch applicants:", err));
   }, []);
@@ -250,7 +250,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     const role = localStorage.getItem("role");
     if (person_id && role) {
       axios
-        .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`)
+        .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setPersonData(res.data))
         .catch(console.error);
     }
@@ -258,7 +258,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
 
   useEffect(() => {
     const handleProfileImageUpdated = (event) => {
-      if (event.detail?.role !== "registrar") return;
+      if (!["administrator", "superadmin", "technical"].includes(event.detail?.role)) return;
       if (event.detail.profileImage) {
         setProfileImage(event.detail.profileImage);
       }
@@ -281,7 +281,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // ── Holidays ────────────────────────────────────────────────────
   useEffect(() => {
     axios
-      .get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`)
+      .get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const lookup = {};
         res.data.forEach((h) => {
@@ -430,12 +430,12 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
 
     axios
-      .get(`${API_BASE_URL}/api/enrolled-count`, { params })
+      .get(`${API_BASE_URL}/api/enrolled-count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params })
       .then((res) => setEnrolledCount(res.data.total))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/accepted-students-count`, { params })
+      .get(`${API_BASE_URL}/api/accepted-students-count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params })
       .then((res) => setAcceptedCount(res.data.total))
       .catch(console.error);
   }, [selectedCampus]);
@@ -447,7 +447,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     if (resolvedSemester) params.semester = resolvedSemester;
 
     axios
-      .get(`${API_BASE_URL}/api/ecat-summary`, { params })
+      .get(`${API_BASE_URL}/api/ecat-summary`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params })
       .then((res) => {
         const s = res.data || {};
         setPieData([
@@ -477,7 +477,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       const role = localStorage.getItem("role");
       const accountRes = await axios.get(
-        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`,
+        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const user_account_id = accountRes.data.user_account_id;
       const formData = new FormData();
@@ -485,10 +485,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       await axios.post(
         `${API_BASE_URL}/api/update_registrar/${user_account_id}`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } },
       );
       const refreshed = await axios.get(
-        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`,
+        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPersonData(refreshed.data);
       setProfileImage(

@@ -84,7 +84,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const [selectedPerson, setSelectedPerson] = useState(null);
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/requirements`)
+      .get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const allRequirements = res.data;
 
@@ -127,7 +127,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/person_with_applicant/${personID}`,
+        `${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPerson(res.data);
       setSelectedPerson(res.data);
@@ -173,7 +173,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -261,7 +261,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -277,7 +277,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -290,7 +290,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -329,7 +329,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
       setUserRole(storedRole);
       setUserID(storedID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         if (storedID !== "undefined") {
         } else {
           console.warn("Stored person_id is invalid:", storedID);
@@ -431,7 +431,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
     if (!applicant_number) return;
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/uploads/by-applicant/${applicant_number}`,
+        `${API_BASE_URL}/api/uploads/by-applicant/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setUploads(res.data);
     } catch (err) {
@@ -447,7 +447,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
     }
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/person_with_applicant/${personID}`,
+        `${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const safePerson = {
         ...res.data,
@@ -466,7 +466,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const fetchDocumentStatus = async (applicant_number) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/document_status/${applicant_number}`,
+        `${API_BASE_URL}/api/document_status/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setDocumentStatus(response.data.document_status);
       setPerson((prev) => ({
@@ -556,7 +556,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
 
   const fetchPersons = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+      const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPersons(res.data);
     } catch (err) {
       console.error("Error fetching persons:", err);
@@ -702,7 +702,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
       formData.append("remarks", selectedFiles.remarks || "");
 
       await axios.post(`${API_BASE_URL}/api/upload`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           "x-person-id": localStorage.getItem("person_id"), // ✅ now inside headers
           ...getAuditConfig().headers,
@@ -770,7 +770,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
       const response = await axios.post(
         `${API_BASE_URL}/api/upload-profile-picture`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } }
       );
 
       const fileName = response.data.filename || response.data.profile_img;
@@ -830,7 +830,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
 
     try {
       await axios.delete(`${API_BASE_URL}/api/admin/uploads/${uploadId}`, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "x-person-id": localStorage.getItem("person_id"),
           ...getAuditConfig().headers,
         },
@@ -1322,8 +1322,9 @@ const ApplicantOnlineRequirementsAdmin = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1358,8 +1359,9 @@ const ApplicantOnlineRequirementsAdmin = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1388,8 +1390,9 @@ const ApplicantOnlineRequirementsAdmin = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1419,7 +1422,9 @@ const ApplicantOnlineRequirementsAdmin = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1465,9 +1470,10 @@ const ApplicantOnlineRequirementsAdmin = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "120px",
-
-                  mr: 4.8,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Applying As:
@@ -1508,8 +1514,10 @@ const ApplicantOnlineRequirementsAdmin = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "140px",
-                  mr: 2.3,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Document Status:
@@ -1564,7 +1572,9 @@ const ApplicantOnlineRequirementsAdmin = () => {
                   sx={{
                     fontSize: "14px",
                     fontFamily: "Poppins, sans-serif",
-                    width: "90px",
+                    width: 150,
+                    minWidth: 150,
+                    flexShrink: 0,
                   }}
                 >
                   Document Type:
@@ -1614,15 +1624,13 @@ const ApplicantOnlineRequirementsAdmin = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  marginLeft: "-25px",
                 }}
               >
                 <Typography
                   sx={{
                     fontSize: "14px",
                     fontFamily: "Poppins, sans-serif",
-                    width: "100px",
-                    textAlign: "center",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Document File:

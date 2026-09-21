@@ -169,7 +169,7 @@ const ExamAttendanceScanner = () => {
     setUserRole(storedRole);
     setEmployeeID(storedEmployeeID);
 
-    const allowedRoles = ["registrar", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -181,7 +181,7 @@ const ExamAttendanceScanner = () => {
   const checkAccess = async (empID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${PAGE_ID}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${PAGE_ID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -201,7 +201,7 @@ const ExamAttendanceScanner = () => {
   useEffect(() => {
     const fetchPersons = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setPersons(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Error fetching applicants for manual search:", err);
@@ -253,7 +253,7 @@ const ExamAttendanceScanner = () => {
         token,
         scanned_by: employeeID,
         scanned_by_role: userRole,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setScanStatus({ type: "success", message: res.data.message });
 
       if (person?.applicant_number) {
@@ -272,7 +272,7 @@ const ExamAttendanceScanner = () => {
   const fetchAllForApplicant = async (applicant_number, personIdFromSearch) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/person/${personIdFromSearch}`,
+        `${API_BASE_URL}/api/person/${personIdFromSearch}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       let personData = res.data;
       personData.applicant_number = applicant_number;
@@ -280,7 +280,7 @@ const ExamAttendanceScanner = () => {
 
       try {
         const verifyRes = await axios.get(
-          `${API_BASE_URL}/api/document-verification/${applicant_number}`,
+          `${API_BASE_URL}/api/document-verification/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setIsVerified(Boolean(verifyRes.data?.verified));
         setVerifiedAt(
@@ -292,7 +292,7 @@ const ExamAttendanceScanner = () => {
 
       try {
         const schedRes = await axios.get(
-          `${API_BASE_URL}/api/applicant-schedule/${applicant_number}`,
+          `${API_BASE_URL}/api/applicant-schedule/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setExamSchedule(schedRes.data);
       } catch (schedErr) {
@@ -302,7 +302,7 @@ const ExamAttendanceScanner = () => {
 
       try {
         const attRes = await axios.get(
-          `${API_BASE_URL}/api/exam-attendance/token/${applicant_number}`,
+          `${API_BASE_URL}/api/exam-attendance/token/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setAttendanceToken(attRes.data?.qr_token || null);
         setAttendanceStatus(attRes.data?.status || null);
@@ -315,7 +315,7 @@ const ExamAttendanceScanner = () => {
       }
 
       try {
-        const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(progRes.data);
       } catch (progErr) {
         console.error("Error fetching programs:", progErr);
@@ -323,7 +323,7 @@ const ExamAttendanceScanner = () => {
 
       try {
         const registrarRes = await axios.get(
-          `${API_BASE_URL}/api/scheduled-by/registrar`,
+          `${API_BASE_URL}/api/scheduled-by/registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (registrarRes.data?.fullName)
           setScheduledBy(registrarRes.data.fullName);

@@ -5,6 +5,7 @@ import {
     Paper,
     Typography,
     FormControl,
+    InputLabel,
     Select,
     MenuItem,
     TextField,
@@ -27,6 +28,7 @@ import {
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import HistoryToggleOffIcon from '@mui/icons-material/HistoryToggleOff';
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -44,6 +46,7 @@ import {
     Cell,
 } from "recharts";
 import { TableVirtuoso } from "react-virtuoso";
+import StudentBalanceList from "./StudentBalanceList";
 
 const RECEIPT_STATUS = {
     PAID_NOT_PRINTED: "PAID_NOT_PRINTED",
@@ -186,7 +189,11 @@ const MatriculationPaymentModule = () => {
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [data, setData] = useState([]);
-    const [keepVisiblePaidMatriculationId, setKeepVisiblePaidMatriculationId] = useState(null);
+    const [academicTerms, setAcademicTerms] = useState([]);
+    const [selectedYearId, setSelectedYearId] = useState("");
+    const [selectedSemesterId, setSelectedSemesterId] = useState("");
+    const [selectedTermId, setSelectedTermId] = useState("");
+    const [studentSearch, setStudentSearch] = useState("");
     const [cashierAccountTypeId, setCashierAccountTypeId] = useState(null);
     const pageSize = 100; // Number of rows per page
     const getScopedRowTotal = (row) =>
@@ -261,13 +268,49 @@ const MatriculationPaymentModule = () => {
         }, new Map()).values()
     ).sort((a, b) => Number(a.id) - Number(b.id));
 
-    const visibleData = data.filter((row) => {
+    const academicFilteredData = selectedTermId
+        ? data.filter((row) => String(row?.active_school_year_id) === String(selectedTermId))
+        : data;
+
+    const normalizedStudentSearch = studentSearch.trim().toLowerCase();
+    const searchedData = normalizedStudentSearch
+        ? academicFilteredData.filter((row) => {
+            const searchable = [
+                row?.student_number,
+                row?.last_name,
+                row?.given_name,
+                row?.middle_initial,
+                row?.program_description,
+                row?.degree_program,
+            ].filter(Boolean).join(" ").toLowerCase();
+            return searchable.includes(normalizedStudentSearch);
+        })
+        : academicFilteredData;
+
+    const visibleData = searchedData.filter((row) => {
         const scopedBalance = getScopedRowTotal(row);
-        const keepVisible = String(row?.id) === String(keepVisiblePaidMatriculationId);
-        return scopedBalance > 0 || keepVisible;
+        const existingPayment = toAmount(row?.payment_total ?? row?.payment ?? 0);
+
+        // This screen is for students who have not made any payment yet.
+        // A student is hidden after the first payment, even if another fee
+        // remains unpaid.
+        return existingPayment <= 0 && scopedBalance > 0;
     });
 
     const totalPages = Math.max(1, Math.ceil(visibleData.length / pageSize));
+
+    const yearOptions = useMemo(() => (
+        [...new Map(academicTerms.map((term) => [String(term.year_id), term])).values()]
+            .sort((a, b) => Number(a.year_description) - Number(b.year_description))
+    ), [academicTerms]);
+
+    const semesterOptions = useMemo(() => (
+        [...new Map(
+            academicTerms
+                .filter((term) => String(term.year_id) === String(selectedYearId))
+                .map((term) => [String(term.semester_id), term]),
+        ).values()].sort((a, b) => Number(a.semester_id) - Number(b.semester_id))
+    ), [academicTerms, selectedYearId]);
 
     // Dialog states
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -279,6 +322,7 @@ const MatriculationPaymentModule = () => {
     const [receiptData, setReceiptData] = useState(null);
     const [closeWithoutPrintConfirmOpen, setCloseWithoutPrintConfirmOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [balanceListOpen, setBalanceListOpen] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [transactionData, setTransactionData] = useState([]);
     const [historyRenderLimit, setHistoryRenderLimit] = useState(HISTORY_INITIAL_BATCH);
@@ -302,7 +346,7 @@ const MatriculationPaymentModule = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -316,13 +360,42 @@ const MatriculationPaymentModule = () => {
     }, [settings]);
 
     useEffect(() => {
+        axios
+            .get(`${API_BASE_URL}/api/student-balance-terms`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+            })
+            .then(({ data: terms }) => {
+                const nextTerms = Array.isArray(terms) ? terms : [];
+                setAcademicTerms(nextTerms);
+                const activeTerm = nextTerms.find((term) => Number(term.astatus) === 1) || nextTerms[0];
+                if (activeTerm) {
+                    setSelectedYearId(String(activeTerm.year_id));
+                    setSelectedSemesterId(String(activeTerm.semester_id));
+                    setSelectedTermId(String(activeTerm.id || activeTerm.school_year_id));
+                }
+            })
+            .catch((error) => console.error("Failed to load academic terms:", error));
+    }, []);
+
+    useEffect(() => {
+        if (!selectedYearId || !selectedSemesterId) return;
+        const selectedTerm = academicTerms.find(
+            (term) =>
+                String(term.year_id) === String(selectedYearId) &&
+                String(term.semester_id) === String(selectedSemesterId),
+        );
+        setSelectedTermId(String(selectedTerm?.id || selectedTerm?.school_year_id || ""));
+        setCurrentPage(1);
+    }, [academicTerms, selectedYearId, selectedSemesterId]);
+
+    useEffect(() => {
         const storedUser = localStorage.getItem("email");
         const storedRole = localStorage.getItem("role");
         const storedID = localStorage.getItem("person_id");
         const storedEmployeeID = localStorage.getItem("employee_id");
 
         if (storedUser && storedRole && storedID) {
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -336,7 +409,7 @@ const MatriculationPaymentModule = () => {
         setLoading(true);
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -364,7 +437,7 @@ const MatriculationPaymentModule = () => {
 
         if (person_id && role) {
             axios
-                .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`)
+                .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => setPersonData(res.data))
                 .catch((err) => console.error("Failed to fetch person data:", err));
         }
@@ -378,13 +451,13 @@ const MatriculationPaymentModule = () => {
 
             try {
                 const activeSchoolYearRes = await axios.get(
-                    `${API_BASE_URL}/api/active_school_year`
+                    `${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
                 const activeSchoolYear = activeSchoolYearRes.data?.[0];
                 if (!activeSchoolYear?.school_year_id) return;
 
                 const counterRes = await axios.get(
-                    `${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYear.school_year_id}`
+                    `${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYear.school_year_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
                 const assignment = (counterRes.data || []).find(
                     (row) => String(row.employee_id) === String(employeeId)
@@ -401,7 +474,7 @@ const MatriculationPaymentModule = () => {
 
     const fetchStudentData = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_student_data_matriculation`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_student_data_matriculation`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setData(res.data);
         } catch {
             showSnackbar("Failed to fetch matriculation data.", "error");
@@ -435,7 +508,6 @@ const MatriculationPaymentModule = () => {
                 payment_status: paymentSummary.paymentStatus,
                 employee_id: employeeId,
             }, auditConfig);
-            setKeepVisiblePaidMatriculationId(row?.id ?? null);
             await fetchStudentData();
             setReceiptData({
                 transaction_no: saveRes?.data?.transaction_no || saveRes?.data?.transaction_id || "",
@@ -521,7 +593,7 @@ const MatriculationPaymentModule = () => {
         setHistoryOpen(true);
         setHistoryLoading(true);
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/payment_matriculation/transactions`);
+            const res = await axios.get(`${API_BASE_URL}/api/payment_matriculation/transactions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const rows = res.data || [];
             setTransactionData(rows);
             setHistoryRenderLimit(Math.min(HISTORY_INITIAL_BATCH, rows.length || HISTORY_INITIAL_BATCH));
@@ -718,7 +790,6 @@ const MatriculationPaymentModule = () => {
         setViewReceiptPromptOpen(false);
         await markCancelledPrintIfUnprinted();
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -737,7 +808,6 @@ const MatriculationPaymentModule = () => {
         await markCancelledPrintIfUnprinted();
         setReceiptOpen(false);
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -746,7 +816,6 @@ const MatriculationPaymentModule = () => {
         await markCancelledPrintIfUnprinted();
         setReceiptOpen(false);
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -930,7 +999,56 @@ const MatriculationPaymentModule = () => {
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
-            <Box fullWidth sx={{ p: '10px 0px', display: "flex", justifyContent: "flex-end" }}>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", mb: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>School Year</InputLabel>
+                    <Select
+                        value={selectedYearId}
+                        label="School Year"
+                        onChange={(event) => {
+                            const nextYearId = event.target.value;
+                            const firstSemester = academicTerms.find(
+                                (term) => String(term.year_id) === String(nextYearId),
+                            );
+                            setSelectedYearId(nextYearId);
+                            setSelectedSemesterId(String(firstSemester?.semester_id || ""));
+                        }}
+                    >
+                        {yearOptions.map((term) => (
+                            <MenuItem key={term.year_id} value={String(term.year_id)}>
+                                {term.year_description} - {term.next_year || Number(term.year_description || 0) + 1}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Semester</InputLabel>
+                    <Select
+                        value={selectedSemesterId}
+                        label="Semester"
+                        onChange={(event) => setSelectedSemesterId(event.target.value)}
+                    >
+                        {semesterOptions.map((term) => (
+                            <MenuItem key={term.semester_id} value={String(term.semester_id)}>
+                                {term.semester_description}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <TextField
+                    size="small"
+                    label="Search student"
+                    value={studentSearch}
+                    onChange={(event) => {
+                        setStudentSearch(event.target.value);
+                        setCurrentPage(1);
+                    }}
+                    placeholder="Name or student number"
+                    sx={{ minWidth: 240 }}
+                />
+            </Box>
+
+            <Box fullWidth sx={{ p: '10px 0px', display: "flex", justifyContent: "flex-end", gap: 1 }}>
                 <Button
                     startIcon={<HistoryToggleOffIcon />}
                     sx={{
@@ -941,6 +1059,18 @@ const MatriculationPaymentModule = () => {
                     onClick={openTransactionHistory}
                 >
                     Transaction History
+                </Button>
+                <Button
+                    startIcon={<AccountBalanceWalletOutlinedIcon />}
+                    sx={{
+                        backgroundColor: colors.header || "maroon",
+                        color: "white",
+                        width: "180px",
+                        "&:hover": { backgroundColor: colors.header || "#5b0000" },
+                    }}
+                    onClick={() => setBalanceListOpen(true)}
+                >
+                    View Balances
                 </Button>
             </Box>
 
@@ -2032,6 +2162,45 @@ const MatriculationPaymentModule = () => {
                         Yes, Close
                     </Button>
                 </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={balanceListOpen}
+                onClose={() => setBalanceListOpen(false)}
+                fullWidth
+                maxWidth="xl"
+                PaperProps={{
+                    sx: {
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        minWidth: { xs: "96vw", md: 1200 },
+                        maxHeight: "94vh",
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        backgroundColor: colors.header || "#6D2323",
+                        color: "white",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontWeight: "bold",
+                        px: 3,
+                        py: 1.5,
+                    }}
+                >
+                    <Typography color="white" fontWeight="bold">
+                        Student Balances
+                    </Typography>
+                    <IconButton onClick={() => setBalanceListOpen(false)} sx={{ color: "white" }}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ p: 0 }}>
+                    <StudentBalanceList />
+                </DialogContent>
             </Dialog>
 
             <Snackbar

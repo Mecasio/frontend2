@@ -64,7 +64,7 @@ const EvaluatorScheduleTile = () => {
     const storedEmployeeID = localStorage.getItem("employee_id");
 
     if (storedUser && storedRole && storedID) {
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -77,7 +77,7 @@ const EvaluatorScheduleTile = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -104,13 +104,13 @@ const EvaluatorScheduleTile = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const yearsRes = await axios.get(`${API_BASE_URL}/api/get_school_year/`);
+        const yearsRes = await axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setSchoolYears(yearsRes.data);
 
-        const semRes = await axios.get(`${API_BASE_URL}/api/get_school_semester/`);
+        const semRes = await axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setSchoolSemester(semRes.data);
 
-        const activeRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+        const activeRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (activeRes.data.length > 0) {
           setSelectedSchoolYear(activeRes.data[0].year_id);
           setSelectedSchoolSemester(activeRes.data[0].semester_id);
@@ -136,7 +136,7 @@ const EvaluatorScheduleTile = () => {
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/verify_schedules_with_count/${selectedSchoolYear}/${selectedSchoolSemester}`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: selectedBranch ? { branch: selectedBranch } : {},
           },
         );

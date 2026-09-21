@@ -143,7 +143,7 @@ const ApplicantServicesSurvey = forwardRef((props, ref) => {
 
     const fetchPersonData = async (id) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+            const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setPerson(res.data);
         } catch (error) {
             console.error("Failed to fetch person:", error);
@@ -165,7 +165,7 @@ const ApplicantServicesSurvey = forwardRef((props, ref) => {
             setUserRole(storedRole);
             setUserID(storedID);
 
-            if (storedRole === "applicant" || storedRole === "registrar") {
+      if (storedRole === "applicant" || storedRole === "administrator") {
                 fetchPersonData(storedID);
             } else {
                 window.location.href = "/login";

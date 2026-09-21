@@ -135,7 +135,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/honors/gwa_printing_status`)
+      .get(`${API_BASE_URL}/api/honors/gwa_printing_status`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) =>
         setGwaPrintStatus({
           overall: Boolean(res.data?.overall),
@@ -181,12 +181,12 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/student/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/student/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
 
       try {
         const honorRes = await axios.get(
-          `${API_BASE_URL}/api/student/latin-honor-standing/${id}`,
+          `${API_BASE_URL}/api/student/latin-honor-standing/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         setHonorStanding({
@@ -223,7 +223,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   const fetchTotalCourse = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/course_count/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/course_count/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log("course count:", res.data);
       setCourseCount(res.data || { initial_course: 0 });
     } catch (error) {
@@ -233,7 +233,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   const fetchStudentDetails = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/student_details/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/student_details/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setStudent(res.data);
     } catch (error) {
       console.error(error);
@@ -243,7 +243,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const fetchActiveEnrollmentStatus = async (id) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_active_enrollment_status/${id}`,
+        `${API_BASE_URL}/api/student_active_enrollment_status/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setIsOfficiallyEnrolled(Number(res.data?.enrolled_status) === 1);
     } catch (error) {
@@ -256,7 +256,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     try {
       const res = await axios.get(
         `${API_BASE_URL}/api/student-assessment/${id}`,
-        { params: { enrolled_status: 1 } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { enrolled_status: 1 } },
       );
       const rows = Array.isArray(res.data?.rows) ? res.data.rows : [];
       setIsOfficiallyEnrolledForBalance(rows.length > 0);
@@ -272,7 +272,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setActiveSY(res.data[0] || {}))
       .catch((err) => console.error(err));
   }, []);
@@ -376,7 +376,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         ],
         file_name: `${studentNumberForExport}_Certificate_Of_Registration`,
         frontend_origin: window.location.origin,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const jobId = startRes.data?.job_id;
       if (!jobId) throw new Error("Server did not return an export job id.");
@@ -387,7 +387,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`,
+          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         job = statusRes.data;
 
@@ -402,7 +402,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       // 3) Download the finished PDF
       const downloadRes = await axios.get(
         `${API_BASE_URL}/api/cor-export/jobs/${jobId}/download`,
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       downloadBlob(
@@ -512,7 +512,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const fetchTermGwa = async (id) => {
     setTermGwaLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/student_grade/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/student_grade/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const rows = Array.isArray(res.data) ? res.data : [];
       const latestMigratedTermKey = getLatestMigratedTermKey(rows);
 
@@ -574,7 +574,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     const fetchHolidays = async () => {
       try {
         const res = await axios.get(
-          `https://date.nager.at/api/v3/PublicHolidays/${year}/PH`,
+          `https://date.nager.at/api/v3/PublicHolidays/${year}/PH`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const lookup = {};
         res.data.forEach((h) => {
@@ -599,7 +599,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         const email = localStorage.getItem("email");
 
         const res = await axios.get(
-          `${API_BASE_URL}/api/announcements/user/${email}`,
+          `${API_BASE_URL}/api/announcements/user/${email}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         setAnnouncements(res.data.announcements || []);
@@ -662,10 +662,10 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       formData.append("profile_picture", file);
       formData.append("person_id", person_id);
 
-      await axios.post(`${API_BASE_URL}/api/update_student`, formData);
+      await axios.post(`${API_BASE_URL}/api/update_student`, formData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const updated = await axios.get(
-        `${API_BASE_URL}/api/person_data/${person_id}/${role}`,
+        `${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       setPerson((prev) => ({

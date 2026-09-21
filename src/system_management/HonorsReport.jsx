@@ -237,7 +237,7 @@ export default function HonorsReport() {
     const storedRole = localStorage.getItem("role");
     const storedEmployeeID = localStorage.getItem("employee_id");
     if (storedRole && storedEmployeeID) {
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -250,7 +250,7 @@ export default function HonorsReport() {
   const checkAccess = async (employeeID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(res.data?.page_privilege === 1);
     } catch {
@@ -262,21 +262,21 @@ export default function HonorsReport() {
   useEffect(() => {
     if (!hasAccess) return;
     axios
-      .get(`${API_BASE_URL}/api/honors/school_years`)
+      .get(`${API_BASE_URL}/api/honors/school_years`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((r) => setSchoolYears(r.data))
       .catch(console.error);
     // Semesters from DB (semester_table) — no more hardcoded S1/S2/S3
     axios
-      .get(`${API_BASE_URL}/api/honors/semesters`)
+      .get(`${API_BASE_URL}/api/honors/semesters`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((r) => setSemesters(r.data))
       .catch(console.error);
     // Colleges from DB (dprtmnt_table) — powers the College filter
     axios
-      .get(`${API_BASE_URL}/api/honors/departments`)
+      .get(`${API_BASE_URL}/api/honors/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((r) => setDepartments(r.data))
       .catch(console.error);
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((r) => {
         const activeTerm = Array.isArray(r.data) ? r.data[0] : r.data;
         if (activeTerm) {
@@ -292,7 +292,7 @@ export default function HonorsReport() {
   useEffect(() => {
     if (!hasAccess) return;
     axios
-      .get(`${API_BASE_URL}/api/honors/programs`, {
+      .get(`${API_BASE_URL}/api/honors/programs`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           campus_id: campusId || undefined,
         },
@@ -329,7 +329,7 @@ export default function HonorsReport() {
     async (signal) => {
       setListLoading(true);
       try {
-        const res = await axios.get(`${API_BASE_URL}${endpoint}`, {
+        const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: {
             page: currentPage,
             limit: rowsPerPage, // top 100 per page — keeps the initial load fast
@@ -347,7 +347,7 @@ export default function HonorsReport() {
         setTotal(res.data.total);
         setTotalPages(res.data.totalPages);
       } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        if (axios.isCancel(err, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }) || err.name === "CanceledError") return;
         console.error(err);
       } finally {
         if (!signal?.aborted) setListLoading(false);

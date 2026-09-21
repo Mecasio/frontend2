@@ -243,7 +243,7 @@ const MedicalPersonalInformation = () => {
   useEffect(() => {
     const fetchYearLevels = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+        const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setYearLevelOptions(res.data);
       } catch (err) {
         console.error("Error fetching year levels:", err);
@@ -303,7 +303,7 @@ const MedicalPersonalInformation = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -316,7 +316,7 @@ const MedicalPersonalInformation = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -354,7 +354,7 @@ const MedicalPersonalInformation = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -568,7 +568,7 @@ const MedicalPersonalInformation = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/enrollment/person/${targetId}`, cleanedData);
+      await axios.put(`${API_BASE_URL}/api/enrollment/person/${targetId}`, cleanedData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
 
       console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
@@ -755,7 +755,7 @@ const MedicalPersonalInformation = () => {
         `${API_BASE_URL}/api/upload-profile-picture`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
         },
       );
 
@@ -953,7 +953,7 @@ const MedicalPersonalInformation = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(restrictToRegistrarCurriculum(response.data)); // array of { curriculum_id: "..." }
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -987,7 +987,7 @@ const MedicalPersonalInformation = () => {
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/search-person-student`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: { query: searchQuery },
           },
         );
@@ -1067,7 +1067,7 @@ const MedicalPersonalInformation = () => {
     const fetchPersons = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/student_upload_documents_data`,
+          `${API_BASE_URL}/api/student_upload_documents_data`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setPersons(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
@@ -1113,7 +1113,7 @@ const MedicalPersonalInformation = () => {
     const fetchStudent = async () => {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`,
+          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const data = await res.json();
 
@@ -1126,7 +1126,7 @@ const MedicalPersonalInformation = () => {
           }
 
           const detailsRes = await fetch(
-            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`,
+            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           const detailsData = await detailsRes.json();
           if (Array.isArray(detailsData) && detailsData.length > 0) {
@@ -1162,7 +1162,7 @@ const MedicalPersonalInformation = () => {
 
     // fetch info of that person
     axios
-      .get(`${API_BASE_URL}api/person_with_applicant/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}api/person_with_applicant/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.student_number) {
           // AUTO-INSERT applicant_number into search bar
@@ -1338,9 +1338,9 @@ const MedicalPersonalInformation = () => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+          audit_actor_role: userRole || "administrator",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -1391,7 +1391,7 @@ const MedicalPersonalInformation = () => {
 
   useEffect(() => {
     if (!userID) return;
-    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`).then((res) => {
+    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }).then((res) => {
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
       setCanPrintPermit(verified);
     });

@@ -104,7 +104,7 @@ const ApplicantProfile = () => {
   useEffect(() => {
     const fetchApplicants = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setApplicants(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Error fetching applicants for search:", err);
@@ -127,7 +127,7 @@ const ApplicantProfile = () => {
   const fetchSubmittedDocuments = async (pid) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/applicant-documents/${pid}`,
+        `${API_BASE_URL}/api/applicant-documents/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       if (Array.isArray(res.data)) {
@@ -227,7 +227,7 @@ const ApplicantProfile = () => {
     try {
       // 1️⃣ Get person_id
       const res = await axios.get(
-        `${API_BASE_URL}/api/person-by-applicant/${query}`,
+        `${API_BASE_URL}/api/person-by-applicant/${query}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       if (!res.data?.person_id) {
@@ -240,7 +240,7 @@ const ApplicantProfile = () => {
 
       // 2️⃣ Check document verification
       const verifiedRes = await axios.get(
-        `${API_BASE_URL}/api/document_status/check/${query}`,
+        `${API_BASE_URL}/api/document_status/check/${query}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       if (!verifiedRes.data.verified) {
@@ -258,7 +258,7 @@ const ApplicantProfile = () => {
 
       try {
         const scoreRes = await axios.get(
-          `${API_BASE_URL}/api/applicant-scores/${query}`,
+          `${API_BASE_URL}/api/applicant-scores/${query}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         entrance_exam_status = normalizeExamStatus(
@@ -279,7 +279,7 @@ const ApplicantProfile = () => {
 
       try {
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/interview_applicants/${query}`,
+          `${API_BASE_URL}/api/interview_applicants/${query}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         collegeApprovalStatus = normalizeCollegeApprovalStatus(
@@ -298,7 +298,7 @@ const ApplicantProfile = () => {
 
       try {
         const registrarRes = await axios.get(
-          `${API_BASE_URL}/api/submitted-status/${pid}`,
+          `${API_BASE_URL}/api/submitted-status/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         isRegistrarApproved =
@@ -313,7 +313,7 @@ const ApplicantProfile = () => {
 
       try {
         const studentRes = await axios.get(
-          `${API_BASE_URL}/api/student_status/${pid}`,
+          `${API_BASE_URL}/api/student_status/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         hasStudentNumberLocal = studentRes.data?.hasStudentNumber;

@@ -55,7 +55,7 @@ const CurriculumFeeManagement = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -71,7 +71,7 @@ const CurriculumFeeManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -84,7 +84,7 @@ const CurriculumFeeManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const allowed = response.data?.page_privilege === 1;
       setHasAccess(allowed);
@@ -114,7 +114,7 @@ const CurriculumFeeManagement = () => {
 
   const fetchYear = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year_table`);
+      const res = await axios.get(`${API_BASE_URL}/api/year_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearList(res.data);
     } catch (err) {
       console.error(err);
@@ -123,7 +123,7 @@ const CurriculumFeeManagement = () => {
 
   const fetchProgram = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_program`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setProgramList(res.data);
     } catch (err) {
       console.error(err);
@@ -150,13 +150,13 @@ const CurriculumFeeManagement = () => {
   }, []);
 
   const fetchCurriculum = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
     setCurriculumList(res.data);
   };
 
   const fetchTaggedPrograms = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`);
+      const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const tagged = res.data.map((p) => ({
         ...p,
@@ -189,7 +189,7 @@ const CurriculumFeeManagement = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/tosf`)
+      .get(`${API_BASE_URL}/api/tosf`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         setTosf(res.data[0]); // get first row
         console.log("TOSF:", res.data[0]);
@@ -201,7 +201,7 @@ const CurriculumFeeManagement = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/fee_rules`)
+      .get(`${API_BASE_URL}/api/fee_rules`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         setFeeRules(res.data); // keep full objects
       })
@@ -277,7 +277,7 @@ const CurriculumFeeManagement = () => {
   const [miscFees, setMiscFees] = useState({});
 
   const fetchMiscFee = async (yearId, semId, programId, departmentId) => {
-    const res = await axios.get(`${API_BASE_URL}/api/misc_fee`, {
+    const res = await axios.get(`${API_BASE_URL}/api/misc_fee`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
       params: {
         year_level_id: yearId,
         semester_id: semId,
@@ -475,7 +475,7 @@ const CurriculumFeeManagement = () => {
 
   const fetchExtraFees = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/extra_fees`);
+      const res = await axios.get(`${API_BASE_URL}/api/extra_fees`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setExtraFees(res.data);
     } catch (err) {
       console.error("Error fetching extra fees:", err);
@@ -557,7 +557,7 @@ const CurriculumFeeManagement = () => {
 
   const fetchYearLevels = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearLevelList(res.data);
     } catch (err) {
       console.error("Error fetching year levels:", err);
@@ -566,7 +566,7 @@ const CurriculumFeeManagement = () => {
 
   const fetchSemesters = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSemesterList(res.data);
     } catch (err) {
       console.error("Error fetching semesters:", err);

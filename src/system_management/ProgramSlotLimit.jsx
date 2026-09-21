@@ -94,7 +94,7 @@ const ProgramSlotLimit = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
   const [hasAccess, setHasAccess] = useState(null);
@@ -172,7 +172,7 @@ const ProgramSlotLimit = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -185,7 +185,7 @@ const ProgramSlotLimit = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -261,14 +261,14 @@ const ProgramSlotLimit = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
@@ -279,7 +279,7 @@ const ProgramSlotLimit = () => {
 
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartment(res.data);
     } catch (err) {
       console.error("Fetch error:", err);
@@ -290,7 +290,7 @@ const ProgramSlotLimit = () => {
     if (!dprtmnt_id) return [];
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/applied_program/${dprtmnt_id}`,
+        `${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPrograms(res.data);
       return res.data;
@@ -304,7 +304,7 @@ const ProgramSlotLimit = () => {
   const fetchSlotSummary = async () => {
     if (!yearId || !semesterId) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/programs/availability`, {
+      const res = await axios.get(`${API_BASE_URL}/api/programs/availability`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { year_id: yearId, semester_id: semesterId },
       });
       setSlots(res.data);
@@ -316,7 +316,7 @@ const ProgramSlotLimit = () => {
 
   const fetchActiveSchoolYear = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data.length > 0) {
         const active = res.data[0];
         setYearId(active.year_id);
@@ -480,7 +480,7 @@ const ProgramSlotLimit = () => {
     try {
       await axios.delete(
         `${API_BASE_URL}/api/program-slots/reset`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           data: { curriculum_id: curriculumId, year_id: yearId, semester_id: semesterId },
           ...auditConfig,
         },
@@ -503,7 +503,7 @@ const ProgramSlotLimit = () => {
     try {
       await axios.delete(
         `${API_BASE_URL}/api/program-slots/reset/department`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           data: { dprtmnt_id: selectedDepartmentFilter, year_id: yearId, semester_id: semesterId },
           ...auditConfig,
         },
@@ -522,7 +522,7 @@ const ProgramSlotLimit = () => {
     try {
       await axios.delete(
         `${API_BASE_URL}/api/program-slots/reset/all`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           data: { year_id: yearId, semester_id: semesterId },
           ...auditConfig,
         },

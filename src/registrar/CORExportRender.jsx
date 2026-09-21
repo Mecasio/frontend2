@@ -143,7 +143,7 @@ const CORExportRender = () => {
     fetch(
       `${API_BASE_URL}/api/cor-export/jobs/${jobId}/preload/${encodeURIComponent(
         initialStudentNumber,
-      )}`,
+      )}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
     )
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {

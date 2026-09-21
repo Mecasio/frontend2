@@ -136,7 +136,7 @@ const AcademicSubjectManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${PAGE_ID}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${PAGE_ID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(
         response.data && Number(response.data.page_privilege) === 1,
@@ -152,7 +152,7 @@ const AcademicSubjectManagement = () => {
     try {
       const res = await axios.get(
         `${API_BASE_URL}/api/course-tagging-summary`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: {
             page: currentPage,
             limit: itemsPerPage,
@@ -186,7 +186,7 @@ const AcademicSubjectManagement = () => {
     setDetailsLoading(true);
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/course-tagging-summary/${course.course_id}/details`,
+        `${API_BASE_URL}/api/course-tagging-summary/${course.course_id}/details`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setDetailsRows(res.data || []);
     } catch (err) {

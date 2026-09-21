@@ -138,7 +138,7 @@ const RegistrarResetPassword = () => {
       try {
         const person_id = localStorage.getItem("person_id");
         const res = await axios.get(
-          `${API_BASE_URL}/api/get-otp-setting/user/${person_id}`
+          `${API_BASE_URL}/api/get-otp-setting/user/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
         setTotpEnabled(res.data.require_otp === 1);
       } catch (err) {
@@ -163,7 +163,7 @@ const RegistrarResetPassword = () => {
         type: "user",
         person_id,
         require_otp: newValue ? 1 : 0,  // use captured value, NOT state
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSnack({ open: true, message: res.data.message, severity: "success" });
     } catch (err) {
       // Roll back on failure
@@ -189,7 +189,7 @@ const RegistrarResetPassword = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -202,7 +202,7 @@ const RegistrarResetPassword = () => {
   const checkAccess = async (empID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -224,7 +224,7 @@ const RegistrarResetPassword = () => {
       const person_id = localStorage.getItem("person_id");
       const response = await axios.post(
         `${API_BASE_URL}/api/registrar-change-password`,
-        { person_id, currentPassword, newPassword }
+        { person_id, currentPassword, newPassword }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setSnack({ open: true, message: response.data.message, severity: "success" });
       setCurrentPassword("");
@@ -232,7 +232,20 @@ const RegistrarResetPassword = () => {
       setConfirmPassword("");
       localStorage.removeItem("force_password_change");
       window.dispatchEvent(new Event("password_changed"));
-      setTimeout(() => navigate("/registrar_dashboard"), 1500);
+      const role = String(localStorage.getItem("role") || "").trim().toLowerCase();
+      let dashboard = "/registrar_dashboard";
+      if (role === "administrator") {
+        try {
+          const accessList = JSON.parse(localStorage.getItem("accessList") || "[]");
+          const accessSet = new Set((Array.isArray(accessList) ? accessList : []).map(Number));
+          if (accessSet.has(101)) dashboard = "/registrar_dashboard";
+          else if (accessSet.has(102)) dashboard = "/enrollment_officer_dashboard";
+          else if (accessSet.has(103)) dashboard = "/admission_officer_dashboard";
+        } catch {
+          dashboard = "/registrar_dashboard";
+        }
+      }
+      setTimeout(() => navigate(dashboard), 1500);
     } catch (err) {
       setSnack({
         open: true,

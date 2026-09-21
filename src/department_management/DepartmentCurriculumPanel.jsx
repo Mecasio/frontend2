@@ -128,7 +128,7 @@ export default function DepartmentCurriculumPanel() {
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -145,7 +145,7 @@ export default function DepartmentCurriculumPanel() {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -157,7 +157,7 @@ export default function DepartmentCurriculumPanel() {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -247,7 +247,7 @@ export default function DepartmentCurriculumPanel() {
 
   async function fetchDepartments() {
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/departments`);
+      const { data } = await axios.get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartments(data);
     } catch (err) {
       console.error("Failed to fetch departments", err);
@@ -258,7 +258,7 @@ export default function DepartmentCurriculumPanel() {
 
   const fetchProgram = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_program`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPrograms(res.data);
     } catch (err) {
       console.error(err);
@@ -277,7 +277,7 @@ export default function DepartmentCurriculumPanel() {
 
   async function fetchCurriculums() {
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/get_curriculum`);
+      const { data } = await axios.get(`${API_BASE_URL}/api/get_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCurriculums(data);
     } catch (err) {
       console.error("Failed to fetch curriculums", err);
@@ -287,7 +287,7 @@ export default function DepartmentCurriculumPanel() {
   async function fetchMappings(dprtmnt_id) {
     setMappingsLoading(true);
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/dprtmnt_curriculum/${dprtmnt_id}`);
+      const { data } = await axios.get(`${API_BASE_URL}/api/dprtmnt_curriculum/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setMappings(data || []);
     } catch (err) {
       console.error("Failed to fetch mappings", err);

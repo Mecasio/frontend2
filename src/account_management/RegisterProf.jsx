@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import {
   Box,
@@ -23,6 +23,7 @@ import {
   Select,
   Grid,
   MenuItem,
+  Checkbox,
 } from "@mui/material";
 import { Add, Search, SortByAlpha, FileDownload } from "@mui/icons-material";
 import axios from "axios";
@@ -49,6 +50,7 @@ import InputAdornment from "@mui/material/InputAdornment";
 import PrintIcon from "@mui/icons-material/Print";
 import SendIcon from "@mui/icons-material/Send";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
+import SchoolIcon from "@mui/icons-material/School";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -151,7 +153,7 @@ const RegisterProf = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -177,7 +179,7 @@ const RegisterProf = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -189,7 +191,7 @@ const RegisterProf = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -228,6 +230,34 @@ const RegisterProf = () => {
   const [editData, setEditData] = useState(null);
   const [profToDelete, setProfToDelete] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const leftFormRef = useRef(null);
+  const columnHeightObserverRef = useRef(null);
+  const [departmentColumnHeight, setDepartmentColumnHeight] = useState(null);
+
+  const updateDepartmentColumnHeight = useCallback(() => {
+    const leftForm = leftFormRef.current;
+    if (!leftForm) return;
+    const nextHeight = Math.round(leftForm.offsetHeight);
+    if (nextHeight <= 0) return;
+    setDepartmentColumnHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+  }, []);
+
+  const setLeftFormNode = useCallback((node) => {
+    if (columnHeightObserverRef.current) {
+      columnHeightObserverRef.current.disconnect();
+      columnHeightObserverRef.current = null;
+    }
+
+    leftFormRef.current = node;
+    if (!node) return;
+
+    updateDepartmentColumnHeight();
+    const observer = new ResizeObserver(updateDepartmentColumnHeight);
+    observer.observe(node);
+    const dialogPaper = node.closest(".MuiDialog-paper");
+    if (dialogPaper) observer.observe(dialogPaper);
+    columnHeightObserverRef.current = observer;
+  }, [updateDepartmentColumnHeight]);
 
 
   const [form, setForm] = useState({
@@ -239,7 +269,7 @@ const RegisterProf = () => {
     password: "",
     role: "faculty",
     dprtmnt_id: "",
-    status: 1,
+    status: "",
     profileImage: null,
     preview: "", // ✅ for image preview
   });
@@ -247,6 +277,125 @@ const RegisterProf = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // success | error | info | warning
+  const [educationDialogOpen, setEducationDialogOpen] = useState(false);
+  const [educationRecords, setEducationRecords] = useState([]);
+  const [educationPersonId, setEducationPersonId] = useState("");
+  const [educationBachelor, setEducationBachelor] = useState("");
+  const [educationMaster, setEducationMaster] = useState("");
+  const [educationDoctor, setEducationDoctor] = useState("");
+  const [educationSaving, setEducationSaving] = useState(false);
+
+  const openFacultyEducation = async () => {
+    // person_prof_table.person_id stores the professor's prof_id.
+    // Do not use prof.person_id here; that is a different identifier.
+    const professorId = editData?.prof_id ? String(editData.prof_id) : "";
+    setEducationPersonId(professorId);
+    setEducationBachelor("");
+    setEducationMaster("");
+    setEducationDoctor("");
+
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/person_prof_list`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      });
+      const records = Array.isArray(response.data) ? response.data : [];
+      setEducationRecords(records);
+
+      if (professorId) {
+        const existing = records.find((record) => String(record.person_id) === professorId);
+        if (existing) {
+          setEducationBachelor(existing.bachelor || "");
+          setEducationMaster(existing.master || "");
+          setEducationDoctor(existing.doctor || "");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load faculty education records:", error);
+    }
+
+    setEducationDialogOpen(true);
+  };
+
+  const closeFacultyEducation = () => {
+    if (educationSaving) return;
+    setEducationDialogOpen(false);
+    setEducationPersonId("");
+    setEducationBachelor("");
+    setEducationMaster("");
+    setEducationDoctor("");
+  };
+
+  const saveFacultyEducation = async () => {
+    // A new professor does not have a prof_id until the account is created.
+    // Keep the entered education in the parent form and save it after creation.
+    if (!editData) {
+      setEducationDialogOpen(false);
+      setEducationPersonId("");
+      return;
+    }
+
+    if (!educationPersonId) {
+      setSnackbarMessage("Please select a professor first.");
+      setSnackbarSeverity("warning");
+      setOpenSnackbar(true);
+      return;
+    }
+
+    const existing = educationRecords.find(
+      (record) => String(record.person_id) === String(educationPersonId),
+    );
+    setEducationSaving(true);
+    try {
+      const config = {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      };
+      if (existing) {
+        await axios.put(`${API_BASE_URL}/api/person_prof/${educationPersonId}`, {
+          bachelor: educationBachelor,
+          master: educationMaster,
+          doctor: educationDoctor,
+        }, config);
+      } else {
+        await axios.post(`${API_BASE_URL}/api/person_prof`, {
+          person_id: educationPersonId,
+          bachelor: educationBachelor,
+          master: educationMaster,
+          doctor: educationDoctor,
+        }, config);
+      }
+
+      setSnackbarMessage(existing ? "Faculty education updated successfully." : "Faculty education added successfully.");
+      setSnackbarSeverity("success");
+      setOpenSnackbar(true);
+      setEducationDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to save faculty education:", error);
+      setSnackbarMessage(error.response?.data?.message || "Failed to save faculty education.");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+    } finally {
+      setEducationSaving(false);
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (!openDialog) {
+      setDepartmentColumnHeight(null);
+      return undefined;
+    }
+
+    updateDepartmentColumnHeight();
+    const frame = requestAnimationFrame(() => {
+      updateDepartmentColumnHeight();
+      requestAnimationFrame(updateDepartmentColumnHeight);
+    });
+    window.addEventListener("resize", updateDepartmentColumnHeight);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateDepartmentColumnHeight);
+    };
+  }, [openDialog, form.password, updateDepartmentColumnHeight]);
 
   const printFacultySlip = (prof, password, email) => {
     const resolvedCampusAddress =
@@ -399,7 +548,7 @@ const RegisterProf = () => {
 
   const fetchProfessors = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/professors`);
+      const res = await axios.get(`${API_BASE_URL}/api/professors`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       console.log("Fetched Professors:", res.data); // 👈 check what backend returns
 
@@ -419,7 +568,7 @@ const RegisterProf = () => {
 
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartment(res.data);
       console.log(res.data);
     } catch (err) {
@@ -560,7 +709,7 @@ const RegisterProf = () => {
         employee_id: employeeId,
         email,
         password,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       return true;
     } catch (err) {
       console.error("Failed to send faculty password email:", err);
@@ -630,6 +779,19 @@ const RegisterProf = () => {
           formData,
           permissionHeaders,
         );
+
+        const createdProfessorId = response.data?.prof_id;
+        const hasEducation = [educationBachelor, educationMaster, educationDoctor]
+          .some((value) => String(value || "").trim());
+
+        if (createdProfessorId && hasEducation) {
+          await axios.post(`${API_BASE_URL}/api/person_prof`, {
+            person_id: createdProfessorId,
+            bachelor: educationBachelor,
+            master: educationMaster,
+            doctor: educationDoctor,
+          }, permissionHeaders);
+        }
       }
 
       if (response.data?.success === false) {
@@ -664,6 +826,10 @@ const RegisterProf = () => {
       setTimeout(() => {
         fetchProfessors();
       }, 500);
+
+      if (!silent) {
+        handleCloseDialog();
+      }
 
       return true;
     } catch (err) {
@@ -752,7 +918,7 @@ const RegisterProf = () => {
       password: "",
       role: "faculty",
       dprtmnt_id: "",
-      status: 1,
+      status: "",
       profileImage: null,
       preview: "",
     });
@@ -1323,7 +1489,7 @@ const RegisterProf = () => {
                           password: "",
                           role: "faculty",
                           dprtmnt_id: "",
-                          status: 1,
+                          status: "",
                           profileImage: null,
                           preview: "",
                         }));
@@ -1800,8 +1966,11 @@ const RegisterProf = () => {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="sm"
+        maxWidth="lg"
         fullWidth
+        slotProps={{
+          transition: { onEntered: updateDepartmentColumnHeight },
+        }}
         PaperProps={{
           sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 }
         }}
@@ -1813,26 +1982,53 @@ const RegisterProf = () => {
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",
-            py: 2
+            py: 2,
+            mb: 0,
           }}
         >
           FACULTY REGISTRATION
         </DialogTitle>
 
-        <DialogContent sx={{ p: 3 }}>
+        <DialogContent sx={{ p: { xs: 2, md: 2.5 }, pt: { xs: 3, md: 3 } }}>
 
-          <Box display="flex" flexDirection="column" alignItems="center" mb={3} mt={3}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) minmax(0, 1fr)" },
+              gap: 3,
+              alignItems: "start",
+            }}
+          >
+            <Box ref={setLeftFormNode} sx={{ alignSelf: "start" }}>
+
+          <Box
+            sx={{
+              display: { xs: "block", md: "grid" },
+              gridTemplateColumns: { md: "110px minmax(0, 1fr)" },
+              columnGap: { md: 2 },
+              alignItems: "center",
+            }}
+          >
+
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            mb={0}
+            mt={2}
+            sx={{ gridColumn: { md: "1" }, gridRow: { md: "2" }, position: "relative" }}
+          >
             <Box position="relative" component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
               <Avatar
                 src={form.preview}
                 sx={{
-                  width: 110,
-                  height: 110,
+                  width: 78,
+                  height: 78,
                   border: "1.5px solid black",
                   boxShadow: "0 2px 8px rgba(0,0,0,.15)",
                 }}
               >
-                {!form.preview && <ImageIcon sx={{ fontSize: 40, color: "#999" }} />}
+                {!form.preview && <ImageIcon sx={{ fontSize: 36, color: "#999" }} />}
               </Avatar>
 
               <label
@@ -1841,8 +2037,8 @@ const RegisterProf = () => {
                   position: "absolute",
                   bottom: 2,
                   right: 2,
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   borderRadius: "50%",
                   background: "white",
                   display: "flex",
@@ -1852,7 +2048,7 @@ const RegisterProf = () => {
                   boxShadow: "0 1px 4px rgba(0,0,0,.3)",
                 }}
               >
-                <AddCircleIcon sx={{ fontSize: 26, color: mainButtonColor }} />
+                <AddCircleIcon sx={{ fontSize: 24, color: mainButtonColor }} />
               </label>
 
               <input
@@ -1865,18 +2061,63 @@ const RegisterProf = () => {
               />
             </Box>
 
-            <Typography variant="caption" color="text.secondary" mt={1}>
-              Click to upload 2x2 profile picture
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                position: "absolute",
+                top: { md: -28, xs: -28 },
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: 160,
+                textAlign: "center",
+                fontSize: "11px",
+                lineHeight: 1.15,
+              }}
+            >
+              Click to upload 2x2<br />
+              profile picture
             </Typography>
           </Box>
 
-          <Typography fontWeight={700} mt={2} mb={2}>
-            Faculty Information
-          </Typography>
+          <Box
+            sx={{
+              gridColumn: { md: "1 / -1" },
+              gridRow: { md: "1" },
+              mt: 2,
+              mb: 1.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+            }}
+          >
+            <Typography fontWeight={700}>
+              User's Account Information
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<SchoolIcon fontSize="small" />}
+              onClick={openFacultyEducation}
+              sx={{ fontWeight: 600, textTransform: "none" }}
+            >
+              {editData ? "Edit Faculty Education" : "Add Faculty Education"}
+            </Button>
+          </Box>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
+          <Grid
+            container
+            spacing={1}
+            sx={{
+              gridColumn: { md: "2" },
+              gridRow: { md: "2" },
+              mt: { md: 2 },
+            }}
+          >
+            <Grid item xs={6}>
               <TextField
+                size="small"
                 label="Employee ID"
                 fullWidth
                 name="employee_id"
@@ -1889,6 +2130,7 @@ const RegisterProf = () => {
 
             <Grid item xs={6}>
               <TextField
+                size="small"
                 label="First Name"
                 fullWidth
                 name="fname"
@@ -1898,8 +2140,9 @@ const RegisterProf = () => {
               />
             </Grid>
 
-            <Grid item xs={6}>
+            <Grid item xs={6} sx={{ order: 4 }}>
               <TextField
+                size="small"
                 label="Last Name"
                 fullWidth
                 name="lname"
@@ -1909,8 +2152,9 @@ const RegisterProf = () => {
               />
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={6} sx={{ order: 3 }}>
               <TextField
+                size="small"
                 label="Middle Name"
                 fullWidth
                 name="mname"
@@ -1921,21 +2165,21 @@ const RegisterProf = () => {
             </Grid>
           </Grid>
 
-          <Typography fontWeight={700} mt={3} mb={2}>
-            Account Details
-          </Typography>
+          </Box>
 
           <TextField
+            size="small"
             label="Email"
             fullWidth
             value={form.email}
             name="email"
             onChange={handleChange}
             autoComplete="new-password"
-            sx={{ mb: 2 }}
+            sx={{ mb: 1.5, mt: 2 }}
           />
 
           <TextField
+            size="small"
             label={editData ? "New Password (leave blank to keep current)" : "Password"}
             fullWidth
             name="password"
@@ -1955,47 +2199,67 @@ const RegisterProf = () => {
             }}
           />
 
-          {form.password && (
-            <Box
-              mt={3}
-              p={3}
-              sx={{ border: "2px dashed #1976d2", borderRadius: 2, textAlign: "center", backgroundColor: "#f9f9f9" }}
-            >
-              <Typography variant="h6" gutterBottom>
-                Generated Password
+          <Box
+            mt={1}
+            p={2.5}
+            sx={{
+              border: "2px dashed #1976d2",
+              borderRadius: 2,
+              textAlign: "center",
+              backgroundColor: "#f9f9f9",
+              minHeight: 96,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {form.password ? (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  Generated Password
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{ fontWeight: "bold", letterSpacing: 2, color: "#d32f2f" }}
+                >
+                  {form.password}
+                </Typography>
+                <Typography variant="caption" mt={0.5}>
+                  Please print or save this password.
+                </Typography>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No password generated yet.
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: "bold", letterSpacing: 2, color: "#d32f2f" }}>
-                {form.password}
-              </Typography>
-              <Typography variant="body2" mt={1}>
-                Please print or save this password.
-              </Typography>
-            </Box>
-          )}
+            )}
+          </Box>
 
-          <FormControl fullWidth margin="dense" sx={{ mt: 3 }}>
-            <InputLabel>Department</InputLabel>
-            <Select
-              name="dprtmnt_id"
-              value={form.dprtmnt_id}
-              onChange={handleSelect}
-              label="Department"
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 1.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LockResetIcon />}
+              onClick={handleGeneratePassword}
+              sx={{ fontWeight: 600 }}
             >
-              <MenuItem value="">
-                <em>No Department</em>
-              </MenuItem>
-
-              {department.map((dep) => (
-                <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
-                  {dep.dprtmnt_name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              Generate
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PrintIcon />}
+              disabled={!form.password}
+              onClick={() => printFacultySlip(form, form.password, form.email)}
+              sx={{ fontWeight: 600 }}
+            >
+              Print
+            </Button>
+          </Box>
 
           {/* ✅ Status now lives inside the modal instead of the table */}
-          {editData && (
-            <FormControl fullWidth margin="dense" sx={{ mt: 3 }}>
+          <FormControl fullWidth size="small" margin="dense" sx={{ mt: 2 }}>
               <InputLabel>Status</InputLabel>
               <Select
                 name="status"
@@ -2003,16 +2267,143 @@ const RegisterProf = () => {
                 onChange={handleSelect}
                 label="Status"
               >
+                <MenuItem value="">Select Status</MenuItem>
                 <MenuItem value={1}>Active</MenuItem>
                 <MenuItem value={0}>Inactive</MenuItem>
               </Select>
-            </FormControl>
-          )}
+          </FormControl>
 
+            </Box>
 
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                minWidth: 0,
+                overflow: { md: "hidden" },
+                height: {
+                  md: departmentColumnHeight ? `${departmentColumnHeight}px` : 0,
+                },
+                maxHeight: {
+                  md: departmentColumnHeight ? `${departmentColumnHeight}px` : 0,
+                },
+              }}
+            >
+              <Typography fontWeight={700} mb={0.5} sx={{ mt: 2 }}>
+                Department
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Select the department assigned to this faculty member.
+              </Typography>
+              <Box
+                sx={{
+                  border: "1px solid #e0e0e0",
+                  borderRadius: 2,
+                  p: 1,
+                  mt: 1.5,
+                  flex: 1,
+                  minHeight: { xs: 220, md: 0 },
+                  maxHeight: { xs: 280, md: "none" },
+                  overflowY: "auto",
+                }}
+              >
+                {department.map((dep) => {
+                  const departmentId = String(dep.dprtmnt_id);
+                  const isSelected = String(form.dprtmnt_id) === departmentId;
 
+                  return (
+                    <Box
+                      key={dep.dprtmnt_id}
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          dprtmnt_id: isSelected ? "" : dep.dprtmnt_id,
+                        }))
+                      }
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 1,
+                        px: 1,
+                        py: 0.5,
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 2,
+                        backgroundColor: isSelected ? "#eaf3ff" : "#f5f5f5",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:last-child": { mb: 0 },
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        checked={isSelected}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          setForm((prev) => ({
+                            ...prev,
+                            dprtmnt_id: event.target.checked ? dep.dprtmnt_id : "",
+                          }));
+                        }}
+                      />
+                      <Typography variant="body2" fontWeight={600}>
+                        {dep.dprtmnt_name}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          </Box>
 
         </DialogContent>
+
+        <Dialog
+          open={educationDialogOpen}
+          onClose={closeFacultyEducation}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              background: headerColor || "#1976d2",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "1.1rem",
+              py: 2,
+            }}
+          >
+            {editData ? "Edit Faculty Education" : "Add Faculty Education"}
+          </DialogTitle>
+          <DialogContent sx={{ p: { xs: 2, md: 2.5 }, pt: 3 }}>
+            {editData && (
+              <Typography sx={{ mt: 1, mb: 2 }} color="text.secondary">
+                Editing education for {editData.fname} {editData.lname}
+              </Typography>
+            )}
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <TextField label="Bachelor's Degree" value={educationBachelor} onChange={(event) => setEducationBachelor(event.target.value)} fullWidth />
+              <TextField label="Master's Degree" value={educationMaster} onChange={(event) => setEducationMaster(event.target.value)} fullWidth />
+              <TextField label="Doctorate" value={educationDoctor} onChange={(event) => setEducationDoctor(event.target.value)} fullWidth />
+            </Stack>
+          </DialogContent>
+          <DialogActions
+            sx={{
+              px: 3,
+              py: 2,
+              borderTop: "1px solid #e0e0e0",
+              backgroundColor: "#fafafa",
+              justifyContent: "space-between",
+            }}
+          >
+            <Button onClick={closeFacultyEducation} color="error" variant="outlined">Cancel</Button>
+            <Button onClick={saveFacultyEducation} variant="contained" disabled={educationSaving} startIcon={<SaveIcon />}>
+              {editData ? "Save" : "Done"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* ACTIONS — same layout as the Student Accounts modal:
             Cancel on the left, Generate / Print / Save / Send on the right */}
@@ -2043,29 +2434,6 @@ const RegisterProf = () => {
               flexWrap: "nowrap",
             }}
           >
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<LockResetIcon />}
-              onClick={handleGeneratePassword}
-              sx={{ fontWeight: 600 }}
-            >
-              Generate
-            </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<PrintIcon />}
-              disabled={!form.password}
-              onClick={() =>
-                printFacultySlip(form, form.password, form.email)
-              }
-              sx={{ fontWeight: 600 }}
-            >
-              Print
-            </Button>
-
             <Button
               variant="contained"
               size="small"

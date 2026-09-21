@@ -122,7 +122,7 @@ const SuperAdminRegistrarResetPassword = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -135,7 +135,7 @@ const SuperAdminRegistrarResetPassword = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -167,7 +167,7 @@ const SuperAdminRegistrarResetPassword = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -178,7 +178,7 @@ const SuperAdminRegistrarResetPassword = () => {
       setLoading(true);
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/superadmin-get-all-registrar`,
+          `${API_BASE_URL}/api/superadmin-get-all-registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setRegistrars(res.data);
       } catch (err) {
@@ -230,7 +230,7 @@ const SuperAdminRegistrarResetPassword = () => {
           `${API_BASE_URL}/api/superadmin-get-registrar`,
           {
             search: searchQuery.trim(),
-          }
+          }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
 
         setUserInfo(res.data);

@@ -19,6 +19,11 @@ import CampaignIcon from "@mui/icons-material/Campaign";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import "../styles/Container.css";
+import {
+  UNIFORM_BORDER,
+  UNIFORM_RADIUS,
+  fieldBorder,
+} from "../styles/formTokens";
 import Logo from "../assets/Logo.png";
 import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
@@ -466,23 +471,19 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
 };
 
 /* ─── Inline compact-device announcement banner (mobile + tablet) ─── */
-const CompactAnnouncementBanner = ({ slides }) => {
+const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false }) => {
   const [openViewer, setOpenViewer] = useState(false);
   const [viewerStartIndex, setViewerStartIndex] = useState(0);
   const [index, setIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(true);
-  const [expandedContent, setExpandedContent] = useState(true);
+  const [expandedContent, setExpandedContent] = useState(false);
 
   useEffect(() => {
     if (slides.length <= 1) return;
     const t = setTimeout(() => setIndex((prev) => (prev + 1) % slides.length), 4500);
     return () => clearTimeout(t);
   }, [index, slides.length]);
-
-  useEffect(() => {
-    setExpandedContent(true);
-  }, [index]);
 
   if (!slides.length) return null;
   const current = slides[index];
@@ -519,8 +520,8 @@ const CompactAnnouncementBanner = ({ slides }) => {
         <button
           onClick={() => setBannerVisible(true)}
           style={{
-            width: "100%",
-            marginBottom: "14px",
+            width: flush ? "calc(100% - 32px)" : "100%",
+            margin: flush ? "12px 16px 0" : "0 0 14px",
             padding: "10px",
             background: "rgba(0,0,0,0.08)",
             border: "1.5px dashed rgba(0,0,0,0.25)",
@@ -533,6 +534,7 @@ const CompactAnnouncementBanner = ({ slides }) => {
             color: "rgba(0,0,0,0.55)",
             fontSize: "13px",
             fontWeight: 500,
+            boxSizing: "border-box",
           }}
         >
           <CampaignIcon sx={{ fontSize: 16 }} />
@@ -544,12 +546,17 @@ const CompactAnnouncementBanner = ({ slides }) => {
         <div
           style={{
             width: "100%",
-            borderRadius: "14px",
+            borderRadius: flush
+              ? roundTop
+                ? "12px 12px 0 0"
+                : 0
+              : "14px",
             overflow: "hidden",
-            marginBottom: "16px",
-            boxShadow: "0 4px 18px rgba(0,0,0,0.25)",
+            marginBottom: flush ? 0 : "16px",
+            boxShadow: flush ? "none" : "0 4px 18px rgba(0,0,0,0.25)",
             background: "#000",
-            border: "1.5px solid rgba(0,0,0,0.15)",
+            border: flush ? "none" : "1.5px solid rgba(0,0,0,0.15)",
+            borderBottom: flush ? "1px solid rgba(0,0,0,0.12)" : undefined,
           }}
         >
           {hasImage && (
@@ -785,12 +792,13 @@ const CompactAnnouncementBanner = ({ slides }) => {
 ══════════════════════════════════════════════════════════════ */
 const Login = ({ setIsAuthenticated }) => {
   const settings = useContext(SettingsContext);
-  const { device, isMobile, isTablet, isDesktop, isCompact } = useResponsive();
+  const { isMobile, isTablet, isCompact } = useResponsive();
   const colors = settings?.colors || {};
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
   const mainButtonColor = colors.mainButton || "#1976d2";
   const headerColor = colors.header || "#1976d2";
+  const borderColor = colors.border || "#e6e6e6";
   const companyName = branding.companyName || "Company Name";
 
   const [email, setEmail] = useState("");
@@ -822,17 +830,16 @@ const Login = ({ setIsAuthenticated }) => {
     });
   }, []);
 
-  // Fetch the compact banner data for BOTH mobile and tablet, since neither
-  // has room for the full side-by-side desktop AnnouncementSlider.
+  // Fetch the compact banner data for mobile/tablet; desktop uses AnnouncementSlider.
   useEffect(() => {
-    if (isDesktop) return;
+    if (!isCompact) return;
     axios
-      .get(`${API_BASE_URL}/api/announcements`)
+      .get(`${API_BASE_URL}/api/announcements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (Array.isArray(res.data.data)) setCompactSlides(res.data.data);
       })
       .catch(() => { });
-  }, [isDesktop]);
+  }, [isCompact]);
 
   /* ── Restore lockout for THIS email when the email field changes ── */
   useEffect(() => {
@@ -911,7 +918,7 @@ const Login = ({ setIsAuthenticated }) => {
         password,
         audit_log_db: "db3",
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data.locked) {
         const secs = res.data.remainingSeconds ?? 180;
@@ -967,13 +974,17 @@ const Login = ({ setIsAuthenticated }) => {
         localStorage.setItem("department", res.data.department || "");
         localStorage.setItem("employee_id", res.data.employee_id);
         localStorage.setItem("curriculum_id", res.data.curriculum_id || "");
+        localStorage.setItem(
+          "accessList",
+          JSON.stringify(Array.isArray(res.data.accessList) ? res.data.accessList : []),
+        );
         setIsAuthenticated(true);
         if (shouldForceChange) {
           const roleVal = res.data.role?.toLowerCase();
           const changePwPath =
             roleVal === "faculty"
               ? "/faculty_reset_password"
-              : roleVal === "registrar"
+              : ["administrator", "superadmin", "technical"].includes(roleVal)
                 ? "/registrar_reset_password"
                 : "/student_reset_password";
           navigate(changePwPath);
@@ -1028,14 +1039,21 @@ const Login = ({ setIsAuthenticated }) => {
   function getUserDashboard(role, accessList = []) {
     const accessSet = accessToSet(accessList);
     const normalizedRole = String(role || "").trim().toLowerCase();
-    if (normalizedRole === "registrar") return getRegistrarDashboard(accessSet);
+    // Superadmin / technical always open on Registrar Dashboard.
+    if (["superadmin", "technical"].includes(normalizedRole)) {
+      return "/registrar_dashboard";
+    }
+    // Administrator: registrar by default; admission/enrollment officers by page access.
+    if (normalizedRole === "administrator") {
+      return getRegistrarDashboard(accessSet);
+    }
     if (normalizedRole === "faculty") return "/faculty_dashboard";
-    if (normalizedRole === "superadmin") return "/system_dashboard";
     return "/student_dashboard";
   }
 
-  const backgroundImage =
+  const backgroundBase =
     assets.backgroundImage || "linear-gradient(to right, #f5f5f5, #fafafa)";
+  const backgroundImage = `linear-gradient(to bottom, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.15)), ${backgroundBase}`;
   const logoSrc = assets.logoUrl || Logo;
 
   // 🔒 Disable right-click + block DevTools shortcuts.
@@ -1060,84 +1078,136 @@ const Login = ({ setIsAuthenticated }) => {
   });
 
   // ── Layout tokens per device tier ──
-  const cardWidth = isMobile ? "calc(100% - 32px)" : isTablet ? "min(520px, 92vw)" : undefined;
-  const cardMaxWidth = isMobile ? 480 : isTablet ? 520 : undefined;
-  const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
-  const cardMarginLeft = isDesktop ? -100 : 0;
-  const cardMarginTop = isDesktop ? -130 : 0;
-  const fieldHeight = isMobile ? "52px" : "54px";
+  const fieldHeight = isMobile ? "48px" : "46px";
 
   return (
     <Box
       sx={{
         backgroundImage,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover, cover",
+        backgroundPosition: "center, center",
+        backgroundRepeat: "no-repeat, no-repeat",
         width: "100%",
-        minHeight: "100dvh",
+        height: isCompact ? undefined : "calc(100vh - 100px)",
+        minHeight: isCompact ? "100dvh" : 0,
         display: "flex",
-        alignItems: isDesktop ? "center" : "flex-start",
+        alignItems: "center",
         justifyContent: "center",
-        overflowY: isDesktop ? "hidden" : "auto",
-        py: isDesktop ? 0 : isTablet ? 4 : 2,
-        px: isMobile ? 0 : 2,
+        overflowY: isCompact ? "auto" : "hidden",
+        overflowX: "hidden",
+        py: isCompact ? (isTablet ? 4 : 0) : 0,
+        px: isCompact ? (isMobile ? 0 : 2) : 2,
         pb: isMobile ? "calc(16px + env(safe-area-inset-bottom))" : undefined,
+        boxSizing: "border-box",
       }}
     >
       <Container
         style={{
+          width: "100%",
+          maxWidth: isCompact ? 672 : 1400,
+          margin: "0 auto",
           display: "flex",
+          flexDirection: isCompact ? "column" : "row",
           alignItems: "center",
           justifyContent: "center",
-          flexDirection: isCompact ? "column" : "row",
-          padding: isMobile ? "0 0" : undefined,
-          width: "100%",
+          gap: isCompact ? 16 : 28,
+          padding: isCompact ? (isMobile ? "0" : "0 16px") : "0 24px",
+          boxSizing: "border-box",
         }}
         maxWidth={false}
       >
-        {isDesktop && <AnnouncementSlider />}
+        {!isCompact && (
+          <Box
+            sx={{
+              width: "auto",
+              flex: "1 1 auto",
+              minWidth: 0,
+              position: "relative",
+              height: "min(690px, calc(100vh - 100px))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <AnnouncementSlider alignCenter />
+          </Box>
+        )}
 
         <div
           style={{
-            border: `${cardBorderWidth} solid black`,
-            marginLeft: cardMarginLeft,
-            marginTop: cardMarginTop,
-            width: cardWidth,
-            maxWidth: cardMaxWidth,
+            border: `1px solid ${borderColor}`,
+            marginLeft: 0,
+            marginTop: 0,
+            width: isCompact
+              ? isMobile
+                ? "calc(100% - 32px)"
+                : "min(520px, 92vw)"
+              : 460,
+            maxWidth: isCompact ? (isMobile ? 480 : 520) : 460,
+            minWidth: 0,
+            flex: isCompact ? "none" : "0 0 460px",
+            transform: isMobile ? "scale(0.9)" : "none",
+            transformOrigin: isMobile ? "top center" : undefined,
+            boxSizing: "border-box",
           }}
-          className="Container"
+          className="Container login-card uniform-card"
         >
-          {/* ── Header ── */}
-          <div
-            className="Header"
-            style={{
-              backgroundColor: headerColor,
-              padding: isMobile ? "12px 10px" : isTablet ? "14px 12px" : "1rem 0",
-              borderBottom: "3px solid black",
-            }}
-          >
-            <div className="HeaderTitle">
-              <div className="CircleCon">
-                <img src={logoSrc} alt="Logo" />
+          {/* ── Header (hidden on mobile) ── */}
+          {!isMobile && (
+            <div
+              className="Header"
+              style={{
+                backgroundColor: headerColor,
+                padding: isTablet ? "14px 12px" : "1rem 0",
+                borderBottom: "none",
+              }}
+            >
+              <div className="HeaderTitle">
+                <div className="CircleCon">
+                  <img src={logoSrc} alt="Logo" />
+                </div>
+              </div>
+              <div className="HeaderBody">
+                <strong style={{ color: "white" }}>
+                  {companyName.split(" ").reduce((acc, word, i) => {
+                    if (i % 4 === 0 && i !== 0) acc.push(<br key={`br-${i}`} />);
+                    acc.push(word + " ");
+                    return acc;
+                  }, [])}
+                </strong>
+                <p>Academic Portal System</p>
               </div>
             </div>
-            <div className="HeaderBody">
-              <strong style={{ color: "white" }}>
-                {companyName.split(" ").reduce((acc, word, i) => {
-                  if (i % 4 === 0 && i !== 0) acc.push(<br key={`br-${i}`} />);
-                  acc.push(word + " ");
-                  return acc;
-                }, [])}
-              </strong>
-              <p>Academic Information System</p>
-            </div>
-          </div>
+          )}
 
           {/* ── Body ── */}
-          <div className="Body">
-            {isCompact && compactSlides.length > 0 && <CompactAnnouncementBanner slides={compactSlides} />}
+          <div
+            className="Body"
+            style={
+              isCompact && compactSlides.length > 0
+                ? { padding: 0 }
+                : undefined
+            }
+          >
+            {isCompact && compactSlides.length > 0 && (
+              <CompactAnnouncementBanner
+                slides={compactSlides}
+                flush
+                roundTop={isMobile}
+              />
+            )}
 
+            <div
+              style={
+                isCompact && compactSlides.length > 0
+                  ? {
+                      padding: isMobile
+                        ? "16px 16px 0"
+                        : "20px 18px 0",
+                    }
+                  : undefined
+              }
+            >
             {/* Login As */}
             <div className="TextField" style={{ position: "relative" }}>
               <label htmlFor="loginType">Login As</label>
@@ -1153,8 +1223,8 @@ const Login = ({ setIsAuthenticated }) => {
                 style={{
                   width: "100%",
                   padding: "0.8rem 2.5rem 0.8rem 2.80rem",
-                  borderRadius: "10px",
-                  border: "2px solid black",
+                  borderRadius: UNIFORM_RADIUS,
+                  border: UNIFORM_BORDER,
                   fontSize: "16px",
                   height: fieldHeight,
                   backgroundColor: "white",
@@ -1197,8 +1267,8 @@ const Login = ({ setIsAuthenticated }) => {
                   paddingLeft: "2.80rem",
                   height: fieldHeight,
                   fontSize: "16px",
-                  border: errors.email ? "2px solid red" : "2px solid black",
-                  borderRadius: "10px",
+                  border: fieldBorder(errors.email),
+                  borderRadius: UNIFORM_RADIUS,
                   width: "100%",
                 }}
               />
@@ -1222,8 +1292,8 @@ const Login = ({ setIsAuthenticated }) => {
                   paddingLeft: "2.80rem",
                   height: fieldHeight,
                   fontSize: "16px",
-                  border: errors.password ? "2px solid red" : "2px solid black",
-                  borderRadius: "10px",
+                  border: fieldBorder(errors.password),
+                  borderRadius: UNIFORM_RADIUS,
                   width: "100%",
                 }}
               />
@@ -1251,14 +1321,19 @@ const Login = ({ setIsAuthenticated }) => {
                 )}
               </button>
             </div>
+            <div style={{marginTop: "-10px"}}>
+              <span>
+                <Link to="/applicant_forgot_password">Forgot your password</Link>
+              </span>
+            </div>
 
             {/* Login Button */}
             <div
               tabIndex={0}
               style={{
-                height: isMobile ? "48px" : "50px",
-                borderRadius: "10px",
-                border: "2px solid black",
+                height: isMobile ? "48px" : "44px",
+                borderRadius: UNIFORM_RADIUS,
+                border: "none",
                 backgroundColor: isLocked ? "#999" : loading ? "#ccc" : mainButtonColor,
                 opacity: isLocked || loading ? 0.7 : 1,
                 pointerEvents: isLocked || loading ? "none" : "auto",
@@ -1276,24 +1351,66 @@ const Login = ({ setIsAuthenticated }) => {
             </div>
 
             {/* Forgot Password */}
-            <div className="LinkContainer">
+            {/* <div className="LinkContainer">
               <span>
                 <Link to="/applicant_forgot_password">Forgot your password</Link>
               </span>
-            </div>
+            </div> */}
 
             <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-              <Typography
+              {/*<Typography
                 variant="body1"
                 color="textSecondary"
                 align="center"
-                sx={{ fontSize: isMobile ? "0.82rem" : isTablet ? "0.9rem" : undefined }}
+                sx={{ lineHeight: 1.55 }}
               >
                 Welcome! If you are a new applicant or have not yet finalized your registration, you may create an
                 account now. Registering an account enables you to submit your application and access all required
                 information.
-              </Typography>
-              <Button
+              </Typography>*/}
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: "-8px",
+                  padding: "9px 10px",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  backgroundColor: "#fff1f1",
+                  borderRadius: "6px",
+                  border: "1px solid #f4d2d2",
+                }}
+              >
+                <div style={{ textAlign: "left", lineHeight: 1.15 }}>
+                  <div style={{ color: "#7a0000", fontWeight: 700, fontSize: isMobile ? "12px" : "11px" }}>
+                    New applicant?
+                  </div>
+                  <div style={{ color: "#777", fontSize: isMobile ? "10px" : "9px", marginTop: "3px" }}>
+                    Register for ECAT to create your applicant account.
+                  </div>
+                </div>
+                <Link
+                  to="/register"
+                  style={{
+                    flexShrink: 0,
+                    padding: "6px 9px",
+                    border: "1px solid #b40000",
+                    borderRadius: "5px",
+                    color: "#8b0000",
+                    backgroundColor: "#fff",
+                    fontSize: isMobile ? "10px" : "9px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Register for ECAT <span aria-hidden="true">➜</span>
+                </Link>
+              </div>
+              
+              {/* <Button
                 component={RouterLink}
                 to="/register"
                 variant="contained"
@@ -1302,8 +1419,8 @@ const Login = ({ setIsAuthenticated }) => {
                   fontWeight: "bold",
                   px: 3,
                   py: 1.2,
-                  borderRadius: "10px",
-                  border: "2px solid black",
+                  borderRadius: UNIFORM_RADIUS,
+                  border: "none",
                   color: "#fff",
                   boxShadow: "none",
                   width: isCompact ? "100%" : undefined,
@@ -1311,16 +1428,21 @@ const Login = ({ setIsAuthenticated }) => {
                 }}
               >
                 REGISTER NOW
-              </Button>
+              </Button> */}
             </Box>
+            </div>
           </div>
 
           {/* ── Footer ── */}
-          <div className="Footer">
+          <div
+            className="Footer"
+            style={{
+              backgroundColor: headerColor,
+              borderTop: "none",
+              color: "white",
+            }}
+          >
             <div className="FooterText">
-              &copy; {currentYear} {companyName || "EARIST"} <br />
-              Academic Information System. <br />
-              All rights reserved.
             </div>
           </div>
         </div>

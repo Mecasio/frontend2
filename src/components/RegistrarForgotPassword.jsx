@@ -114,7 +114,7 @@ const ForgotPasswordTotpModal = ({
         type: accountType,
         token: code,
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data?.success) {
         setTempPassword(res.data.temp_password || "");
@@ -685,7 +685,7 @@ const RegistrarForgotPassword = () => {
         identifier: identifier.trim(),
         email: email.trim(),
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data?.success) {
         setAccountType(res.data.type);

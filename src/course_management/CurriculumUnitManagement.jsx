@@ -56,7 +56,7 @@ const CurriculumUnitManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -69,7 +69,7 @@ const CurriculumUnitManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const allowed = response.data?.page_privilege === 1;
       setHasAccess(allowed);
@@ -99,7 +99,7 @@ const CurriculumUnitManagement = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -116,12 +116,12 @@ const CurriculumUnitManagement = () => {
   }, []);
 
   const fetchCurriculum = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
     setCurriculumList(res.data);
   };
 
   const fetchTaggedPrograms = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`);
+    const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
     const unique = Array.from(
       new Map(res.data.map((item) => [item.program_tagging_id, item])).values(),
     );
@@ -271,7 +271,7 @@ const CurriculumUnitManagement = () => {
 
   const fetchYearLevels = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearLevelList(res.data);
     } catch (err) {
       console.error("Error fetching year levels:", err);
@@ -280,7 +280,7 @@ const CurriculumUnitManagement = () => {
 
   const fetchSemesters = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSemesterList(res.data);
     } catch (err) {
       console.error("Error fetching semesters:", err);

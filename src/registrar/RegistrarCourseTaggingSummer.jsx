@@ -24,6 +24,7 @@ import {
   Chip,
   useMediaQuery,
   useTheme,
+  Autocomplete,
 } from "@mui/material";
 import LinearWithValueLabel from "../components/LinearWithValueLabel";
 import { Snackbar, Alert } from "@mui/material";
@@ -52,6 +53,10 @@ import {
   formatStudentDisplayName,
   logBulkCourseEnrollmentHistory,
 } from "../utils/studentHistoryLogs";
+import {
+  getCachedSummerSchoolYearContext,
+  getCachedYearLevels,
+} from "../utils/summerAcademicCache";
 
 /* ─── Design tokens ─── */
 const TOKEN = {
@@ -188,6 +193,16 @@ const formatSection = (programCode, description) =>
     .filter(Boolean)
     .join("-");
 
+const formatDepartmentSectionLabel = (section) => {
+  if (!section) return "";
+  const code = cleanDisplayValue(section.program_code);
+  const name = joinDisplayValues(section.program_description, section.major);
+  const desc = cleanDisplayValue(section.description);
+  return [code ? `(${code})` : "", name, desc ? `— ${desc}` : ""]
+    .filter(Boolean)
+    .join(" ");
+};
+
 const formatTimeRange = (start, end) =>
   [cleanDisplayValue(start), cleanDisplayValue(end)].filter(Boolean).join("–");
 
@@ -285,7 +300,7 @@ const RegistrarCourseTaggingSummer = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
       Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     },
   };
@@ -302,7 +317,7 @@ const RegistrarCourseTaggingSummer = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -315,7 +330,7 @@ const RegistrarCourseTaggingSummer = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -398,12 +413,16 @@ const RegistrarCourseTaggingSummer = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [confirmDialogMessage, setConfirmDialogMessage] = useState("");
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [enrollModalCourse, setEnrollModalCourse] = useState(null);
+  const [enrollModalSectionId, setEnrollModalSectionId] = useState("");
+  const [sectionUpdatingId, setSectionUpdatingId] = useState(null);
 
   const fetchSubjectCounts = async (sectionId) => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/subject-enrollment-count`,
-        { params: { sectionId, activeSchoolYearId } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { sectionId, activeSchoolYearId } },
       );
       const counts = {};
       response.data.forEach((item) => {
@@ -416,55 +435,16 @@ const RegistrarCourseTaggingSummer = () => {
   };
 
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/api/get_year_level`)
-      .then((res) => setYearLevel(res.data))
+    getCachedYearLevels()
+      .then((data) => setYearLevel(Array.isArray(data) ? data : []))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     const fetchSummerContext = async () => {
       try {
-        const [semesterRes, activeYearRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/get_semester`),
-          axios.get(`${API_BASE_URL}/api/active_school_year`),
-        ]);
-        const semesters = Array.isArray(semesterRes.data)
-          ? semesterRes.data
-          : [];
-        const summerSemester = semesters.find((semester) =>
-          String(semester.semester_description || "")
-            .toLowerCase()
-            .includes("summer"),
-        );
-        if (!summerSemester) {
-          setSnack({
-            open: true,
-            message: "Summer semester not found.",
-            severity: "warning",
-          });
-          setActiveSemester("Summer");
-          setActiveSemesterId(null);
-          return;
-        }
-        const activeYearRow = Array.isArray(activeYearRes.data)
-          ? activeYearRes.data[0]
-          : null;
-        const yearId = activeYearRow?.year_id ?? null;
-        if (!yearId) {
-          setSnack({
-            open: true,
-            message: "Active school year not found.",
-            severity: "warning",
-          });
-          return;
-        }
-        const selectedYearRes = await axios.get(
-          `${API_BASE_URL}/api/get_selecterd_year/${yearId}/${summerSemester.semester_id}`,
-        );
-        const summerSchoolYearId = Array.isArray(selectedYearRes.data)
-          ? selectedYearRes.data[0]?.school_year_id
-          : null;
+        const context = await getCachedSummerSchoolYearContext();
+        const summerSchoolYearId = context?.school_year_id ?? null;
         if (!summerSchoolYearId) {
           setSnack({
             open: true,
@@ -473,8 +453,8 @@ const RegistrarCourseTaggingSummer = () => {
           });
           return;
         }
-        setActiveSemester(summerSemester.semester_description || "Summer");
-        setActiveSemesterId(summerSemester.semester_id);
+        setActiveSemester(context.semester_description || "Summer");
+        setActiveSemesterId(context.semester_id);
         setActiveSchoolYearId(summerSchoolYearId);
       } catch (err) {
         console.error("Error loading summer context:", err);
@@ -497,7 +477,7 @@ const RegistrarCourseTaggingSummer = () => {
   useEffect(() => {
     if (currId) {
       axios
-        .get(`${API_BASE_URL}/api/courses/${currId}`)
+        .get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setCourses(res.data))
         .catch((err) => console.error(err));
     }
@@ -506,8 +486,8 @@ const RegistrarCourseTaggingSummer = () => {
   useEffect(() => {
     if (userId && currId && activeSchoolYearId) {
       axios
-        .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
-          params: { activeSchoolYearId },
+        .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+          params: { activeSchoolYearId, includeOtherCurricula: true },
         })
         .then((res) => setEnrolled(res.data))
         .catch((err) => console.error(err));
@@ -527,7 +507,7 @@ const RegistrarCourseTaggingSummer = () => {
       setLoading(true);
       const response = await axios.get(
         `${API_BASE_URL}/api/department-sections`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { departmentId },
         },
       );
@@ -556,25 +536,40 @@ const RegistrarCourseTaggingSummer = () => {
     const sectionId = e.target.value;
     setSelectedSection(sectionId);
     try {
-      const response = await axios.put(
+      await axios.put(
         `${API_BASE_URL}/api/update-active-curriculum`,
         {
           studentId: studentNumber,
           departmentSectionId: sectionId,
-        },
+          active_school_year_id: activeSchoolYearId,
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
-      const courseRes = await axios.get(
-        `${API_BASE_URL}/api/search-student/${sectionId}`,
-      );
-      if (courseRes.data.length > 0) {
-        setCurr(courseRes.data[0].curriculum_id);
-        setCourseCode(cleanDisplayValue(courseRes.data[0].program_code));
-        setCourseDescription(
-          cleanDisplayValue(courseRes.data[0].program_description),
+      // Home section only fills NULL/0 subject sections; keep active_curriculum / currId.
+      if (userId && currId && activeSchoolYearId) {
+        const { data } = await axios.get(
+          `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+            params: { activeSchoolYearId, includeOtherCurricula: true },
+          },
         );
+        setEnrolled(data);
       }
+      setSnack({
+        open: true,
+        message:
+          "Home section updated. Only subjects without a section were filled in; active curriculum was kept.",
+        severity: "success",
+      });
     } catch (error) {
       console.error("Error updating curriculum:", error);
+      setSnack({
+        open: true,
+        message:
+          error.response?.data?.error ||
+          "Failed to change section. Please try again.",
+        severity: "error",
+      });
     }
   };
 
@@ -595,7 +590,7 @@ const RegistrarCourseTaggingSummer = () => {
           course_id: course.course_id,
           semester_id: course.semester_id,
           curriculum_id: currId,
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (typeof data.allowed !== "boolean") {
         return {
@@ -657,7 +652,7 @@ const RegistrarCourseTaggingSummer = () => {
     computePrereqStatus();
   }, [userId, courses]);
 
-  const addToCart = async (course) => {
+  const addToCart = async (course, sectionIdOverride = null) => {
     if (!canCreate) {
       setSnack({
         open: true,
@@ -666,7 +661,8 @@ const RegistrarCourseTaggingSummer = () => {
       });
       return;
     }
-    if (!selectedSection) {
+    const sectionForEnroll = sectionIdOverride || selectedSection;
+    if (!sectionForEnroll) {
       setSnack({
         open: true,
         message:
@@ -694,7 +690,7 @@ const RegistrarCourseTaggingSummer = () => {
     if (isEnrolledCourse(course.course_id)) return;
     const payload = {
       subject_id: course.course_id,
-      department_section_id: selectedSection,
+      department_section_id: sectionForEnroll,
       active_school_year_id: activeSchoolYearId,
     };
     try {
@@ -705,7 +701,7 @@ const RegistrarCourseTaggingSummer = () => {
       );
       const { data } = await axios.get(
         `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
-        { params: { activeSchoolYearId } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { activeSchoolYearId, includeOtherCurricula: true } },
       );
       setEnrolled(data);
       setSnack({
@@ -720,6 +716,55 @@ const RegistrarCourseTaggingSummer = () => {
         message: "Error enrolling in this course. Please try again.",
         severity: "error",
       });
+    }
+  };
+
+  const handleEnrolledSectionChange = async (enrolledRow, nextSectionId) => {
+    if (!canEdit) {
+      setSnack({
+        open: true,
+        message: "You do not have permission to change subject sections.",
+        severity: "error",
+      });
+      return;
+    }
+    if (!enrolledRow?.id || !nextSectionId) return;
+    if (String(enrolledRow.department_section_id || "") === String(nextSectionId)) {
+      return;
+    }
+
+    setSectionUpdatingId(enrolledRow.id);
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/enrolled-courses/${enrolledRow.id}/section`,
+        { department_section_id: nextSectionId },
+        auditConfig,
+      );
+      const { data } = await axios.get(
+        `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          },
+          params: { activeSchoolYearId, includeOtherCurricula: true },
+        },
+      );
+      setEnrolled(data);
+      setSnack({
+        open: true,
+        message: `Section updated for ${enrolledRow.course_code || "subject"}.`,
+        severity: "success",
+      });
+    } catch (err) {
+      setSnack({
+        open: true,
+        message:
+          err.response?.data?.error ||
+          "Failed to update subject section. Please try again.",
+        severity: "error",
+      });
+    } finally {
+      setSectionUpdatingId(null);
     }
   };
 
@@ -743,7 +788,7 @@ const RegistrarCourseTaggingSummer = () => {
       );
       const { data } = await axios.get(
         `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
-        { params: { activeSchoolYearId } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { activeSchoolYearId, includeOtherCurricula: true } },
       );
       setEnrolled(data);
       setSnack({
@@ -838,9 +883,16 @@ const RegistrarCourseTaggingSummer = () => {
 
       const data = await refreshEnrolledCourses();
       if (data.length > 0) {
-        setCourseCode(cleanDisplayValue(data[0].program_code));
-        setCourseDescription(cleanDisplayValue(data[0].program_description));
-        setSectionDescription(cleanDisplayValue(data[0].section));
+        const nextCode = cleanDisplayValue(data[0].program_code);
+        const nextDesc = cleanDisplayValue(data[0].program_description);
+        const nextSection = cleanDisplayValue(data[0].section);
+        if (nextCode && nextCode.toUpperCase() !== "TBA") setCourseCode(nextCode);
+        if (nextDesc && nextDesc.toUpperCase() !== "TBA") {
+          setCourseDescription(nextDesc);
+        }
+        if (nextSection && nextSection.toUpperCase() !== "TBA") {
+          setSectionDescription(nextSection);
+        }
       }
       setSnack({
         open: true,
@@ -880,11 +932,11 @@ const RegistrarCourseTaggingSummer = () => {
       }
       await axios.delete(`${API_BASE_URL}/api/courses/user/${userId}`, {
         headers: auditConfig.headers,
-        params: { activeSchoolYearId },
+        params: { activeSchoolYearId, includeOtherCurricula: true },
       });
       const { data } = await axios.get(
         `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
-        { params: { activeSchoolYearId } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { activeSchoolYearId, includeOtherCurricula: true } },
       );
       setEnrolled(data);
       setDisableYearButtons(false);
@@ -911,7 +963,7 @@ const RegistrarCourseTaggingSummer = () => {
           studentNumber,
           active_school_year_id: activeSchoolYearId || true,
         },
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
       );
       const {
         token2,
@@ -1013,7 +1065,7 @@ const RegistrarCourseTaggingSummer = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+        const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setDepartments(res.data);
       } catch (err) {
         console.error("Error fetching departments:", err);
@@ -1041,7 +1093,7 @@ const RegistrarCourseTaggingSummer = () => {
         `${API_BASE_URL}/api/import-xlsx`,
         formData,
         {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "Content-Type": "multipart/form-data",
             ...auditConfig.headers,
           },
@@ -1091,15 +1143,6 @@ const RegistrarCourseTaggingSummer = () => {
   };
 
   const handleEnrollClick = async (course) => {
-    if (!selectedSection) {
-      setSnack({
-        open: true,
-        message:
-          "Please select a department section before enrolling in a course.",
-        severity: "warning",
-      });
-      return;
-    }
     if (!userId) {
       setSnack({
         open: true,
@@ -1109,18 +1152,54 @@ const RegistrarCourseTaggingSummer = () => {
       return;
     }
     if (isEnrolledCourse(course.course_id)) return;
+    if (!sections.length) {
+      setSnack({
+        open: true,
+        message: "Please select a department so section options can load.",
+        severity: "warning",
+      });
+      return;
+    }
+    setEnrollModalCourse(course);
+    setEnrollModalSectionId(selectedSection || "");
+    setEnrollModalOpen(true);
+  };
+
+  const handleEnrollModalClose = () => {
+    setEnrollModalOpen(false);
+    setEnrollModalCourse(null);
+    setEnrollModalSectionId("");
+  };
+
+  const proceedSingleEnrollWithChecks = async (course, sectionId) => {
     const status = prereqMap[course.course_id];
     if (status && status.hasPrereq) {
       let msg = `The subject ${course.course_code} has prerequisite subject(s).\n\n`;
       msg += status.allowed
         ? "The student meets the prerequisite qualification.\n\nDo you want to continue enrolling this subject?"
         : "The student does NOT meet the prerequisite qualification (failed or not yet passed).\n\nDo you still want to attempt to enroll this subject?";
-      setPendingAction({ type: "single", course });
+      setPendingAction({ type: "single", course, sectionId });
       setConfirmDialogMessage(msg);
       setConfirmDialogOpen(true);
     } else {
-      await addToCart(course);
+      await addToCart(course, sectionId);
     }
+  };
+
+  const handleEnrollModalConfirm = async () => {
+    if (!enrollModalCourse) return;
+    if (!enrollModalSectionId) {
+      setSnack({
+        open: true,
+        message: "Please select a section for this subject.",
+        severity: "warning",
+      });
+      return;
+    }
+    const course = enrollModalCourse;
+    const sectionId = enrollModalSectionId;
+    handleEnrollModalClose();
+    await proceedSingleEnrollWithChecks(course, sectionId);
   };
 
   const handleBulkEnrollClick = async (yearLevelId, semesterLabel) => {
@@ -1194,7 +1273,10 @@ const RegistrarCourseTaggingSummer = () => {
     }
     try {
       if (pendingAction.type === "single" && pendingAction.course)
-        await addToCart(pendingAction.course);
+        await addToCart(
+          pendingAction.course,
+          pendingAction.sectionId || selectedSection,
+        );
       else if (pendingAction.type === "bulk" && pendingAction.yearLevelId)
         await addAllToCart(pendingAction.yearLevelId);
     } finally {
@@ -1232,7 +1314,7 @@ const RegistrarCourseTaggingSummer = () => {
     try {
       const { data } = await axios.get(
         `${API_BASE_URL}/api/program-summer-subjects/check`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: {
             curriculum_id: curriculumId,
             semester_id: activeSemesterId,
@@ -1619,23 +1701,6 @@ const RegistrarCourseTaggingSummer = () => {
                   },
                 }}
               />
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={handleSearchStudent}
-                sx={{
-                  backgroundColor: headerColor,
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "13px",
-                  mt: 3,
-                  textTransform: "none",
-                  height: 38,
-                  boxShadow: "none",
-                }}
-              >
-                Search Student
-              </Button>
             </Stack>
           </Box>
 
@@ -1884,40 +1949,59 @@ const RegistrarCourseTaggingSummer = () => {
                 {error}
               </Typography>
             ) : (
-              <TextField
-                select
+              <Autocomplete
                 fullWidth
-                value={selectedSection}
-                onChange={handleSectionChange}
                 size="small"
-                label="Select a Department Section"
-                sx={{ "& .MuiOutlinedInput-root": { fontSize: "13px" } }}
-              >
-                <MenuItem value="">
-                  <em>Select a department section</em>
-                </MenuItem>
-                {sections.map((section) => (
-                  <MenuItem
-                    key={section.department_and_program_section_id}
-                    value={section.department_and_program_section_id}
-                    sx={{ fontSize: "13px" }}
-                  >
-                    <strong>
-                      {cleanDisplayValue(section.program_code)
-                        ? `(${cleanDisplayValue(section.program_code)})`
+                options={sections}
+                value={
+                  sections.find(
+                    (section) =>
+                      String(section.department_and_program_section_id) ===
+                      String(selectedSection),
+                  ) || null
+                }
+                onChange={(event, selected) => {
+                  handleSectionChange({
+                    target: {
+                      value: selected
+                        ? String(selected.department_and_program_section_id)
+                        : "",
+                    },
+                  });
+                }}
+                getOptionLabel={formatDepartmentSectionLabel}
+                isOptionEqualToValue={(option, value) =>
+                  String(option.department_and_program_section_id) ===
+                  String(value.department_and_program_section_id)
+                }
+                renderOption={(props, section) => (
+                  <li {...props} key={section.department_and_program_section_id}>
+                    <Typography component="span" sx={{ fontSize: "13px" }}>
+                      <strong>
+                        {cleanDisplayValue(section.program_code)
+                          ? `(${cleanDisplayValue(section.program_code)})`
+                          : ""}
+                      </strong>
+                      {(cleanDisplayValue(section.program_code) ? " " : "") +
+                        joinDisplayValues(
+                          section.program_description,
+                          section.major,
+                        )}
+                      {cleanDisplayValue(section.description)
+                        ? ` — ${cleanDisplayValue(section.description)}`
                         : ""}
-                    </strong>
-                    &nbsp;
-                    {joinDisplayValues(
-                      section.program_description,
-                      section.major,
-                    )}
-                    {cleanDisplayValue(section.description)
-                      ? ` — ${cleanDisplayValue(section.description)}`
-                      : ""}
-                  </MenuItem>
-                ))}
-              </TextField>
+                    </Typography>
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select a Department Section"
+                    placeholder="Search section..."
+                    sx={{ "& .MuiOutlinedInput-root": { fontSize: "13px" } }}
+                  />
+                )}
+              />
             )}
 
             {/* Year level / bulk buttons */}
@@ -2064,9 +2148,63 @@ const RegistrarCourseTaggingSummer = () => {
                         whiteSpace: "nowrap",
                         border: `1px solid ${borderColor}`,
                         textAlign: "center",
+                        minWidth: 160,
                       }}
                     >
-                      {formatSection(e.program_code, e.description) || "—"}
+                      <TextField
+                        select
+                        size="small"
+                        fullWidth
+                        disabled={!canEdit || sectionUpdatingId === e.id}
+                        value={
+                          e.department_section_id
+                            ? String(e.department_section_id)
+                            : ""
+                        }
+                        onChange={(ev) =>
+                          handleEnrolledSectionChange(e, ev.target.value)
+                        }
+                        sx={{
+                          "& .MuiInputBase-root": {
+                            fontSize: "12px",
+                            backgroundColor: "#fff",
+                          },
+                        }}
+                      >
+                        {!e.department_section_id && (
+                          <MenuItem value="">
+                            <em>No section</em>
+                          </MenuItem>
+                        )}
+                        {e.department_section_id &&
+                          !sections.some(
+                            (s) =>
+                              String(s.department_and_program_section_id) ===
+                              String(e.department_section_id),
+                          ) && (
+                            <MenuItem value={String(e.department_section_id)}>
+                              {formatSection(e.program_code, e.description) ||
+                                `Section ${e.department_section_id}`}
+                            </MenuItem>
+                          )}
+                        {sections.map((section) => (
+                          <MenuItem
+                            key={section.department_and_program_section_id}
+                            value={String(
+                              section.department_and_program_section_id,
+                            )}
+                          >
+                            {[
+                              section.program_code,
+                              section.description,
+                            ]
+                              .map((v) => cleanDisplayValue(v))
+                              .filter(Boolean)
+                              .join(" - ") ||
+                              `Section ${section.department_and_program_section_id}`}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </StyledTd>
                     <StyledTd
                       sx={{
@@ -2199,6 +2337,106 @@ const RegistrarCourseTaggingSummer = () => {
           )}
         </Card>
       </Box>
+
+      {/* ── ENROLL SECTION MODAL ── */}
+      <Dialog
+        open={enrollModalOpen}
+        onClose={handleEnrollModalClose}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { boxShadow: TOKEN.shadowMd } }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "15px",
+            py: 2,
+          }}
+        >
+          Select Section to Enroll
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, overflow: "visible" }}>
+          <Typography sx={{ fontSize: "13px", mb: 1.5, color: TOKEN.textMid }}>
+            Subject:{" "}
+            <strong>
+              {enrollModalCourse
+                ? `${enrollModalCourse.course_code} — ${enrollModalCourse.course_description || ""}`
+                : ""}
+            </strong>
+          </Typography>
+          <Autocomplete
+            fullWidth
+            size="small"
+            options={sections}
+            value={
+              sections.find(
+                (section) =>
+                  String(section.department_and_program_section_id) ===
+                  String(enrollModalSectionId),
+              ) || null
+            }
+            onChange={(event, selected) => {
+              setEnrollModalSectionId(
+                selected
+                  ? String(selected.department_and_program_section_id)
+                  : "",
+              );
+            }}
+            getOptionLabel={(section) =>
+              [
+                section.program_code,
+                section.major,
+                section.description,
+              ]
+                .map((v) => cleanDisplayValue(v))
+                .filter(Boolean)
+                .join(" — ") ||
+              `Section ${section.department_and_program_section_id}`
+            }
+            isOptionEqualToValue={(option, value) =>
+              String(option.department_and_program_section_id) ===
+              String(value.department_and_program_section_id)
+            }
+            renderOption={(props, section) => (
+              <li {...props} key={section.department_and_program_section_id}>
+                {[
+                  section.program_code,
+                  section.major,
+                  section.description,
+                ]
+                  .map((v) => cleanDisplayValue(v))
+                  .filter(Boolean)
+                  .join(" — ") ||
+                  `Section ${section.department_and_program_section_id}`}
+              </li>
+            )}
+            slotProps={{
+              popper: { disablePortal: true },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Section"
+                placeholder="Search section..."
+              />
+            )}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" onClick={handleEnrollModalClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleEnrollModalConfirm}
+            sx={{ backgroundColor: headerColor }}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── CONFIRM DIALOG ── */}
       <Dialog

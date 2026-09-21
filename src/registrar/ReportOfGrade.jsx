@@ -157,7 +157,7 @@ const ReportOfGrade = () => {
             if (!listYearId || !listSemesterId) return false;
 
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+                const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 const active =
                     Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
                 if (!active) return false;
@@ -197,7 +197,7 @@ const ReportOfGrade = () => {
 
             try {
                 const res = await axios.get(
-                    `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`,
+                    `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
                 );
                 if (cancelled) return;
                 const resolvedStudentNumber = res.data?.student_number;
@@ -242,7 +242,7 @@ const ReportOfGrade = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -254,7 +254,7 @@ const ReportOfGrade = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -285,7 +285,7 @@ const ReportOfGrade = () => {
             setUserRole(storedRole);
             setUserID(storedID);
 
-            if (storedRole !== "registrar") {
+            if (!["administrator", "superadmin", "technical"].includes(storedRole)) {
                 window.location.href = "/login";
             } else {
                 console.log("Hello")
@@ -304,7 +304,7 @@ const ReportOfGrade = () => {
 
         const fetchStudent = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/program_evaluation/${searchQuery}`);
+                const res = await fetch(`${API_BASE_URL}/api/program_evaluation/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 const data = await res.json();
 
                 if (data) {
@@ -316,7 +316,7 @@ const ReportOfGrade = () => {
                         setSearchQuery(data[0].student_number);
                     }
 
-                    const detailsRes = await fetch(`${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`);
+                    const detailsRes = await fetch(`${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                     const detailsData = await detailsRes.json();
 
                     if (Array.isArray(detailsData) && detailsData.length > 0) {
@@ -357,7 +357,7 @@ const ReportOfGrade = () => {
 
         const delayDebounce = setTimeout(async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+                const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     params: { query, limit: 10 },
                 });
 
@@ -390,8 +390,8 @@ const ReportOfGrade = () => {
 
     useEffect(() => {
         Promise.all([
-            axios.get(`${API_BASE_URL}/api/get_school_year/`),
-            axios.get(`${API_BASE_URL}/api/active_school_year`),
+            axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+            axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
         ])
             .then(([yearsRes, activeRes]) => {
                 const active =
@@ -409,7 +409,7 @@ const ReportOfGrade = () => {
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, []);
@@ -417,7 +417,7 @@ const ReportOfGrade = () => {
     useEffect(() => {
         if (selectedSchoolYear && selectedSchoolSemester) {
             axios
-                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`)
+                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => {
                     if (res.data.length > 0) {
                         setSelectedActiveSchoolYear(res.data[0].school_year_id);
@@ -433,7 +433,7 @@ const ReportOfGrade = () => {
 
     const fetchGradeConversionDic = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`);
+            const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setGradeConversions(res.data);
 
             console.log("Fetching Successfully");

@@ -834,7 +834,7 @@ const FacultyWorkload = () => {
   useEffect(() => {
     const fetchWorkloadTypes = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/workload`);
+        const res = await axios.get(`${API_BASE_URL}/api/workload`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setWorkloadTypes(res.data || []);
       } catch (err) {
         console.error("Error fetching workload types:", err);
@@ -852,7 +852,7 @@ const FacultyWorkload = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.length > 0) {
           const active = res.data[0];
@@ -899,7 +899,7 @@ const FacultyWorkload = () => {
         : storedEmployeeID
           ? `/api/get_prof_data_by_employee/${storedEmployeeID}`
           : `/api/get_prof_data/${id}`;
-      const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+      const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const first = res.data[0];
       localStorage.setItem("prof_id", first.prof_id || "");
       localStorage.setItem("employee_id", first.employee_id || "");
@@ -928,7 +928,7 @@ const FacultyWorkload = () => {
 
     const fetchProfessorEducation = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/person_prof_list`);
+        const response = await axios.get(`${API_BASE_URL}/api/person_prof_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const education = (response.data || []).find(
           (row) => String(row.person_id) === String(profData.prof_id)
         );
@@ -947,7 +947,7 @@ const FacultyWorkload = () => {
     const fetchSchedule = async () => {
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/professor-schedule/${profData.prof_id}`,
+          `${API_BASE_URL}/api/professor-schedule/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setSchedule(response.data);
       } catch (err) {
@@ -1354,7 +1354,7 @@ const FacultyWorkload = () => {
 
       const res = await fetch(`${API_BASE_URL}/api/generate-faculty-workload-pdf`, {
         method: "POST",
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

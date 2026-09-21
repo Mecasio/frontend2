@@ -177,7 +177,7 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
   }, [personData.prof_id]);
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/announcements/faculty`)
+    axios.get(`${API_BASE_URL}/api/announcements/faculty`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : res.data?.data;
         setAnnouncements(data || []);
@@ -252,7 +252,7 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
   const month = date.getMonth();
 
   useEffect(() => {
-    axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`)
+    axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const lookup = {};
         res.data.forEach((h) => { lookup[h.date] = h; });
@@ -270,7 +270,7 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
         : storedEmployeeID
           ? `/api/get_prof_data_by_employee/${storedEmployeeID}`
           : `/api/get_prof_data/${id}`;
-      const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+      const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const first = res.data[0];
       localStorage.setItem("prof_id", first.prof_id || "");
       localStorage.setItem("employee_id", first.employee_id || "");
@@ -290,7 +290,7 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
   const fetchDashboard = async (profId) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/faculty_dashboard_summary/${profId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/faculty_dashboard_summary/${profId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDashboard(res.data);
     } catch (err) {
       console.error("Dashboard fetch failed:", err);
@@ -307,8 +307,8 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
       const formData = new FormData();
       formData.append("profile_picture", file);
       formData.append("employee_id", employee_id);
-      await axios.post(`${API_BASE_URL}/api/update_faculty`, formData);
-      const updated = await axios.get(`${API_BASE_URL}/api/get_prof_data_by_employee/${employee_id}`);
+      await axios.post(`${API_BASE_URL}/api/update_faculty`, formData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+      const updated = await axios.get(`${API_BASE_URL}/api/get_prof_data_by_employee/${employee_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const updatedFaculty = updated.data[0];
       setPerson((prev) => ({ ...prev, profile_image: updatedFaculty.profile_image }));
       setProfileImage(`${API_BASE_URL}/uploads/Faculty1by1/${updatedFaculty.profile_image}?t=${Date.now()}`);

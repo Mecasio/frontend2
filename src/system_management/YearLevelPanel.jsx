@@ -52,7 +52,7 @@ const YearLevelPanel = () => {
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -85,7 +85,7 @@ const YearLevelPanel = () => {
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -98,7 +98,7 @@ const YearLevelPanel = () => {
   const checkAccess = async (employeeID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data?.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -124,7 +124,7 @@ const YearLevelPanel = () => {
 
   const fetchYearLevelList = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_year_level`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearLevelList(res.data);
     } catch (err) {
       console.error("Failed to fetch year levels:", err);

@@ -106,7 +106,7 @@ const SignatureUpload = () => {
       setPersonID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
         fetchSignatures(); // ✅ Fix 6: fetch on mount
       } else {
@@ -148,7 +148,7 @@ const SignatureUpload = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -173,7 +173,7 @@ const SignatureUpload = () => {
 
   const fetchSignatures = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/signature`);
+      const res = await axios.get(`${API_BASE_URL}/api/signature`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data.success) {
         setSignatureList(res.data.data);
       }
@@ -191,7 +191,7 @@ const SignatureUpload = () => {
     "x-employee-id": employeeID,
     "x-page-id": pageId,
     "x-audit-actor-id": employeeID,
-    "x-audit-actor-role": userRole || "registrar",
+    "x-audit-actor-role": userRole || "administrator",
   });
 
   const handleSubmit = async () => {
@@ -240,7 +240,7 @@ const SignatureUpload = () => {
           `${API_BASE_URL}/api/signature/${editId}`,
           submitData,
           {
-            headers: {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
               "Content-Type": "multipart/form-data",
               ...getAuditHeaders(),
             },
@@ -258,7 +258,7 @@ const SignatureUpload = () => {
         submitData.append("signature", signature);
 
         res = await axios.post(`${API_BASE_URL}/api/signature`, submitData, {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "Content-Type": "multipart/form-data",
             ...getAuditHeaders(),
           },

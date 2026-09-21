@@ -115,7 +115,7 @@ const DprtmntRoom = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -136,7 +136,7 @@ const DprtmntRoom = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -148,7 +148,7 @@ const DprtmntRoom = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (Number(response.data?.page_privilege) === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -168,7 +168,7 @@ const DprtmntRoom = () => {
 
   const fetchDepartment = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const response = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartmentList(response.data);
     } catch (err) {
       console.error("Error fetching departments:", err);
@@ -177,7 +177,7 @@ const DprtmntRoom = () => {
 
   const fetchRoomList = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/room_list`);
+      const response = await axios.get(`${API_BASE_URL}/api/room_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRoomList(response.data);
     } catch (err) {
       console.log("Error fetching room list:", err);
@@ -186,7 +186,7 @@ const DprtmntRoom = () => {
 
   const fetchRoomAssignments = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/assignments`);
+      const response = await axios.get(`${API_BASE_URL}/api/assignments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const assignments = response.data;
 
       const groupedAssignments = assignments.reduce((acc, assignment) => {

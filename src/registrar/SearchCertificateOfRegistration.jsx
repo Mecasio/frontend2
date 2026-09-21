@@ -38,8 +38,6 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
-import Unauthorized from "../components/Unauthorized";
-import LoadingOverlay from "../components/LoadingOverlay";
 import StudentHistoryDialog from "../components/StudentHistoryDialog";
 import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import { postAuditEvent } from "../utils/auditEvents";
@@ -83,6 +81,15 @@ const logCorSearchAudit = async (student, fallbackStudentNumber) => {
   } catch (err) {
     console.error("COR search audit failed:", err);
   }
+};
+
+const ensureStudentQr = async (studentNumber) => {
+  const response = await axios.post(
+    `${API_BASE_URL}/api/students/${encodeURIComponent(studentNumber)}/ensure-qr`,
+    {},
+    { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
+  );
+  return response.data?.qr_code_url || "";
 };
 
 // Small blob-download helper (same pattern used in CORExportingModule)
@@ -146,10 +153,6 @@ const SearchCertificateOfRegistration = () => {
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
 
-  const [hasAccess, setHasAccess] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const pageId = 56;
-
   const [employeeID, setEmployeeID] = useState("");
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -162,38 +165,8 @@ const SearchCertificateOfRegistration = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-
-      if (storedRole === "registrar") {
-        checkAccess(storedEmployeeID);
-      } else {
-        window.location.href = "/login";
-      }
-    } else {
-      window.location.href = "/login";
     }
   }, []);
-
-  const checkAccess = async (employeeID) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
-      );
-      if (response.data && response.data.page_privilege === 1) {
-        setHasAccess(true);
-      } else {
-        setHasAccess(false);
-      }
-    } catch (error) {
-      console.error("Error checking access:", error);
-      setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
-      setLoading(false);
-    }
-  };
 
   const location = useLocation();
   const REGISTRAR_COR_SEARCH_KEY = "registrar_cor_search_student_number";
@@ -214,6 +187,7 @@ const SearchCertificateOfRegistration = () => {
   const [studentDetails, setStudentDetails] = useState([]);
   const [corPreload, setCorPreload] = useState(null);
   const [corPreloadLoading, setCorPreloadLoading] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [schoolYears, setSchoolYears] = useState([]);
   const [schoolSemesters, setSchoolSemesters] = useState([]);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
@@ -234,8 +208,8 @@ const SearchCertificateOfRegistration = () => {
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_BASE_URL}/api/get_school_year/`),
-      axios.get(`${API_BASE_URL}/api/active_school_year`),
+      axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
     ])
       .then(([yearsRes, activeRes]) => {
         const active =
@@ -253,7 +227,7 @@ const SearchCertificateOfRegistration = () => {
       .catch((err) => console.error(err));
 
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemesters(res.data || []))
       .catch((err) => console.error(err));
   }, []);
@@ -266,7 +240,7 @@ const SearchCertificateOfRegistration = () => {
 
     axios
       .get(
-        `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+        `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         if (Array.isArray(res.data) && res.data.length > 0) {
@@ -315,7 +289,7 @@ const SearchCertificateOfRegistration = () => {
     setCorPreload(null);
 
     axios
-      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const resolvedStudentNumber = res.data?.student_number;
         if (resolvedStudentNumber) {
@@ -360,10 +334,11 @@ const SearchCertificateOfRegistration = () => {
       try {
         setCorPreload(null);
         setCorPreloadLoading(true);
+        setQrCodeUrl("");
 
         const [res, preloadRes] = await Promise.all([
           fetch(
-            `${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`,
+            `${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           ),
           axios
             .post(
@@ -372,7 +347,7 @@ const SearchCertificateOfRegistration = () => {
                 studentNumber: debouncedStudentNumber,
                 active_school_year_id: selectedActiveSchoolYear,
               },
-              { headers: { "Content-Type": "application/json" } },
+              { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
             )
             .catch((err) => {
               console.error("COR preload failed:", err);
@@ -386,6 +361,15 @@ const SearchCertificateOfRegistration = () => {
         ]);
 
         setCorPreload(preloadRes?.data || null);
+
+        if (preloadRes?.data) {
+          try {
+            setQrCodeUrl(await ensureStudentQr(debouncedStudentNumber));
+          } catch (qrError) {
+            console.error("Student QR generation failed:", qrError);
+            showSnackbar("Student found, but the QR code could not be prepared.", "warning");
+          }
+        }
 
         // Match the first function's response handling
         if (!res.ok) {
@@ -408,6 +392,14 @@ const SearchCertificateOfRegistration = () => {
         console.log("Fetched student data:", data);
 
         if (data) {
+          if (!preloadRes?.data) {
+            try {
+              setQrCodeUrl(await ensureStudentQr(data.student_number || debouncedStudentNumber));
+            } catch (qrError) {
+              console.error("Student QR generation failed:", qrError);
+              showSnackbar("Student found, but the QR code could not be prepared.", "warning");
+            }
+          }
           setSelectedStudent(data);
           setStudentData(data);
 
@@ -417,7 +409,7 @@ const SearchCertificateOfRegistration = () => {
           showSnackbar("Student found successfully.", "success");
 
           const detailsRes = await fetch(
-            `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`,
+            `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           const detailsData = await detailsRes.json();
 
@@ -520,7 +512,7 @@ const SearchCertificateOfRegistration = () => {
         ],
         file_name: `${debouncedStudentNumber}_Certificate_Of_Registration`,
         frontend_origin: window.location.origin,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const jobId = startRes.data?.job_id;
       if (!jobId) throw new Error("Server did not return an export job id.");
@@ -530,7 +522,7 @@ const SearchCertificateOfRegistration = () => {
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`,
+          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         job = statusRes.data;
 
@@ -547,7 +539,7 @@ const SearchCertificateOfRegistration = () => {
       setExportStatus("Downloading PDF...");
       const downloadRes = await axios.get(
         `${API_BASE_URL}/api/cor-export/jobs/${jobId}/download`,
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       downloadBlob(
@@ -599,7 +591,7 @@ const SearchCertificateOfRegistration = () => {
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/cor-student-suggestions`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: { query, limit: 10 },
           },
         );
@@ -678,15 +670,6 @@ const SearchCertificateOfRegistration = () => {
     if (paymentButtonsDisabled) return;
     corPaymentActionsRef.current?.openScholarshipModal();
   };
-
-  // Put this at the very bottom before the return
-  if (loading || hasAccess === null) {
-    return <LoadingOverlay open={loading} message="Loading..." />;
-  }
-
-  if (!hasAccess) {
-    return <Unauthorized />;
-  }
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1052,6 +1035,7 @@ const SearchCertificateOfRegistration = () => {
           }
           activeSchoolYearId={selectedActiveSchoolYear || undefined}
           preload={corPreload}
+          qrCodeUrl={qrCodeUrl}
           onPaymentActionsChange={handlePaymentActionsChange}
           onNotify={({ message, severity }) => showSnackbar(message, severity)}
         />

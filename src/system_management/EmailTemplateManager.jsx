@@ -79,7 +79,7 @@ export default function EmailTemplateManager() {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -91,7 +91,7 @@ export default function EmailTemplateManager() {
     if (storedUser && storedRole && storedID) {
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -104,7 +104,7 @@ export default function EmailTemplateManager() {
   const checkAccess = async (empID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -136,7 +136,7 @@ export default function EmailTemplateManager() {
 
   const loadTemplates = async () => {
     try {
-      const res = await axios.get(API);
+      const res = await axios.get(API, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRows(res.data || []);
     } catch (err) {
       showSnack("Failed to load templates", "error");
@@ -145,7 +145,7 @@ export default function EmailTemplateManager() {
 
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/departments`);
+      const res = await axios.get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartments(res.data || []);
     } catch (err) {
       console.error("Failed to fetch departments", err);
@@ -154,7 +154,7 @@ export default function EmailTemplateManager() {
 
   const fetchCurriculums = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setActiveCurriculums(res.data || []);
     } catch (err) {
       console.error("Failed to fetch active curriculums", err);
@@ -163,7 +163,7 @@ export default function EmailTemplateManager() {
 
   const fetchAllEmployees = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/registrars`);
+      const res = await axios.get(`${API_BASE_URL}/api/registrars`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAllEmployees(res.data || []);
     } catch (err) {
       console.error("Failed to fetch employees", err);
@@ -202,7 +202,7 @@ export default function EmailTemplateManager() {
     if (!taggedEmployeesByTemplate[templateId]) {
       setLoadingTagged((prev) => ({ ...prev, [templateId]: true }));
       try {
-        const res = await axios.get(`${API}/${templateId}/employees`);
+        const res = await axios.get(`${API}/${templateId}/employees`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setTaggedEmployeesByTemplate((prev) => ({
           ...prev,
           [templateId]: res.data || [],
@@ -473,7 +473,7 @@ export default function EmailTemplateManager() {
     // Load currently tagged employees
     let existingTagged = [];
     try {
-      const empRes = await axios.get(`${API}/${row.template_id}/employees`);
+      const empRes = await axios.get(`${API}/${row.template_id}/employees`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       existingTagged = empRes.data || [];
     } catch (err) {
       console.error("Failed to load tagged employees for edit", err);

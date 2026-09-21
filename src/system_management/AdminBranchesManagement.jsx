@@ -110,7 +110,7 @@ const AdminBranchesManagement = () => {
       "x-audit-actor-id":
         employeeID || localStorage.getItem("employee_id") || "",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -126,7 +126,7 @@ const AdminBranchesManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -139,7 +139,7 @@ const AdminBranchesManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -189,7 +189,7 @@ const AdminBranchesManagement = () => {
 
   const fetchBranches = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/branches`);
+      const res = await axios.get(`${API_BASE_URL}/api/branches`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const safeData = res.data.map((b) => ({
         ...b,

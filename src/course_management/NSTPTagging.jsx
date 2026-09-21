@@ -103,7 +103,7 @@ const NSTPTagging = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -114,7 +114,7 @@ const NSTPTagging = () => {
 
     if (storedRole && storedID) {
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -127,7 +127,7 @@ const NSTPTagging = () => {
   const checkAccess = async (empID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(res.data?.page_privilege === 1);
     } catch {
@@ -155,13 +155,13 @@ const NSTPTagging = () => {
     const fetchDropdowns = async () => {
       try {
         const [secRes, deptRes, curRes, yearLevelRes, yrRes, semRes, activeRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/department_section`),
-          axios.get(`${API_BASE_URL}/api/get_department`),
-          axios.get(`${API_BASE_URL}/api/get_active_curriculum`),
-          axios.get(`${API_BASE_URL}/api/api/year-levels`),
-          axios.get(`${API_BASE_URL}/api/get_school_year`),
-          axios.get(`${API_BASE_URL}/api/get_school_semester`),
-          axios.get(`${API_BASE_URL}/api/active_school_year`),
+          axios.get(`${API_BASE_URL}/api/department_section`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/get_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/get_school_semester`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+          axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
         ]);
         setDepartmentSections(secRes.data || []);
         setDepartments(deptRes.data || []);
@@ -199,7 +199,7 @@ const NSTPTagging = () => {
     if (!selectedYear || !selectedSemester) return;
     axios
       .get(
-        `${API_BASE_URL}/api/get_selected_year/${selectedYear}/${selectedSemester}`,
+        `${API_BASE_URL}/api/get_selected_year/${selectedYear}/${selectedSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         if (res.data?.length > 0) setActiveSYID(res.data[0].school_year_id);
@@ -335,7 +335,7 @@ const NSTPTagging = () => {
 
   // ── Fetch all students in section — left panel never filters anyone out ───
   const fetchSectionStudents = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/get_student_per_section`, {
+    const res = await axios.get(`${API_BASE_URL}/api/get_student_per_section`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
       params: {
         department_section_id: selectedSection,
         active_school_year_id: activeSYID,
@@ -347,7 +347,7 @@ const NSTPTagging = () => {
 
   const fetchTaggedStudents = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_nstp_tagged_student`, {
+      const res = await axios.get(`${API_BASE_URL}/api/get_nstp_tagged_student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           department_section_id: selectedSection,
           active_school_year_id: activeSYID,

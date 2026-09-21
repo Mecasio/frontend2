@@ -26,7 +26,6 @@ import {
   TableCell,
   TableContainer,
   Paper,
-  FormControlLabel,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import {
@@ -266,21 +265,6 @@ const DepartmentSectionFormDialog = memo(
             }}
             sx={{ mb: 2 }}
           />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={Number(form.is_open_for_self_enrollment) === 1}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    is_open_for_self_enrollment: e.target.checked ? 1 : 0,
-                  }))
-                }
-              />
-            }
-            label="Open for Self-Enrollment"
-          />
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
@@ -312,7 +296,6 @@ const EMPTY_FORM = {
   section_id: "",
   year_level_id: "",
   max_slots: 0,
-  is_open_for_self_enrollment: 1,
 };
 
 const DepartmentSectionGrid = memo(
@@ -326,7 +309,6 @@ const DepartmentSectionGrid = memo(
     onEdit,
     onDelete,
     onToggleStatus,
-    onToggleSelfEnrollment,
   }) => (
     <Box
       sx={{
@@ -480,34 +462,6 @@ const DepartmentSectionGrid = memo(
                           {Number(ds.dsstat) === 1 ? "Active" : "Inactive"}
                         </Typography>
                       </Box>
-
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <Switch
-                          size="small"
-                          checked={Number(ds.is_open_for_self_enrollment) === 1}
-                          onChange={(e) =>
-                            onToggleSelfEnrollment(
-                              ds.department_section_id,
-                              e.target.checked ? 1 : 0,
-                            )
-                          }
-                          disabled={!canEdit}
-                        />
-                        <Typography
-                          fontSize="11px"
-                          sx={{
-                            minWidth: 90,
-                            color:
-                              Number(ds.is_open_for_self_enrollment) === 1
-                                ? "success.main"
-                                : "text.disabled",
-                          }}
-                        >
-                          {Number(ds.is_open_for_self_enrollment) === 1
-                            ? "Self-Enroll: Open"
-                            : "Self-Enroll: Closed"}
-                        </Typography>
-                      </Box>
                     </Box>
 
                     <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -616,7 +570,7 @@ const DepartmentSection = () => {
     "x-page-id": pageId,
     "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
     "x-audit-actor-role":
-      userRole || localStorage.getItem("role") || "registrar",
+      userRole || localStorage.getItem("role") || "administrator",
   });
 
   useEffect(() => {
@@ -630,7 +584,7 @@ const DepartmentSection = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -643,7 +597,7 @@ const DepartmentSection = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && Number(response.data.page_privilege) === 1) {
         setHasAccess(true);
@@ -675,7 +629,7 @@ const DepartmentSection = () => {
 
   const fetchYearLevels = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/get_year_level`);
+      const response = await axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearLevels(response.data || []);
     } catch (err) {
       console.error(err);
@@ -684,7 +638,7 @@ const DepartmentSection = () => {
 
   const fetchCurriculum = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCurriculumList(res.data);
     } catch (err) {
       console.error(err);
@@ -693,7 +647,7 @@ const DepartmentSection = () => {
 
   const fetchSections = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/section_table`);
+      const response = await axios.get(`${API_BASE_URL}/api/section_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSectionsList(response.data || []);
     } catch (err) {
       console.error(err);
@@ -704,7 +658,7 @@ const DepartmentSection = () => {
   const fetchDepartmentSections = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/department_section`,
+        `${API_BASE_URL}/api/department_section`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setDepartmentSections(response.data || []);
     } catch (err) {
@@ -747,16 +701,11 @@ const DepartmentSection = () => {
         const sectionDesc = (ds.section_description || "").toLowerCase();
         const yearLevelDesc = (ds.year_level_description || "").toLowerCase();
         const status = ds.dsstat === 1 ? "active" : "inactive";
-        const selfEnrollStatus =
-          Number(ds.is_open_for_self_enrollment) === 1
-            ? "open self-enrollment"
-            : "closed self-enrollment";
         return (
           programLabel.includes(search) ||
           sectionDesc.includes(search) ||
           yearLevelDesc.includes(search) ||
-          status.includes(search) ||
-          selfEnrollStatus.includes(search)
+          status.includes(search)
         );
       });
 
@@ -821,9 +770,6 @@ const DepartmentSection = () => {
             ? 0
             : Number(formData.max_slots),
         dsstat: overrides.dsstat ?? 0,
-        is_open_for_self_enrollment:
-          overrides.is_open_for_self_enrollment ??
-          (Number(formData.is_open_for_self_enrollment) === 0 ? 0 : 1),
         program_code: curriculum?.program_code || "",
         program_description: curriculum?.program_description || "",
         major: curriculum?.major || "",
@@ -981,8 +927,6 @@ const DepartmentSection = () => {
           section_id: section.section_id ?? "",
           year_level_id: section.year_level_id ?? "",
           max_slots: section.max_slots ?? 0,
-          is_open_for_self_enrollment:
-            Number(section.is_open_for_self_enrollment) === 0 ? 0 : 1,
         },
       });
     },
@@ -1031,53 +975,6 @@ const DepartmentSection = () => {
         setSnackbar({
           open: true,
           message: err.response?.data?.message || "Failed to update status.",
-          severity: "error",
-        });
-      }
-    },
-    [canEdit, departmentSections, employeeID, userRole],
-  );
-
-  const handleToggleSelfEnrollment = useCallback(
-    async (departmentSectionId, value) => {
-      if (value === null) return;
-      if (!canEdit) {
-        setSnackbar({
-          open: true,
-          message: "You do not have permission to edit items on this page.",
-          severity: "error",
-        });
-        return;
-      }
-
-      const previousSections = departmentSections;
-      setDepartmentSections((prev) =>
-        prev.map((row) =>
-          String(row.department_section_id) === String(departmentSectionId)
-            ? { ...row, is_open_for_self_enrollment: value }
-            : row,
-        ),
-      );
-
-      try {
-        await axios.put(
-          `${API_BASE_URL}/api/department_section/${departmentSectionId}/self_enrollment`,
-          { is_open_for_self_enrollment: value },
-          { headers: getPermissionHeaders() },
-        );
-        setSnackbar({
-          open: true,
-          message: `Self-enrollment ${value === 1 ? "opened" : "closed"} successfully!`,
-          severity: "success",
-        });
-      } catch (err) {
-        setDepartmentSections(previousSections);
-        console.error(err);
-        setSnackbar({
-          open: true,
-          message:
-            err.response?.data?.message ||
-            "Failed to update self-enrollment setting.",
           severity: "error",
         });
       }
@@ -1432,7 +1329,6 @@ const DepartmentSection = () => {
           onEdit={openEditDepartmentSection}
           onDelete={handleDeleteRequest}
           onToggleStatus={handleToggleStatus}
-          onToggleSelfEnrollment={handleToggleSelfEnrollment}
         />
 
         {filteredGroupedEntries.length === 0 && (

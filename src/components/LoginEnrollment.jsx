@@ -3,7 +3,6 @@ import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { Modal } from "@mui/material";
 import {
-  Container,
   Box,
   Snackbar,
   Alert,
@@ -26,6 +25,11 @@ import {
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import "../styles/Container.css";
+import {
+  UNIFORM_BORDER,
+  UNIFORM_RADIUS,
+  fieldBorder,
+} from "../styles/formTokens";
 import Logo from "../assets/Logo.png";
 import { SettingsContext } from "../App";
 import LoadingOverlay from "./LoadingOverlay";
@@ -49,9 +53,15 @@ function getRegistrarDashboard(accessSet) {
 function getUserDashboard(role, accessList = []) {
   const accessSet = accessToSet(accessList);
   const normalizedRole = String(role || "").trim().toLowerCase();
-  if (normalizedRole === "registrar") return getRegistrarDashboard(accessSet);
+  // Superadmin / technical always open on Registrar Dashboard.
+  if (["superadmin", "technical"].includes(normalizedRole)) {
+    return "/registrar_dashboard";
+  }
+  // Administrator: registrar by default; admission/enrollment officers by page access.
+  if (normalizedRole === "administrator") {
+    return getRegistrarDashboard(accessSet);
+  }
   if (normalizedRole === "faculty") return "/faculty_dashboard";
-  if (normalizedRole === "superadmin") return "/system_dashboard";
   return "/student_dashboard";
 }
 
@@ -130,7 +140,7 @@ const TotpLoginModal = ({
           loginSetupId: loginData.loginSetupId,
           email: loginData.email,
           source: loginData.source || "user",
-        })
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => {
           if (res.data.success) {
             setQrDataUrl(res.data.qrDataUrl);
@@ -193,7 +203,7 @@ const TotpLoginModal = ({
         loginSetupId: loginData.loginSetupId,
         email: loginData.email,
         source: loginData.source || "user",
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.success) {
           setQrDataUrl(res.data.qrDataUrl);
@@ -231,7 +241,7 @@ const TotpLoginModal = ({
         source: loginData.source || "user",
         audit_log_db: "db3",
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (!verifyRes.data.success) {
         setError(verifyRes.data.message || "Verification failed.");
@@ -748,6 +758,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   const assets = settings?.assets || {};
   const mainButtonColor = colors.mainButton || "#1976d2";
   const headerColor = colors.header || "#1976d2";
+  const borderColor = colors.border || "#e6e6e6";
   const companyName = branding.companyName || "Company Name";
 
   const [email, setEmail] = useState("");
@@ -759,7 +770,6 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   const [tempLoginData, setTempLoginData] = useState(null);
 
   const [loading, setLoading] = useState(false);
-  const [currentYear, setCurrentYear] = useState("");
   const [loginType, setLoginType] = useState("user");
   const [errors, setErrors] = useState({});
   const navigate = useNavigate();
@@ -767,11 +777,6 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   const lockTimerRef = useRef(0);
   const [lockout, setLockout] = useState(false);
   const [lockoutTimer, setLockoutTimer] = useState(0);
-
-  useEffect(() => {
-    const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
-    setCurrentYear(new Date(now).getFullYear());
-  }, []);
 
   useEffect(() => {
     fetchAndStoreUserMacAddress().catch((err) => {
@@ -811,8 +816,9 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
     setLockout(true);
   };
 
-  const backgroundImage =
+  const backgroundBase =
     assets.backgroundImage || "linear-gradient(to right, #f5f5f5, #fafafa)";
+  const backgroundImage = `linear-gradient(to bottom, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.15)), ${backgroundBase}`;
   const logoSrc = assets.logoUrl || Logo;
 
   const isFormValid = () => {
@@ -840,6 +846,10 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
     localStorage.setItem("department", data.department || "");
     localStorage.setItem("employee_id", data.employee_id);
     localStorage.setItem("curriculum_id", data.curriculum_id || "");
+    localStorage.setItem(
+      "accessList",
+      JSON.stringify(Array.isArray(data.accessList) ? data.accessList : []),
+    );
     setIsAuthenticated(true);
 
     if (shouldForceChange) {
@@ -847,7 +857,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
       const changePwPath =
         roleVal === "faculty"
           ? "/faculty_reset_password"
-          : roleVal === "registrar"
+          : ["administrator", "superadmin", "technical"].includes(roleVal)
             ? "/registrar_reset_password"
             : "/student_reset_password";
       navigate(changePwPath);
@@ -883,7 +893,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
         password,
         audit_log_db: "db3",
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data.locked) {
         const secs = res.data.remainingSeconds ?? 180;
@@ -992,10 +1002,6 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   // });
 
   // ── Layout tokens per device tier ──
-  const cardWidth = isMobile ? "calc(100% - 32px)" : isTablet ? "min(520px, 92vw)" : undefined;
-  const cardMaxWidth = isMobile ? 480 : isTablet ? 520 : undefined;
-  const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
-  const containerMarginTop = isMobile ? 0 : isTablet ? -40 : -100;
   const fieldHeight = isMobile ? "52px" : "54px";
 
   return (
@@ -1003,46 +1009,50 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
       <Box
         sx={{
           backgroundImage,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover, cover",
+          backgroundPosition: "center, center",
+          backgroundRepeat: "no-repeat, no-repeat",
           width: "100%",
-          minHeight: "100dvh",
+          height: isDesktop ? "calc(100vh - 100px)" : undefined,
+          minHeight: isDesktop ? 0 : "100dvh",
           display: "flex",
           alignItems: isDesktop ? "center" : "flex-start",
           justifyContent: "center",
           position: "relative",
           overflowY: isDesktop ? "hidden" : "auto",
+          overflowX: "hidden",
           py: isDesktop ? 0 : isTablet ? 4 : 2,
-          px: isMobile ? 0 : 2,
+          px: 2,
           pb: isMobile ? "calc(16px + env(safe-area-inset-bottom))" : undefined,
+          boxSizing: "border-box",
         }}
       >
-        <Container
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: containerMarginTop,
-            padding: isMobile ? "0" : undefined,
+        <Box
+          sx={{
             width: "100%",
+            maxWidth: isMobile ? 400 : isTablet ? 380 : 460,
+            display: "flex",
+            justifyContent: "center",
+            mx: "auto",
           }}
-          maxWidth={false}
         >
           <div
             style={{
-              border: `${cardBorderWidth} solid black`,
-              width: cardWidth,
-              maxWidth: cardMaxWidth,
+              border: `1px solid ${borderColor}`,
+              width: "100%",
+              margin: 0,
+              transform: isMobile ? "scale(0.9)" : "none",
+              transformOrigin: "top center",
+              boxSizing: "border-box",
             }}
-            className="Container"
+            className="Container login-card uniform-card"
           >
             <div
               className="Header"
               style={{
                 backgroundColor: headerColor,
                 padding: isMobile ? "12px 10px" : isTablet ? "14px 12px" : "1rem 0",
-                borderBottom: "3px solid black",
+                borderBottom: "none",
               }}
             >
               <div className="HeaderTitle">
@@ -1060,7 +1070,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                       return acc;
                     }, [])}
                 </strong>
-                <p>Academic Information System</p>
+                <p>Academic Portal System</p>
               </div>
             </div>
 
@@ -1079,10 +1089,10 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                   style={{
                     width: "100%",
                     padding: "0.8rem 2.5rem 0.8rem 2.80rem",
-                    borderRadius: "10px",
-                    border: "2px solid black",
-                    height: fieldHeight,
+                    borderRadius: UNIFORM_RADIUS,
+                    border: UNIFORM_BORDER,
                     fontSize: "16px",
+                    height: fieldHeight,
                     backgroundColor: "white",
                     outline: "none",
                     appearance: "none",
@@ -1103,11 +1113,10 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                   }}
                 />
                 <ArrowDropDownIcon
-                  sx={{
+                  style={{
                     position: "absolute",
-                    right: "10px",
-                    top: "70%",
-                    transform: "translateY(-50%)",
+                    top: "2.80rem",
+                    right: "0.7rem",
                     fontSize: "30px",
                     color: "black",
                     pointerEvents: "none",
@@ -1118,7 +1127,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!lockout) handleLogin();
+                  if (!lockout && !loading) handleLogin();
                 }}
               >
                 <div className="TextField" style={{ position: "relative" }}>
@@ -1135,7 +1144,8 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                       paddingLeft: "2.80rem",
                       height: fieldHeight,
                       fontSize: "16px",
-                      border: errors.email ? "2px solid red" : "2px solid black",
+                      border: fieldBorder(errors.email),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                     }}
                     autoFocus={isDesktop}
@@ -1167,7 +1177,8 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                       paddingLeft: "2.80rem",
                       height: fieldHeight,
                       fontSize: "16px",
-                      border: errors.password ? "2px solid red" : "2px solid black",
+                      border: fieldBorder(errors.password),
+                      borderRadius: UNIFORM_RADIUS,
                       width: "100%",
                     }}
                   />
@@ -1206,49 +1217,53 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                   </button>
                 </div>
 
-                <div style={{ cursor: lockout || loading ? "not-allowed" : "pointer" }}>
-                  <button
-                    type="submit"
-                    tabIndex={0}
-                    disabled={lockout || loading}
-                    style={{
-                      width: "100%",
-                      backgroundColor: lockout ? "#999" : loading ? "#ccc" : mainButtonColor,
-                      border: "2px solid black",
-                      color: "white",
-                      height: isMobile ? "48px" : "50px",
-                      borderRadius: "10px",
-                      padding: "0.5rem 0",
-                      fontSize: "16px",
-                      fontWeight: "bold",
-                      marginTop: isMobile ? "28px" : isTablet ? "36px" : "50px",
-                      cursor: lockout || loading ? "not-allowed" : "pointer",
-                      opacity: lockout || loading ? 0.8 : 1,
-                      transition: "opacity 0.2s ease-in-out",
-                      touchAction: "manipulation",
-                    }}
-                  >
-                    {lockout ? `Locked (${lockoutTimer}s)` : loading ? "Processing..." : "Log In"}
-                  </button>
+                <div style={{ marginTop: "-10px" }}>
+                  <span>
+                    <Link to="/forgot_password">Forgot your password</Link>
+                  </span>
                 </div>
-              </form>
 
-              <div className="LinkContainer">
-                <span>
-                  <Link to="/forgot_password">Forgot your password</Link>
-                </span>
-              </div>
+                <button
+                  type="submit"
+                  tabIndex={0}
+                  disabled={lockout || loading}
+                  className="Button"
+                  style={{
+                    width: "100%",
+                    height: isMobile ? "48px" : "44px",
+                    borderRadius: UNIFORM_RADIUS,
+                    border: "none",
+                    backgroundColor: lockout ? "#999" : loading ? "#ccc" : mainButtonColor,
+                    opacity: lockout || loading ? 0.7 : 1,
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: lockout || loading ? "not-allowed" : "pointer",
+                    touchAction: "manipulation",
+                    marginTop: "30px",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    padding: 0,
+                  }}
+                >
+                  {lockout ? `Locked (${lockoutTimer}s)` : loading ? "Processing..." : "Log In"}
+                </button>
+              </form>
             </div>
 
-            <div className="Footer">
-              <div className="FooterText">
-                &copy; {currentYear} {companyName || "EARIST"} <br />
-                Academic Information System. <br />
-                All rights reserved.
-              </div>
+            <div
+              className="Footer"
+              style={{
+                backgroundColor: headerColor,
+                borderTop: "none",
+                color: "white",
+              }}
+            >
+              <div className="FooterText" />
             </div>
           </div>
-        </Container>
+        </Box>
 
         <TotpLoginModal
           open={showTotpModal}
@@ -1270,7 +1285,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
           </Alert>
         </Snackbar>
 
-        <LoadingOverlay open={loading} />
+        <LoadingOverlay open={loading} preserve />
       </Box>
     </>
   );

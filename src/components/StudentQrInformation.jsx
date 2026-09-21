@@ -52,7 +52,7 @@ const StudentQrInformation = () => {
             setErrorMessage("");
 
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/student-qr-information/${student_number}`);
+                const res = await axios.get(`${API_BASE_URL}/api/student-qr-information/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 if (!cancelled) setResult(res.data);
             } catch (err) {
                 if (cancelled) return;

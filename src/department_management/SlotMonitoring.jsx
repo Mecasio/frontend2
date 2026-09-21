@@ -103,7 +103,7 @@ const SlotMonitoring = () => {
         setLoading(true);
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -121,7 +121,7 @@ const SlotMonitoring = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
+            .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess])
@@ -129,7 +129,7 @@ const SlotMonitoring = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess])
@@ -137,7 +137,7 @@ const SlotMonitoring = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_year_level`)
+            .get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setYearLevels(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess]);
@@ -145,7 +145,7 @@ const SlotMonitoring = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/active_school_year`)
+            .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 if (res.data.length > 0) {
                     setSelectedSchoolYear(res.data[0].year_id);
@@ -158,7 +158,7 @@ const SlotMonitoring = () => {
     useEffect(() => {
         if (selectedSchoolYear && selectedSchoolSemester) {
             axios
-                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`)
+                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => {
                     if (res.data.length > 0) {
                         setSelectedActiveSchoolYear(res.data[0].school_year_id);
@@ -196,7 +196,7 @@ const SlotMonitoring = () => {
     const fetchDepartments = async () => {
         if (hasAccess !== true) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const allDepartments = res.data || [];
             setDepartment(allDepartments);
         } catch (err) {
@@ -208,7 +208,7 @@ const SlotMonitoring = () => {
         if (hasAccess !== true) return;
         if (!dprtmnt_id) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`);
+            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setPrograms(res.data || []);
         } catch (err) {
             console.error("Department fetch error:", err);
@@ -227,7 +227,7 @@ const SlotMonitoring = () => {
             return;
         }
         axios
-            .get(`${API_BASE_URL}/api/courses/${selectedCurriculumId}`)
+            .get(`${API_BASE_URL}/api/courses/${selectedCurriculumId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 const taggedCourses = (res.data || []).filter((course) => {
                     const matchesYearLevel =
@@ -278,7 +278,7 @@ const SlotMonitoring = () => {
                         campus: campusFilter,
                         activeSchoolYearId: selectedActiveSchoolYear,
                     },
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
                     },
                 });
@@ -331,7 +331,7 @@ const SlotMonitoring = () => {
                         activeSchoolYearId: selectedActiveSchoolYear,
                         ...(selectedCourse ? { courseId: selectedCourse } : {}),
                     },
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
                     },
                 });
@@ -364,7 +364,7 @@ const SlotMonitoring = () => {
                         sectionIds,
                         activeSchoolYearId: selectedActiveSchoolYear,
                         ...(selectedCourse ? { courseId: selectedCourse } : {}),
-                    },
+                    }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
                 );
 
                 const enrolledMap = new Map(
@@ -608,7 +608,7 @@ const SlotMonitoring = () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             try {
-                const response = await fetch(url, {
+                const response = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     mode: "cors",
                     signal: controller.signal,
                 });

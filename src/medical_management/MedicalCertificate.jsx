@@ -153,7 +153,7 @@ const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
             setUserRole(storedRole);
             setUserID(storedStudentNumber || storedID);
 
-            if (storedRole === "applicant" || storedRole === "registrar") {
+            if (storedRole === "applicant" || ["administrator", "superadmin", "technical"].includes(storedRole)) {
                 fetchPersonBySearch(storedStudentNumber || storedID);
             } else {
                 window.location.href = "/login";
@@ -351,7 +351,7 @@ const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
                     last_name: person.last_name,
                     first_name: person.first_name,
                 },
-                {
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     responseType: "blob",
                 },
             );
@@ -379,7 +379,7 @@ const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
     useEffect(() => {
         const fetchCurriculums = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+                const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setCurriculumOptions(response.data);
             } catch (error) {
                 console.error("Error fetching curriculum options:", error);
@@ -403,7 +403,7 @@ const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
 
     const fetchPersonBySearch = async (query) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+            const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                 params: { query }
             });
 
@@ -422,7 +422,7 @@ const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
 
     const fetchMedicalData = async (studentNumber) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`);
+            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setMedicalData(res.data);
             console.log("✅ Loaded medical data for:", studentNumber, res.data);
         } catch (err) {

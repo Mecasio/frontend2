@@ -239,7 +239,7 @@ const FacultyMasterList = () => {
         : storedEmployeeID
           ? `/api/get_prof_data_by_employee/${storedEmployeeID}`
           : `/api/get_prof_data/${id}`;
-      const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+      const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const first = res.data[0];
       localStorage.setItem("prof_id", first.prof_id || "");
       localStorage.setItem("employee_id", first.employee_id || "");
@@ -262,7 +262,7 @@ const FacultyMasterList = () => {
   useEffect(() => {
     if (profData.prof_id) {
       axios
-        .get(`${API_BASE_URL}/api/faculty_masterlist_bootstrap/${profData.prof_id}`)
+        .get(`${API_BASE_URL}/api/faculty_masterlist_bootstrap/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => {
           const data = res.data || {};
           const active = data.activeSchoolYear || {};
@@ -332,7 +332,7 @@ const FacultyMasterList = () => {
 
     axios
       .get(
-        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${selectedCourse}/${selectedActiveSchoolYear}`,
+        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${selectedCourse}/${selectedActiveSchoolYear}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         setSectionAssignedTo(res.data);
@@ -359,8 +359,8 @@ const FacultyMasterList = () => {
   useEffect(() => {
     const currentYear = new Date().getFullYear();
     Promise.all([
-      axios.get(`${API_BASE_URL}/api/get_school_year`),
-      axios.get(`${API_BASE_URL}/api/get_school_semester/`),
+      axios.get(`${API_BASE_URL}/api/get_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
     ])
       .then(([yearRes, semRes]) => {
         setSchoolYears(
@@ -381,7 +381,7 @@ const FacultyMasterList = () => {
     }
     axios
       .get(
-        `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+        `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         if (res.data.length > 0) {
@@ -416,7 +416,7 @@ const FacultyMasterList = () => {
 
       // 1ï¸âƒ£ Fetch courses assigned to the professor
       const courseRes = await axios.get(
-        `${API_BASE_URL}/api/course_assigned_to/${profData.prof_id}/${selectedSchoolYear}/${selectedSchoolSemester}`,
+        `${API_BASE_URL}/api/course_assigned_to/${profData.prof_id}/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const courses = courseRes.data;
       setCoursesAssignedTo(courses);
@@ -438,7 +438,7 @@ const FacultyMasterList = () => {
 
       // 3ï¸âƒ£ Fetch sections for the selected course
       const sectionRes = await axios.get(
-        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${courseId}/${selectedActiveSchoolYear}`,
+        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${courseId}/${selectedActiveSchoolYear}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const sections = sectionRes.data;
@@ -474,7 +474,7 @@ const FacultyMasterList = () => {
       setSelectedSection(String(sectionId));
 
       // 5ï¸âƒ£ Fetch students for this section
-      const detailsRes = await axios.get(`${API_BASE_URL}/api/get_class_details/${profData.prof_id}`);
+      const detailsRes = await axios.get(`${API_BASE_URL}/api/get_class_details/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setClassListAndDetails(detailsRes.data);
       setMessage("");
     } catch (err) {
@@ -740,7 +740,7 @@ const FacultyMasterList = () => {
         },
         {
           responseType: "blob",
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "x-employee-id":
               profData.employee_id ||
               localStorage.getItem("employee_id") ||

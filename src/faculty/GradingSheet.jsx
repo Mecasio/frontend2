@@ -363,7 +363,7 @@ const GradingSheet = () => {
         : storedEmployeeID
           ? `/api/get_prof_data_by_employee/${storedEmployeeID}`
           : `/api/get_prof_data/${id}`;
-      const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+      const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const first = res.data[0];
       localStorage.setItem("prof_id", first.prof_id || "");
       localStorage.setItem("employee_id", first.employee_id || "");
@@ -386,7 +386,7 @@ const GradingSheet = () => {
   useEffect(() => {
     if (!profData.prof_id) return;
     axios
-      .get(`${API_BASE_URL}/api/grading_sheet_bootstrap/${profData.prof_id}`, {
+      .get(`${API_BASE_URL}/api/grading_sheet_bootstrap/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           course_id: course_id || undefined,
           department_section_id: section_id || undefined,
@@ -444,7 +444,7 @@ const GradingSheet = () => {
     if (profData.prof_id && selectedCourse && selectedActiveSchoolYear) {
       axios
         .get(
-          `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${selectedCourse}/${selectedActiveSchoolYear}`,
+          `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${selectedCourse}/${selectedActiveSchoolYear}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           setSectionsHandle(res.data);
@@ -471,7 +471,7 @@ const GradingSheet = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year`)
+      .get(`${API_BASE_URL}/api/get_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const currentYear = new Date().getFullYear();
         const filteredYears = res.data.filter(
@@ -485,7 +485,7 @@ const GradingSheet = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
@@ -493,7 +493,7 @@ const GradingSheet = () => {
   useEffect(() => {
     if (school_year_id) return;
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -505,7 +505,7 @@ const GradingSheet = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/admin/grade-conversion`)
+      .get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setGradeConversions(res.data))
       .catch((err) => {
         console.error("Failed to fetch grade conversions:", err);
@@ -517,7 +517,7 @@ const GradingSheet = () => {
     if (selectedSchoolYear && selectedSchoolSemester) {
       axios
         .get(
-          `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+          `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           if (res.data.length > 0) {
@@ -534,7 +534,7 @@ const GradingSheet = () => {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/enrolled_student_list/${profData.prof_id}/${selectedCourse}/${department_section_id}/${selectedActiveSchoolYear}`,
+        `${API_BASE_URL}/api/enrolled_student_list/${profData.prof_id}/${selectedCourse}/${department_section_id}/${selectedActiveSchoolYear}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const data = await response.json();
 
@@ -613,7 +613,7 @@ const GradingSheet = () => {
         return;
       }
 
-      const res = await axios.get(`${API_BASE_URL}/api/grading_sheet_bootstrap/${profData.prof_id}`, {
+      const res = await axios.get(`${API_BASE_URL}/api/grading_sheet_bootstrap/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           course_id: selectedCourse || undefined,
           department_section_id: selectedSectionID || undefined,
@@ -893,7 +893,7 @@ const GradingSheet = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/add_grades`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           midterm: student.midterm,
           finals: student.finals,
@@ -1155,7 +1155,7 @@ const GradingSheet = () => {
         `${API_BASE_URL}/api/grades/import`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
         },
       );
 
@@ -1300,7 +1300,7 @@ const GradingSheet = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/post_student_grades`, {
         method: "PUT",
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "application/json",
           ...getAuditHeaders(),
         },
@@ -1473,7 +1473,7 @@ const GradingSheet = () => {
         },
         {
           responseType: "blob",
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "x-employee-id":
               profData.employee_id ||
               localStorage.getItem("employee_id") ||

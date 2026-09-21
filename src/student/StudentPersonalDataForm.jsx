@@ -205,7 +205,7 @@ const StudentPersonalDataForm = forwardRef((props, ref) => {
     setUserRole(storedRole);
 
     // Allow Applicant, Admin, SuperAdmin to view ECAT
-    const allowedRoles = ["registrar", "applicant", "student"];
+      const allowedRoles = ["administrator", "applicant", "student"];
     if (allowedRoles.includes(storedRole)) {
       const targetId = searchedPersonId || queryPersonId || loggedInPersonId;
       setUserID(targetId);

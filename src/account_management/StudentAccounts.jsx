@@ -184,7 +184,7 @@ export default function StudentAccounts() {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     });
 
   useEffect(() => {
@@ -199,7 +199,7 @@ export default function StudentAccounts() {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -212,7 +212,7 @@ export default function StudentAccounts() {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -244,7 +244,7 @@ export default function StudentAccounts() {
     async (signal) => {
       setListLoading(true);
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/student_list`, {
+        const res = await axios.get(`${API_BASE_URL}/api/student_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: {
             page: currentPage,
             limit: 100,
@@ -257,7 +257,7 @@ export default function StudentAccounts() {
         setTotalPages(res.data.totalPages);
         setTotalStudents(res.data.total);
       } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") {
+        if (axios.isCancel(err, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }) || err.name === "CanceledError") {
           return;
         }
         console.error(err);
@@ -320,7 +320,7 @@ export default function StudentAccounts() {
         `${API_BASE_URL}/api/student_account/${selectedPerson.person_id}`,
         formData,
         {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             ...getAuditHeaders(),
             "Content-Type": "multipart/form-data",
           },
@@ -708,7 +708,7 @@ export default function StudentAccounts() {
           password: generatedPassword,
           audit_actor_id: getAuditHeaders()["x-audit-actor-id"],
           audit_actor_role: getAuditHeaders()["x-audit-actor-role"],
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       if (!res.data.success) {

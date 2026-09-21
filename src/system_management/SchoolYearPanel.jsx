@@ -70,7 +70,7 @@ const SchoolYearPanel = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -100,7 +100,7 @@ const SchoolYearPanel = () => {
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") checkAccess(storedEmployeeID);
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) checkAccess(storedEmployeeID);
       else window.location.href = "/login";
     } else {
       window.location.href = "/login";
@@ -110,7 +110,7 @@ const SchoolYearPanel = () => {
   const checkAccess = async (employeeID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const allowed = response.data?.page_privilege === 1;
       setHasAccess(allowed);
       setCanCreate(allowed && Number(response.data?.can_create) === 1);
@@ -139,7 +139,7 @@ const SchoolYearPanel = () => {
       const res = await axios.post(`${API_BASE_URL}/api/verify-password`, {
         person_id: personId,
         password: authPassword,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data.success) {
         setAuthPassed(true);
@@ -196,7 +196,7 @@ const SchoolYearPanel = () => {
     if (!personId) return;
 
     axios
-      .get(`${API_BASE_URL}/api/check-lock-status/${personId}`)
+      .get(`${API_BASE_URL}/api/check-lock-status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.locked) {
           setIsLocked(true);
@@ -224,17 +224,17 @@ const SchoolYearPanel = () => {
   }, []);
 
   const fetchYears = async () => {
-    try { const res = await axios.get(`${API_BASE_URL}/api/year_table`); setYears(res.data); }
+    try { const res = await axios.get(`${API_BASE_URL}/api/year_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }); setYears(res.data); }
     catch { setSnackbar({ open: true, message: "Failed to fetch years", severity: "error" }); }
   };
 
   const fetchSemesters = async () => {
-    try { const res = await axios.get(`${API_BASE_URL}/api/get_semester`); setSemesters(res.data); }
+    try { const res = await axios.get(`${API_BASE_URL}/api/get_semester`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }); setSemesters(res.data); }
     catch { setSnackbar({ open: true, message: "Failed to fetch semesters", severity: "error" }); }
   };
 
   const fetchSchoolYears = async () => {
-    try { const res = await axios.get(`${API_BASE_URL}/api/school_years`); setSchoolYears(res.data); }
+    try { const res = await axios.get(`${API_BASE_URL}/api/school_years`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }); setSchoolYears(res.data); }
     catch { setSnackbar({ open: true, message: "Failed to fetch school years", severity: "error" }); }
   };
 
@@ -372,7 +372,7 @@ const SchoolYearPanel = () => {
     if (!personId) return;
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/check-lock-status/${personId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/check-lock-status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data.locked) {
         startActivateLockCountdown(
           res.data.remainingSeconds,
@@ -508,7 +508,7 @@ const SchoolYearPanel = () => {
       const verifyRes = await axios.post(`${API_BASE_URL}/api/verify-password`, {
         person_id: personId,
         password: activatePassword,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (!verifyRes.data.success) {
         setActivatePassword("");

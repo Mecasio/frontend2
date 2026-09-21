@@ -96,7 +96,7 @@ const Archived = lazy(() => import("./account_management/ArchivedModule"));
 const MigrationDataPanel = lazy(() => import("./account_management/MigrationDataPanel"));
 const PageManagement = lazy(() => import("./account_management/PageManagement"));
 const RegisterProf = lazy(() => import("./account_management/RegisterProf"));
-const RegisterRegistrar = lazy(() => import("./account_management/RegisterRegistrar"));
+const RegisterAdministrators = lazy(() => import("./account_management/RegisterAdministrators"));
 const RegisterStudent = lazy(() => import("./account_management/RegisterStudent"));
 const RegistrarResetPassword = lazy(() => import("./account_management/RegistrarResetPassword"));
 const ApplicantAdminPersonalInformation = lazy(() => import("./account_management/ApplicantAdminPersonalInformation"));
@@ -107,7 +107,6 @@ const ApplicantAdminOtherInformation = lazy(() => import("./account_management/A
 const SuperAdminApplicantResetPassword = lazy(() => import("./account_management/SuperAdminApplicantResetPassword"));
 const SuperAdminStudentResetPassword = lazy(() => import("./account_management/SuperAdminStudentResetPassword"));
 const SuperAdminFacultyResetPassword = lazy(() => import("./account_management/SuperAdminFacultyResetPassword"));
-const SuperAdminProfessorEducation = lazy(() => import("./account_management/SuperAdminProfessorEducation"));
 const SuperAdminRegistrarPassword = lazy(() => import("./account_management/SuperAdminRegistrarResetPassword"));
 const ApplicantOnlineRequirementsAdmin = lazy(() => import("./account_management/ApplicantOnlineRequirementsAdmin"));
 const StudentOnlineRequirementsAdmin = lazy(() => import("./account_management/StudentOnlineRequirementsAdmin"));
@@ -360,6 +359,7 @@ const ChangeGradingPeriod = lazy(() => import("./system_management/ChangeYearGra
 const EmailTemplateManager = lazy(() => import("./system_management/EmailTemplateManager"));
 const EvaluationCRUD = lazy(() => import("./system_management/EvaluationCrud"));
 const MatriculationPaymentModule = lazy(() => import("./system_management/MatriculationPaymentModule"));
+const StudentBalanceList = lazy(() => import("./system_management/StudentBalanceList"));
 const PaymentExportingModule = lazy(() => import("./system_management/PaymentExportingModule"));
 const ProgramSlotLimit = lazy(() => import("./system_management/ProgramSlotLimit"));
 const ReceiptCounterAssignment = lazy(() => import("./system_management/ReceiptCounterAssignment"));
@@ -445,16 +445,43 @@ function App() {
     localStorage.removeItem("employee_id");
     localStorage.removeItem("department");
     localStorage.removeItem("lastVisitedPath");
+    localStorage.removeItem("accessList");
+  };
+
+  const getStoredAccessList = () => {
+    try {
+      const raw = localStorage.getItem("accessList");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(Number) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const getRegistrarDashboard = (accessSet) => {
+    if (accessSet.has(101)) return "/registrar_dashboard";
+    if (accessSet.has(102)) return "/enrollment_officer_dashboard";
+    if (accessSet.has(103)) return "/admission_officer_dashboard";
+    return "/registrar_dashboard";
   };
 
   const getDefaultDashboardByRole = (role) => {
-    switch (role) {
-      case "applicant": return "/applicant_dashboard";
-      case "student": return "/student_dashboard";
-      case "faculty": return "/faculty_dashboard";
-      case "registrar": return "/registrar_dashboard";
-      case "superadmin": return "/system_dashboard";
-      default: return "/registrar_dashboard";
+    const normalizedRole = String(role || "").trim().toLowerCase();
+    switch (normalizedRole) {
+      case "applicant":
+        return "/applicant_dashboard";
+      case "student":
+        return "/student_dashboard";
+      case "faculty":
+        return "/faculty_dashboard";
+      case "superadmin":
+      case "technical":
+        return "/registrar_dashboard";
+      case "administrator":
+        return getRegistrarDashboard(new Set(getStoredAccessList()));
+      default:
+        return "/registrar_dashboard";
     }
   };
 
@@ -504,7 +531,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || localStorage.getItem("role") !== "registrar") return undefined;
+    if (!isAuthenticated || !["administrator", "superadmin", "technical"].includes(localStorage.getItem("role"))) return undefined;
     const refreshCurrentRegistrarCurriculum = () => {
       refreshRegistrarCurriculumId().catch((err) => {
         console.error("Error refreshing registrar curriculum:", err);
@@ -535,7 +562,7 @@ function App() {
     const forced = localStorage.getItem("force_password_change") === "true";
     const role = localStorage.getItem("role");
     if (forced) {
-      const resetPaths = { student: "/student_reset_password", faculty: "/faculty_reset_password", registrar: "/registrar_reset_password", applicant: "/applicant_reset_password" };
+      const resetPaths = { student: "/student_reset_password", faculty: "/faculty_reset_password", administrator: "/registrar_reset_password", superadmin: "/registrar_reset_password", technical: "/registrar_reset_password", applicant: "/applicant_reset_password" };
       const path = resetPaths[role];
       // Don't redirect if already on the reset page
       if (path && window.location.pathname !== path) {
@@ -545,8 +572,8 @@ function App() {
     return children;
   };
 
-  const GuardedRoute = ({ children, allowedRoles }) => (
-    <ProtectedRoute allowedRoles={allowedRoles}><ForcePasswordGuard>{children}</ForcePasswordGuard></ProtectedRoute>
+  const GuardedRoute = ({ children, allowedRoles, strictRoles = false }) => (
+    <ProtectedRoute allowedRoles={allowedRoles} strictRoles={strictRoles}><ForcePasswordGuard>{children}</ForcePasswordGuard></ProtectedRoute>
   );
 
   const keys = JSON.parse(localStorage.getItem("dashboardKeys") || "{}");
@@ -603,12 +630,12 @@ function App() {
                           )}
 
                           <Box sx={{ display: "flex", flexDirection: "column", transform: { xs: "none", sm: "scale(0.9)" }, transformOrigin: "left center", minWidth: 0, marginLeft: "5px" }}>
-                            <Typography sx={{ fontWeight: "bold", mt: "0px", fontFamily: "Poppins, sans-serif", fontSize: { xs: "16px", sm: "22px", md: "24px" }, lineHeight: 1.1, whiteSpace: { xs: "nowrap", sm: "normal" }, overflow: "hidden", textOverflow: "ellipsis", maxWidth: { xs: "46vw", sm: "none" } }}>
+                            <Typography sx={{ fontWeight: "400", mt: "0px", fontFamily: "Poppins, sans-serif", fontSize: { xs: "15px", sm: "14px" }, lineHeight: 1.1, whiteSpace: { xs: "nowrap", sm: "normal" }, overflow: "hidden", textOverflow: "ellipsis", maxWidth: { xs: "46vw", sm: "none" } }}>
                               <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{appBranding.shortTerm || "SCHOOL"}</Box>
                               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{appBranding.companyName || "SCHOOL NAME"}</Box>
                             </Typography>
-                            <Typography sx={{ fontWeight: "400", fontFamily: "Poppins, sans-serif", fontSize: { xs: "10px", sm: "12px" }, mt: "-3px", letterSpacing: { xs: "1px", sm: "2.5px" }, lineHeight: 1.2, marginTop: "6px", display: { xs: "none", sm: "block" } }}>
-                              {appBranding.shortTerm || "SCHOOL NAME"} ACADEMIC INFORMATION SYSTEM
+                            <Typography sx={{ fontWeight: 600, fontFamily: "Poppins, sans-serif", fontSize: { xs: "18px", sm: "17px", md: "19px" }, mt: "-3px", letterSpacing: { xs: "1px", sm: "2.5px" }, lineHeight: 1.2, marginTop: "6px", display: { xs: "none", sm: "block" } }}>
+                              {appBranding.shortTerm || "SCHOOL NAME"} ACADEMIC PORTAL SYSTEM
                             </Typography>
                           </Box>
                         </Box>
@@ -624,7 +651,14 @@ function App() {
                   )}
 
                   {/* Main content area */}
-                  <main className={isCorExportRenderRoute ? "flex-1 w-full" : "flex-1 w-full mt-[64px] pb-[40px]"} style={{ overflowX: "hidden" }}>
+                  <main
+                    className={
+                      isCorExportRenderRoute
+                        ? "flex-1 w-full"
+                        : "flex-1 w-full mt-[56px] sm:mt-[64px] pb-[40px]"
+                    }
+                    style={{ overflowX: "hidden" }}
+                  >
                     <Routes>
                       {/* ---------------------------------------------------------- */}
                       {/* PUBLIC / AUTH (components folder)                          */}
@@ -673,9 +707,8 @@ function App() {
                       <Route path="/admin_student_edit_permissions5" element={<ProtectedRoute><StudentEditPermissions5 /></ProtectedRoute>} />
                       <Route path="/superadmin_faculty_reset_password" element={<ProtectedRoute><SuperAdminFacultyResetPassword /></ProtectedRoute>} />
                       <Route path="/superadmin_registrar_reset_password" element={<ProtectedRoute><SuperAdminRegistrarPassword /></ProtectedRoute>} />
-                      <Route path="/superadmin_professor_education" element={<ProtectedRoute><SuperAdminProfessorEducation /></ProtectedRoute>} />
                       <Route path="/register_prof" element={<ProtectedRoute><RegisterProf /></ProtectedRoute>} />
-                      <Route path="/register_registrar" element={<ProtectedRoute><RegisterRegistrar /></ProtectedRoute>} />
+                      <Route path="/register_registrar" element={<ProtectedRoute><RegisterAdministrators /></ProtectedRoute>} />
                       <Route path="/register_student" element={<ProtectedRoute><RegisterStudent /></ProtectedRoute>} />
                       <Route path="/archived" element={<ProtectedRoute><Archived /></ProtectedRoute>} />
                       <Route path="/application_process_super_admin" element={<ProtectedRoute><ApplicantProcessSuperAdmin /></ProtectedRoute>} />
@@ -694,7 +727,7 @@ function App() {
                       <Route path="/student_accounts" element={<ProtectedRoute><StudentAccounts /></ProtectedRoute>} />
                       <Route path="/migration_data_panel" element={<ProtectedRoute><MigrationDataPanel /></ProtectedRoute>} />
                       <Route path="/upload_applicants" element={<ProtectedRoute><UploadApplicants /></ProtectedRoute>} />
-                      <Route path="/page_crud" element={<ProtectedRoute><PageManagement /></ProtectedRoute>} />
+                      <Route path="/page_management" element={<ProtectedRoute><PageManagement /></ProtectedRoute>} />
                       <Route path="/user_page_access" element={<ProtectedRoute><UserPageAccess /></ProtectedRoute>} />
 
                       {/* ---------------------------------------------------------- */}
@@ -718,13 +751,13 @@ function App() {
                       <Route path="/admission_health_medical_records" element={<ProtectedRoute><AdmissionHealthMedicalRecords /></ProtectedRoute>} />
                       <Route path="/admission_other_information" element={<ProtectedRoute><AdmissionOtherInformation /></ProtectedRoute>} />
                       <Route path="/admission_online_requirements" element={<ProtectedRoute><AdmissionOnlineRequirements /></ProtectedRoute>} />
-                      <Route path="/admin_ecat_application_form" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminECATApplicationForm /></ProtectedRoute>} />
-                      <Route path="/admin_personal_data_form" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminPersonalDataForm /></ProtectedRoute>} />
-                      <Route path="/admin_admission_form_process" element={<ProtectedRoute allowedRoles={["registrar"]}><AdmissionFormProcess /></ProtectedRoute>} />
-                      <Route path="/empty_admission_form_process" element={<ProtectedRoute allowedRoles={["registrar"]}><EmptyAdmissionFormProcess /></ProtectedRoute>} />
-                      <Route path="/admin_office_of_the_registrar" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminOfficeOfTheRegistrar /></ProtectedRoute>} />
-                      <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
-                      <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
+                      <Route path="/admin_ecat_application_form" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><AdminECATApplicationForm /></ProtectedRoute>} />
+                      <Route path="/admin_personal_data_form" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><AdminPersonalDataForm /></ProtectedRoute>} />
+                      <Route path="/admin_admission_form_process" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><AdmissionFormProcess /></ProtectedRoute>} />
+                      <Route path="/empty_admission_form_process" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><EmptyAdmissionFormProcess /></ProtectedRoute>} />
+                      <Route path="/admin_office_of_the_registrar" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><AdminOfficeOfTheRegistrar /></ProtectedRoute>} />
+                      <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
+                      <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
                       <Route path="/admission_announcement" element={<ProtectedRoute><AdmissionAnnouncement /></ProtectedRoute>} />
                       <Route path="/examination_permit_change_course" element={<ProtectedRoute><ExaminationPermitChangeCourse /></ProtectedRoute>} />
 
@@ -740,7 +773,7 @@ function App() {
                       <Route path="/applicant_online_requirements" element={<ProtectedRoute allowedRoles={["applicant"]}><ApplicantOnlineRequirements /></ProtectedRoute>} />
                       <Route path="/personal_data_form" element={<ProtectedRoute allowedRoles={["applicant"]}><PersonalDataForm /></ProtectedRoute>} />
                       <Route path="/ecat_application_form" element={<ProtectedRoute allowedRoles={["applicant"]}><ECATApplicationForm /></ProtectedRoute>} />
-                      <Route path="/applicant_services_survey" element={<ProtectedRoute allowedRoles={["applicant", "registrar"]}><ApplicantServicesSurvey /></ProtectedRoute>} />
+                      <Route path="/applicant_services_survey" element={<ProtectedRoute allowedRoles={["applicant", "administrator"]}><ApplicantServicesSurvey /></ProtectedRoute>} />
                       <Route path="/office_of_the_registrar" element={<ProtectedRoute allowedRoles={["applicant"]}><OfficeOfTheRegistrar /></ProtectedRoute>} />
                       <Route path="/exam-permit/:applicant_number" element={<ExamPermit />} />
 
@@ -778,8 +811,8 @@ function App() {
                       <Route path="/college_student_numbering" element={<ProtectedRoute><CollegeStudentNumbering /></ProtectedRoute>} />
                       <Route path="/college_course_tagging" element={<ProtectedRoute><CollegeCourseTagging /></ProtectedRoute>} />
                       <Route path="/college_course_tagging_summer" element={<ProtectedRoute><CollegeCourseTaggingSummer /></ProtectedRoute>} />
-                      <Route path="/college_search_certification_of_registration" element={<ProtectedRoute><CollegeSearchCertificateOfRegistration /></ProtectedRoute>} />
-                      <Route path="/college_certificate_of_registration" element={<ProtectedRoute><CollegeCertificateOfRegistration /></ProtectedRoute>} />
+                      <Route path="/college_search_certification_of_registration" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><CollegeSearchCertificateOfRegistration /></ProtectedRoute>} />
+                      <Route path="/college_certificate_of_registration" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><CollegeCertificateOfRegistration /></ProtectedRoute>} />
                       <Route path="/qualifying_interview_room_assignment" element={<ProtectedRoute><QualifyingInterviewRoomAssignment /></ProtectedRoute>} />
                       <Route path="/college_qualifying_interview_room_assignment" element={<ProtectedRoute><CollegeQualifyingInterviewRoomAssignment /></ProtectedRoute>} />
                       <Route path="/college_qualifying_interview_schedule_management" element={<ProtectedRoute><CollegeQualifyingInterviewScheduleManagement /></ProtectedRoute>} />
@@ -837,8 +870,8 @@ function App() {
                       <Route path="/student_number_admin" element={<ProtectedRoute><StudentNumberAdmin /></ProtectedRoute>} />
                       <Route path="/registrar_course_tagging" element={<ProtectedRoute><RegistrarCourseTagging /></ProtectedRoute>} />
                       <Route path="/registrar_course_tagging_summer" element={<ProtectedRoute><RegistrarCourseTaggingSummer /></ProtectedRoute>} />
-                      <Route path="/registrar_search_certificate_of_registration" element={<ProtectedRoute><SearchCertificateOfRegistration /></ProtectedRoute>} />
-                      <Route path="/cor" element={<ProtectedRoute><CertificateOfRegistration /></ProtectedRoute>} />
+                      <Route path="/registrar_search_certificate_of_registration" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><SearchCertificateOfRegistration /></ProtectedRoute>} />
+                      <Route path="/cor" element={<GuardedRoute allowedRoles={["student"]} strictRoles><CertificateOfRegistration /></GuardedRoute>} />
                       <Route path="/registrar_student_list" element={<ProtectedRoute><RegistrarStudentList /></ProtectedRoute>} />
                       <Route path="/registrar_student_grade_file" element={<ProtectedRoute><RegistrarStudentGradeFile /></ProtectedRoute>} />
                       <Route path="/registrar_entrance_examination_score" element={<ProtectedRoute><RegistrarEntranceExamScore /></ProtectedRoute>} />
@@ -855,7 +888,7 @@ function App() {
                       <Route path="/student_registrar_health_medical_records" element={<ProtectedRoute><StudentRegistrarHealthMedicalRecords /></ProtectedRoute>} />
                       <Route path="/student_registrar_other_information" element={<ProtectedRoute><StudentRegistrarOtherInformation /></ProtectedRoute>} />
                       <Route path="/payment_exporting_module" element={<ProtectedRoute><PaymentExportingModule /></ProtectedRoute>} />
-                      <Route path="/cor_exporting_module" element={<ProtectedRoute><CORExportingModule /></ProtectedRoute>} />
+                      <Route path="/cor_exporting_module" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><CORExportingModule /></ProtectedRoute>} />
                       <Route path="/cor_export_render" element={<CORExportRender />} />
                       <Route path="/applicant_online_requirements_registrar" element={<ProtectedRoute><ApplicantOnlineRequirementsRegistrar /></ProtectedRoute>} />
                       <Route path="/registrar_class_list" element={<ProtectedRoute><RegistrarClassList /></ProtectedRoute>} />
@@ -909,7 +942,8 @@ function App() {
                       <Route path="/announcement" element={<ProtectedRoute><Announcement /></ProtectedRoute>} />
                       <Route path="/assign_receipt_counter" element={<ProtectedRoute><ReceiptCounterAssignment /></ProtectedRoute>} />
                       <Route path="/matriculation_payment" element={<ProtectedRoute><MatriculationPaymentModule /></ProtectedRoute>} />
-                      <Route path="/student_scholarship_list" element={<ProtectedRoute><StudentScholarshipList /></ProtectedRoute>} />
+                      <Route path="/student_balance_list" element={<ProtectedRoute><StudentBalanceList /></ProtectedRoute>} />
+                      <Route path="/student_scholarship_list" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><StudentScholarshipList /></ProtectedRoute>} />
                       <Route path="/admin_branches" element={<ProtectedRoute><AdminBranches /></ProtectedRoute>} />
                     </Routes>
                   </main>
@@ -925,7 +959,7 @@ function App() {
 
               {/* Footer */}
               {!isCorExportRenderRoute && (
-                <Box component="footer" sx={{ width: "100%", position: "fixed", bottom: 0, left: 0, zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: appColors.footer || "#ffffff", color: "white", textAlign: "center", padding: "8px 5px" }}>
+                <Box component="footer" sx={{ width: "100%", position: "fixed", bottom: 0, left: 0, zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: appColors.footer || "#ffffff", color: "white", textAlign: "center", padding: "12px 5px" }}>
                   <Typography style={{ fontSize: "14px" }}>{appBranding.footerText || ""}</Typography>
                 </Box>
               )}

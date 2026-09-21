@@ -79,7 +79,7 @@ const AdmissionDashboardPanel = () => {
       setUserRole(storedRole);
       setUserID(storedID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
         fetchUserAccessList(storedEmployeeID);
       } else {
@@ -94,7 +94,7 @@ const AdmissionDashboardPanel = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -108,7 +108,7 @@ const AdmissionDashboardPanel = () => {
   const fetchUserAccessList = async (employeeID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}`
+        `${API_BASE_URL}/api/page_access/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const accessMap = data.reduce((acc, item) => {

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "./index.css";
+import "./utils/axiosAuth";
 import App from "./App.jsx";
 
 // ⭐ Render React (ONLY ONCE)

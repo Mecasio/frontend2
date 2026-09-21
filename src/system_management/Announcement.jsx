@@ -79,7 +79,7 @@ const Announcement = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -106,7 +106,7 @@ const Announcement = () => {
     useEffect(() => {
         const storedRole = localStorage.getItem("role");
         const storedEmployeeID = localStorage.getItem("employee_id");
-        if (storedRole === "registrar") {
+        if (["administrator", "superadmin", "technical"].includes(storedRole)) {
             setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
             checkAccess(storedEmployeeID);
@@ -117,7 +117,7 @@ const Announcement = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (res.data?.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(res.data?.can_create) === 1);
@@ -144,7 +144,7 @@ const Announcement = () => {
 
     const fetchAnnouncements = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/announcements`);
+            const res = await axios.get(`${API_BASE_URL}/api/announcements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
             const list = (res.data?.data || res.data || []).map(a => ({
                 ...a,
@@ -180,7 +180,7 @@ const Announcement = () => {
 
             if (editingId) {
                 await axios.put(`${API_BASE_URL}/api/announcements/${editingId}`, formData, {
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         ...getFlatAuditHeaders(),
                         "Content-Type": "multipart/form-data",
                         "x-employee-id": employeeID,
@@ -190,13 +190,13 @@ const Announcement = () => {
                             localStorage.getItem("employee_id") ||
                             localStorage.getItem("email") ||
                             "unknown",
-                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
                     },
                 });
                 setSnackbar({ open: true, message: "Announcement updated!", severity: "success" });
             } else {
                 await axios.post(`${API_BASE_URL}/api/announcements`, formData, {
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         ...getFlatAuditHeaders(),
                         "Content-Type": "multipart/form-data",
                         "x-employee-id": employeeID,
@@ -206,7 +206,7 @@ const Announcement = () => {
                             localStorage.getItem("employee_id") ||
                             localStorage.getItem("email") ||
                             "unknown",
-                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
                     },
                 });
                 setSnackbar({ open: true, message: "Announcement created!", severity: "success" });

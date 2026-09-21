@@ -111,7 +111,7 @@ const RegisterStudents = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -123,7 +123,7 @@ const RegisterStudents = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -181,7 +181,7 @@ const RegisterStudents = () => {
     // 📥 Fetch Departments
     const fetchDepartments = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setDepartment(res.data);
         } catch (err) {
             console.error("❌ Department fetch error:", err);
@@ -192,7 +192,7 @@ const RegisterStudents = () => {
     const fetchPrograms = async (dprtmnt_id) => {
         if (!dprtmnt_id) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`);
+            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setPrograms(res.data);
         } catch (err) {
             console.error("❌ Department fetch error:", err);
@@ -202,7 +202,7 @@ const RegisterStudents = () => {
 
     const fetchStudents = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/students`);
+            const res = await axios.get(`${API_BASE_URL}/api/students`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setStudents(res.data);
         } catch (err) {
             setErrorMessage("Failed to load Student accounts");
@@ -242,8 +242,8 @@ const RegisterStudents = () => {
                 : `${API_BASE_URL}/api/register_student`;
 
             const res = editData
-                ? await axios.put(url, fd, { headers: { "Content-Type": "multipart/form-data" } })
-                : await axios.post(url, fd, { headers: { "Content-Type": "multipart/form-data" } });
+                ? await axios.put(url, fd, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } })
+                : await axios.post(url, fd, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } });
 
             if (!res.data.success) {
                 setSnackbarMessage(res.data.message);
@@ -343,7 +343,7 @@ const RegisterStudents = () => {
 
         try {
             const res = await axios.post(`${API_BASE_URL}/api/import_xslx_student`, formData, {
-                headers: {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                     "Content-Type": "multipart/form-data",
                 },
             });
@@ -359,7 +359,7 @@ const RegisterStudents = () => {
     const handleToggleStatus = async (id, currentStatus) => {
         const newStatus = currentStatus === 1 ? 0 : 1;
         try {
-            await axios.put(`${API_BASE_URL}/api/update_student_status/${id}`, { status: newStatus });
+            await axios.put(`${API_BASE_URL}/api/update_student_status/${id}`, { status: newStatus }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             fetchStudents(); // 🔄 refresh list
         } catch (error) {
             console.error("❌ Error toggling status:", error);

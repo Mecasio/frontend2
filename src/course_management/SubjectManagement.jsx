@@ -100,7 +100,7 @@ const CourseManagement = () => {
       localStorage.getItem("email") ||
       "unknown",
     "x-audit-actor-role":
-      userRole || localStorage.getItem("role") || "registrar",
+      userRole || localStorage.getItem("role") || "administrator",
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -177,7 +177,7 @@ const CourseManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -208,7 +208,7 @@ const CourseManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && Number(response.data.page_privilege) === 1) {
         setHasAccess(true);
@@ -238,7 +238,7 @@ const CourseManagement = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/course_list`);
+      const response = await axios.get(`${API_BASE_URL}/api/course_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const data = response.data.map((item) => ({
         ...item,
         is_academic_achiever: item.is_academic_achiever ?? 1,
@@ -253,7 +253,7 @@ const CourseManagement = () => {
 
   const fetchFeeRules = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/coursepanel/fee_rules`);
+      const res = await axios.get(`${API_BASE_URL}/api/coursepanel/fee_rules`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setFeeRules(res.data);
     } catch (err) {
       console.error("Error fetching fee rules:", err);
@@ -262,7 +262,7 @@ const CourseManagement = () => {
 
   const fetchHonorRules = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin/honors-rules`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin/honors-rules`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setHonorRules(res.data);
     } catch (err) {
       console.error("Error fetching honor rules:", err);
@@ -272,7 +272,7 @@ const CourseManagement = () => {
   // ✅ NEW
   const fetchSubjectTypes = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/subject-types`);
+      const res = await axios.get(`${API_BASE_URL}/api/subject-types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSubjectTypes(res.data || []);
     } catch (err) {
       console.error("Error fetching subject types:", err);
@@ -282,7 +282,7 @@ const CourseManagement = () => {
   // ✅ NEW
   const fetchCategoryTypes = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/category-types`);
+      const res = await axios.get(`${API_BASE_URL}/api/category-types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCategoryTypes(res.data || []);
     } catch (err) {
       console.error("Error fetching category types:", err);
@@ -593,7 +593,7 @@ const CourseManagement = () => {
         `${API_BASE_URL}/api/import-course-xlsx`,
         formData,
         {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "Content-Type": "multipart/form-data",
             ...getPermissionHeaders(),
           },

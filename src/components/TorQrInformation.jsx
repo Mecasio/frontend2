@@ -49,7 +49,7 @@ const TorQrInformation = () => {
             setErrorMessage("");
 
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/verify-graduate/${student_number}`);
+                const res = await axios.get(`${API_BASE_URL}/api/verify-graduate/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 if (!cancelled) setResult(res.data);
             } catch (err) {
                 if (cancelled) return;
@@ -77,7 +77,7 @@ const TorQrInformation = () => {
         let cancelled = false;
         const fetchStatus = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/tor-qr-status/${student_number}`);
+                const res = await axios.get(`${API_BASE_URL}/api/tor-qr-status/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 if (!cancelled) setTorQrStatus(res.data);
             } catch {
                 if (!cancelled) setTorQrStatus({ has_qr: false });

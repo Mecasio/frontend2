@@ -120,7 +120,7 @@ const WorkloadManagement = () => {
             "x-employee-id": employeeID,
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID,
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -136,7 +136,7 @@ const WorkloadManagement = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -148,7 +148,7 @@ const WorkloadManagement = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(response.data?.can_create) === 1);
@@ -207,7 +207,7 @@ const WorkloadManagement = () => {
     const fetchWorkloads = async () => {
         setWorkloadLoading(true);
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/workload`);
+            const res = await axios.get(`${API_BASE_URL}/api/workload`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setWorkloadList(res.data || []);
         } catch (err) {
             console.error(err);

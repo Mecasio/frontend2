@@ -172,7 +172,7 @@ const StudentOtherInformationResponsive = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["student", "registrar"];
+    const allowedRoles = ["student", "administrator"];
     if (allowedRoles.includes(storedRole)) {
       const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
 

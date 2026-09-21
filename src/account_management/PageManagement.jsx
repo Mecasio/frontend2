@@ -126,7 +126,7 @@ const PageManagement = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -138,7 +138,7 @@ const PageManagement = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(response.data?.can_create) === 1);
@@ -184,7 +184,7 @@ const PageManagement = () => {
 
     const fetchPages = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/pages`);
+            const response = await axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const sortedPages = response.data.sort((a, b) => a.id - b.id);
             setPages(sortedPages);
         } catch (error) {
@@ -218,7 +218,7 @@ const PageManagement = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         });
 
     const handleSubmit = async (e) => {

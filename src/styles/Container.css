@@ -11,6 +11,217 @@
   transform: scale(0.8)
 }
 
+.registration-card.Container {
+  transform: none;
+  margin: 0;
+}
+
+.login-card.Container {
+  transform: none;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ─── Uniform card look, shared by the Login and Register cards ───────────
+   These rules mirror the Important Reminder modal (1px #e6e6e6 borders,
+   Poppins, 13px body text) so every applicant-facing surface matches.
+   Tokens used from JS live in styles/formTokens.js.
+════════════════════════════════════════════════════════════════════════════ */
+.uniform-card.Container {
+  border: 1px solid #e6e6e6;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+
+.uniform-card,
+.uniform-card input,
+.uniform-card select,
+.uniform-card textarea,
+.uniform-card button,
+.uniform-card label,
+.uniform-card p,
+.uniform-card span,
+.uniform-card a,
+.uniform-card strong,
+.uniform-card .Button {
+  font-family: Poppins, sans-serif;
+}
+
+.uniform-card label,
+.uniform-card input,
+.uniform-card select,
+.uniform-card textarea,
+.uniform-card button,
+.uniform-card .Button,
+.uniform-card .MuiInputBase-input,
+.uniform-card p,
+.uniform-card a,
+.uniform-card span {
+  font-size: 13px !important;
+}
+
+.uniform-card .Header {
+  border-radius: 0;
+  border-bottom: none;
+}
+
+/* Title (strong) and subtitle (p) mirror the modal's 16px/12px hierarchy. */
+.uniform-card .HeaderBody strong {
+  font-size: 14px !important;
+  font-weight: 700;
+}
+
+.uniform-card .HeaderBody p {
+  font-size: 11.5px !important;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.uniform-card input,
+.uniform-card select {
+  border-radius: 10px;
+  color: #333;
+}
+
+.uniform-card input:focus,
+.uniform-card select:focus {
+  border-color: #bdbdbd;
+}
+
+.uniform-card .TextField label {
+  color: #333;
+  font-weight: 600;
+}
+
+.uniform-card .Footer {
+  border-radius: 0;
+  border-top: 1px solid #e6e6e6;
+}
+
+/* Overlay icons on the control's grid row, so they stay centred no matter how
+   tall the label or a validation message below the field turns out to be. */
+.uniform-card .TextField:has(> input),
+.uniform-card .TextField:has(> select) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.uniform-card .TextField > label {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.uniform-card .TextField > input,
+.uniform-card .TextField > select {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.uniform-card .TextField > svg,
+.uniform-card .TextField > button {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: center;
+  position: static !important;
+  transform: none !important;
+  z-index: 1;
+}
+
+.uniform-card .TextField > svg {
+  justify-self: start;
+  margin-left: 0.7rem;
+  pointer-events: none;
+}
+
+/* A select's dropdown caret is always its last icon; any icon before it is a
+   leading icon and keeps the start alignment above. */
+.uniform-card .TextField:has(> select) > svg:last-of-type {
+  justify-self: end;
+  margin: 0 10px 0 0;
+}
+
+.uniform-card .TextField > button {
+  justify-self: end;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uniform-card .TextField > input[type="password"],
+.uniform-card .TextField > input#password,
+.uniform-card .TextField > input#confirmPassword {
+  padding-right: 2.8rem;
+}
+
+.registration-announcement {
+  overflow: visible !important;
+}
+
+.registration-announcement > div {
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.registration-announcement > button:first-of-type {
+  left: -20px !important;
+  z-index: 40 !important;
+}
+
+.registration-announcement > button:nth-of-type(2) {
+  right: -20px !important;
+  z-index: 40 !important;
+}
+
+.registration-card .RegistrationLink {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.registration-card .TextField {
+  min-width: 0;
+  margin-bottom: 9px;
+}
+
+.registration-card .TextField label {
+  margin-bottom: 3px;
+}
+
+.registration-card .Button {
+  margin-top: 14px;
+  padding: 8px 0;
+}
+
+.registration-card .LinkContainer {
+  padding: 10px 0;
+}
+
+.registration-card .Footer {
+  padding: 16px 12px;
+  margin-top: 15px;
+}
+
+/* Keep the registration card compact across breakpoints. Font sizes come
+   from the shared .uniform-card rules above. */
+.registration-card,
+.registration-card .Body {
+  font-size: 12.5px;
+}
+
+.registration-card p,
+.registration-card a,
+.registration-card span {
+  word-spacing: 2px;
+  letter-spacing: -0.1px;
+}
+
+.registration-card input,
+.registration-card select {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .Header {
   padding: 16px 20px;
   background-color: #6D2323;
@@ -33,6 +244,7 @@
   border: 4px solid white;
   justify-content: center;
   border-radius: 70%;
+  margin-bottom: 12px;
 }
 
 .CircleCon img {
@@ -45,18 +257,7 @@
   text-align: center;
   color: white;
   margin-top: -3px;
-  letter-spacing: 1px;
-}
-
-.HeaderBody strong {
-  font-size: 19px;
-  font-weight: 600;
-}
-
-.HeaderBody p {
-  font-size: 14px;
-  font-weight: 200;
-  margin-top: -1px;
+  line-height: -3px;
 }
 
 .Body {
@@ -138,7 +339,7 @@
 .Footer {
   padding: 16px 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(0, 0, 0, 0.6);
   background-color: rgba(243, 219, 173, 0.531);
   border-radius: 0 0 10px 10px;
@@ -191,14 +392,6 @@
     height: 72px;
   }
 
-  .HeaderBody strong {
-    font-size: 17px;
-  }
-
-  .HeaderBody p {
-    font-size: 13px;
-  }
-
   .Body {
     padding: 20px 18px 0 18px;
   }
@@ -216,6 +409,12 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 
+  .login-card.Container {
+    width: min(400px, calc(100% - 32px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .Header {
     padding: 16px 12px;
     border-bottom-width: 3px;
@@ -228,16 +427,6 @@
   .CircleCon img {
     width: 70px;
     height: 70px;
-  }
-
-  .HeaderBody strong {
-    font-size: 16px;
-    letter-spacing: 0.5px;
-  }
-
-  .HeaderBody p {
-    font-size: 13px;
-    margin-top: 2px;
   }
 
   .Body {
@@ -267,7 +456,7 @@
   }
 
   .Footer {
-    font-size: 13px;
+    font-size: 12px;
     padding: 14px 10px;
     margin-top: 12px;
   }
@@ -281,17 +470,15 @@
     margin: 0 10px;
   }
 
+  .login-card.Container {
+    width: min(400px, calc(100% - 20px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .CircleCon img {
     width: 58px;
     height: 58px;
-  }
-
-  .HeaderBody strong {
-    font-size: 14px;
-  }
-
-  .HeaderBody p {
-    font-size: 12px;
   }
 
   .Body {

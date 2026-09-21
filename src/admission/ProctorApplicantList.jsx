@@ -131,7 +131,7 @@ const ProctorApplicantList = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -147,7 +147,7 @@ const ProctorApplicantList = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -160,7 +160,7 @@ const ProctorApplicantList = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -212,7 +212,7 @@ useEffect(() => {
     try {
       const { data } = await axios.get(
         `${API_BASE_URL}/api/proctor-applicants`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query: proctorName, schedule_id: scheduleID },
         },
       );
@@ -240,7 +240,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         console.log("✅ curriculumOptions:", response.data); // <--- add this
         setCurriculumOptions(response.data);
       } catch (error) {
@@ -267,7 +267,7 @@ useEffect(() => {
     if (!scheduleId) return;
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/exam-attendance/schedule/${scheduleId}`,
+        `${API_BASE_URL}/api/exam-attendance/schedule/${scheduleId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setAttendanceRows(res.data || []);
     } catch (err) {
@@ -284,7 +284,7 @@ useEffect(() => {
         status: newStatus, // "present" | "absent"
         scanned_by: employeeID || localStorage.getItem("email"),
         scanned_by_role: userRole,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       fetchAttendance(proctor.schedule_id);
       setSnack({
         open: true,
@@ -331,7 +331,7 @@ useEffect(() => {
     try {
       await axios.put(
         `${API_BASE_URL}/api/exam-attendance/mark-absent/${proctor.schedule_id}`,
-        auditActor(),
+        auditActor(), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       fetchAttendance(proctor.schedule_id);
       setSnack({
@@ -1641,7 +1641,7 @@ useEffect(() => {
                 await axios.put(`${API_BASE_URL}/api/exam/remove_applicant`, {
                   applicant_id: applicantToDelete.applicant_number,
                   ...auditActor(),
-                });
+                }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setApplicants((prev) =>
                   prev.filter(
                     (a) =>

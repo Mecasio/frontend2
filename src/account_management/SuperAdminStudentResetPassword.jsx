@@ -113,7 +113,7 @@ const SuperAdminStudentResetPassword = () => {
     const role = localStorage.getItem("role");
     const empID = localStorage.getItem("employee_id");
 
-    if (!email || role !== "registrar") {
+    if (!email || !["administrator"].includes(role)) {
       window.location.href = "/login";
       return;
     }
@@ -125,7 +125,7 @@ const SuperAdminStudentResetPassword = () => {
   const checkAccess = async (id) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${id}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${id}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       setHasAccess(res.data?.page_privilege === 1);
@@ -150,7 +150,7 @@ const SuperAdminStudentResetPassword = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: localStorage.getItem("role") || "registrar",
+    audit_actor_role: localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -176,7 +176,7 @@ const SuperAdminStudentResetPassword = () => {
       try {
         const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-student`, {
           search: searchQuery,
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         setUserInfo(res.data);
       } catch (err) {
@@ -202,7 +202,7 @@ const SuperAdminStudentResetPassword = () => {
 
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/superadmin-get-all-students`,
+          `${API_BASE_URL}/api/superadmin-get-all-students`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
 
         setStudents(res.data);

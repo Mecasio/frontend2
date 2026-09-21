@@ -109,7 +109,7 @@ const EvaluationCrud = () => {
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     });
 
@@ -126,7 +126,7 @@ const EvaluationCrud = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -138,7 +138,7 @@ const EvaluationCrud = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(response.data?.can_create) === 1);
@@ -168,7 +168,7 @@ const EvaluationCrud = () => {
 
     const fetchQuestions = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/get_questions`);
+            const response = await axios.get(`${API_BASE_URL}/api/get_questions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setQuestions(response.data);
         } catch (err) {
             console.error("Error fetching questions:", err);
@@ -177,7 +177,7 @@ const EvaluationCrud = () => {
 
     const fetchCategories = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/get_category`);
+            const response = await axios.get(`${API_BASE_URL}/api/get_category`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setCategories(response.data);
         } catch (err) {
             console.error("Error fetching categories:", err);
@@ -198,14 +198,14 @@ const EvaluationCrud = () => {
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
+            .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
     }, [])
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, [])
@@ -213,7 +213,7 @@ const EvaluationCrud = () => {
     useEffect(() => {
 
         axios
-            .get(`${API_BASE_URL}/api/active_school_year`)
+            .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 if (res.data.length > 0) {
                     setSelectedSchoolYear(res.data[0].year_id);
@@ -228,7 +228,7 @@ const EvaluationCrud = () => {
     useEffect(() => {
         if (selectedSchoolYear && selectedSchoolSemester) {
             axios
-                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`)
+                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => {
                     if (res.data.length > 0) {
                         setSelectedActiveSchoolYear(res.data[0].school_year_id);
@@ -476,7 +476,7 @@ const EvaluationCrud = () => {
 
 
     const getActiveSchoolYearId = async (yearId, semesterId) => {
-        const res = await axios.get(`${API_BASE_URL}/api/get_selecterd_year/${yearId}/${semesterId}`);
+        const res = await axios.get(`${API_BASE_URL}/api/get_selecterd_year/${yearId}/${semesterId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         return res.data?.[0]?.school_year_id || null;
     };
 

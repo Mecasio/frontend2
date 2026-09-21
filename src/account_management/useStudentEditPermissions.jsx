@@ -9,7 +9,7 @@ const useStudentEditPermissions = () => {
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/student_edit_permissions`);
+        const res = await axios.get(`${API_BASE_URL}/api/student_edit_permissions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (res.data && typeof res.data === "object") {
           setPermissions(res.data);
         }

@@ -71,7 +71,7 @@ const DepartmentSectionTagging = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -82,7 +82,7 @@ const DepartmentSectionTagging = () => {
 
     if (storedRole && storedID) {
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -94,7 +94,7 @@ const DepartmentSectionTagging = () => {
 
   const checkAccess = async (empID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setHasAccess(res.data?.page_privilege === 1);
     } catch {
       setHasAccess(false);
@@ -133,15 +133,33 @@ const DepartmentSectionTagging = () => {
   useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const [deptRes, currRes, secRes, yrRes, semRes, yearLevelRes, activeRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/get_department`),
-          axios.get(`${API_BASE_URL}/api/applied_program`).catch(() => ({ data: [] })),
-          axios.get(`${API_BASE_URL}/api/department_section`),
-          axios.get(`${API_BASE_URL}/api/get_school_year`),
-          axios.get(`${API_BASE_URL}/api/get_school_semester`),
-          axios.get(`${API_BASE_URL}/api/get_year_level`).catch(() => ({ data: [] })),
-          axios.get(`${API_BASE_URL}/api/active_school_year`),
-        ]);
+        const sources = [
+          ["Departments", "get_department"],
+          ["Curriculums", "applied_program"],
+          ["Sections", "department_section"],
+          ["School years", "get_school_year"],
+          ["Semesters", "get_school_semester"],
+          ["Year levels", "get_year_level"],
+          ["Active school year", "active_school_year"],
+        ];
+        const failures = [];
+        const results = await Promise.allSettled(sources.map(async ([, endpoint]) => {
+          const response = await axios.get(`${API_BASE_URL}/api/${endpoint}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+          });
+          const data = Array.isArray(response.data) ? response.data : response.data?.data;
+          if (!Array.isArray(data)) throw new Error("Expected a list of options");
+          return { data };
+        }));
+        const [deptRes, currRes, secRes, yrRes, semRes, yearLevelRes, activeRes] = results.map((result, i) => {
+          if (result.status === "fulfilled") return result.value;
+          failures.push(sources[i][0]);
+          console.error(`Failed to load ${sources[i][1]}:`, result.reason);
+          return { data: [] };
+        });
+        if (failures.length) {
+          setSnackbar({ open: true, severity: "error", message: `Could not load: ${failures.join(", ")}. Please reload to retry.` });
+        }
 
         const depts = deptRes.data || [];
         const currs = Array.isArray(currRes.data) ? currRes.data : [];
@@ -243,24 +261,31 @@ const DepartmentSectionTagging = () => {
   );
 
   useEffect(() => {
-    if (filteredSections.length > 0) {
-      setInsertSection(String(filteredSections[0].department_section_id ?? ""));
-    } else {
-      setInsertSection("");
-    }
-  }, [filterCurriculum]); // eslint-disable-line react-hooks/exhaustive-deps
+    setInsertSection((previous) =>
+      filteredSections.some((section) => String(section.department_section_id) === previous)
+        ? previous
+        : String(filteredSections[0]?.department_section_id ?? "")
+    );
+  }, [filteredSections]);
 
   // ── Resolve active_school_year_id ─────────────────────────────────────────
   const [activeSYID, setActiveSYID] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    setActiveSYID("");
     if (!filterYear || !filterSemester) return;
     axios
-      .get(`${API_BASE_URL}/api/get_selecterd_year/${filterYear}/${filterSemester}`)
+      .get(`${API_BASE_URL}/api/get_selecterd_year/${filterYear}/${filterSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
-        if (res.data?.length > 0) setActiveSYID(res.data[0].school_year_id);
+        if (!cancelled) setActiveSYID(res.data?.[0]?.school_year_id ?? "");
       })
-      .catch(() => { });
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to resolve school year:", error);
+        setSnackbar({ open: true, severity: "error", message: "Could not load the selected school year and semester. Please try again." });
+      });
+    return () => { cancelled = true; };
   }, [filterYear, filterSemester]);
 
   // ── Table data ────────────────────────────────────────────────────────────
@@ -362,7 +387,7 @@ const DepartmentSectionTagging = () => {
   const fetchCurriculumStudents = async () => {
     const requestId = ++latestCurriculumRequestRef.current;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_student_per_curriculum`, {
+      const res = await axios.get(`${API_BASE_URL}/api/get_student_per_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           curriculum_id: filterCurriculum,
           active_school_year_id: activeSYID,
@@ -387,7 +412,7 @@ const DepartmentSectionTagging = () => {
   const fetchEnrolledStudents = async () => {
     const requestId = ++latestEnrolledRequestRef.current;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_student_already_tagged`, {
+      const res = await axios.get(`${API_BASE_URL}/api/get_student_already_tagged`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           curriculum_id: filterCurriculum,
           active_school_year_id: activeSYID,

@@ -138,7 +138,7 @@ const FacultyResetPassword = () => {
       try {
         const employee_id = localStorage.getItem("employee_id");
         const res = await axios.get(
-          `${API_BASE_URL}/api/get-otp-setting/prof/${employee_id}`
+          `${API_BASE_URL}/api/get-otp-setting/prof/${employee_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
         setTotpEnabled(res.data.require_otp === 1);
       } catch (err) {
@@ -161,7 +161,7 @@ const FacultyResetPassword = () => {
         type: "prof",
         employee_id,
         require_otp: newValue ? 1 : 0,  // use captured value, NOT state
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSnack({ open: true, message: res.data.message, severity: "success" });
     } catch (err) {
       setTotpEnabled(!newValue);         // roll back on failure

@@ -270,7 +270,7 @@ const StudentDashboard1 = () => {
     if (!storedUser || !storedRole || !loggedInPersonId) { window.location.href = "/login"; return; }
     setUser(storedUser);
     setUserRole(storedRole);
-    const allowedRoles = ["student", "registrar"];
+    const allowedRoles = ["student", "administrator"];
     if (allowedRoles.includes(storedRole)) {
       const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
       if (studentNumber) sessionStorage.setItem("student_number", studentNumber);

@@ -178,7 +178,7 @@ const StudentAdmissionServices = forwardRef((props, ref) => {
         setUser(storedUser);
         setUserRole(storedRole);
 
-        const allowedRoles = ["registrar", "student"];
+        const allowedRoles = ["administrator", "superadmin", "technical", "student"];
         if (allowedRoles.includes(storedRole)) {
             const targetId = searchedPersonId || queryPersonId || loggedInPersonId;
             setUserID(targetId);
@@ -190,7 +190,7 @@ const StudentAdmissionServices = forwardRef((props, ref) => {
 
     useEffect(() => {
         if (user && userID && userRole) {
-            if (["registrar", "student"].includes(userRole)) {
+            if (["administrator", "superadmin", "technical", "student"].includes(userRole)) {
                 fetchPersonData(userID);
             } else {
                 window.location.href = "/login";

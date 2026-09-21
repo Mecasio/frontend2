@@ -70,7 +70,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       setUserRole(role);
       setUserID(id);
       setEmployeeID(empID);
-      if (role === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(role)) {
         checkAccess(empID);
         fetchUserAccessList(empID);
       } else {
@@ -85,7 +85,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -98,7 +98,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const fetchUserAccessList = async (empID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}`,
+        `${API_BASE_URL}/api/page_access/${empID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const accessMap = data.reduce((acc, item) => {
         acc[item.page_id] = item.page_privilege === 1;
@@ -161,29 +161,29 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // â”€â”€ Load reference data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/year_table`)
+      .get(`${API_BASE_URL}/api/year_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setYears(res.data))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/enrolled-count`)
+      .get(`${API_BASE_URL}/api/enrolled-count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setEnrolledCount(res.data.total))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/professors`)
+      .get(`${API_BASE_URL}/api/professors`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) =>
         setProfessorCount(Array.isArray(res.data) ? res.data.length : 0),
       )
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/accepted-students-count`)
+      .get(`${API_BASE_URL}/api/accepted-students-count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setAcceptedCount(res.data.total))
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/registrar_count`)
+      .get(`${API_BASE_URL}/api/registrar_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setRegistrarCount(res.data.count || 0))
       .catch(console.error);
   }, []);
@@ -191,7 +191,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // â”€â”€ Set active school year as default â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const active = res.data?.[0];
         if (active?.year_id) setSelectedYear(active.year_id);
@@ -204,7 +204,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     const email = localStorage.getItem("email");
     if (!email) return;
     axios
-      .get(`${API_BASE_URL}/api/admin_data/${email}`)
+      .get(`${API_BASE_URL}/api/admin_data/${email}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setUserDepartment(res.data?.dprtmnt_id || ""))
       .catch(console.error);
   }, []);
@@ -213,7 +213,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   useEffect(() => {
     if (!userDep) return;
     axios
-      .get(`${API_BASE_URL}/api/applied_program/${userDep}`)
+      .get(`${API_BASE_URL}/api/applied_program/${userDep}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const options = Array.isArray(res.data) ? res.data : [];
         setProgramOptions(options);
@@ -228,7 +228,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // â”€â”€ Fetch ALL students once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/student_number`)
+      .get(`${API_BASE_URL}/api/student_number`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
         setAllStudents(data);
@@ -242,7 +242,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     const role = localStorage.getItem("role");
     if (person_id && role) {
       axios
-        .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`)
+        .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setPersonData(res.data))
         .catch(console.error);
     }
@@ -250,7 +250,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
 
   useEffect(() => {
     const handleProfileImageUpdated = (event) => {
-      if (event.detail?.role !== "registrar") return;
+      if (!["administrator", "superadmin", "technical"].includes(event.detail?.role)) return;
       if (event.detail.profileImage) {
         setProfileImage(event.detail.profileImage);
       }
@@ -270,7 +270,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // â”€â”€ Holidays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
-      .get(`https://date.nager.at/api/v3/PublicHolidays/${calYear}/PH`)
+      .get(`https://date.nager.at/api/v3/PublicHolidays/${calYear}/PH`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const lookup = {};
         res.data.forEach((h) => {
@@ -400,7 +400,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
 
     axios
       .get(
-        `${API_BASE_URL}/api/get_enrollment_statistic/college/${yearDesc}/${userDep}`,
+        `${API_BASE_URL}/api/get_enrollment_statistic/college/${yearDesc}/${userDep}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         const d = res.data;
@@ -425,7 +425,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       const role = localStorage.getItem("role");
       const accountRes = await axios.get(
-        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`,
+        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const user_account_id = accountRes.data.user_account_id;
       const formData = new FormData();
@@ -433,10 +433,10 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       await axios.post(
         `${API_BASE_URL}/api/update_registrar/${user_account_id}`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } },
       );
       const refreshed = await axios.get(
-        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`,
+        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPersonData(refreshed.data);
       setProfileImage(

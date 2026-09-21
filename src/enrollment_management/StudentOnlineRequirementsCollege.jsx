@@ -26,7 +26,6 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import Search from "@mui/icons-material/Search";
 import { Link, useLocation } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import Unauthorized from "../components/Unauthorized";
@@ -125,7 +124,7 @@ const StudentOnlineRequirementsCollege = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/requirements`)
+      .get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const allRequirements = res.data;
 
@@ -175,7 +174,7 @@ const StudentOnlineRequirementsCollege = () => {
 
     // fetch info of that person
     axios
-      .get(`${API_BASE_URL}api/person_with_applicant/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}api/person_with_applicant/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.student_number) {
           // AUTO-INSERT applicant_number into search bar
@@ -235,7 +234,7 @@ const StudentOnlineRequirementsCollege = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(restrictToRegistrarCurriculum(response.data));
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -279,7 +278,7 @@ const StudentOnlineRequirementsCollege = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -295,7 +294,7 @@ const StudentOnlineRequirementsCollege = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -308,7 +307,7 @@ const StudentOnlineRequirementsCollege = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -347,7 +346,7 @@ const StudentOnlineRequirementsCollege = () => {
       setUserRole(storedRole);
       setUserID(storedID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         if (storedID !== "undefined") {
         } else {
           console.warn("Stored person_id is invalid:", storedID);
@@ -449,7 +448,7 @@ const StudentOnlineRequirementsCollege = () => {
     if (!student_number) return;
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/uploads/by-student/${student_number}`,
+        `${API_BASE_URL}/api/uploads/by-student/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setUploads(res.data);
     } catch (err) {
@@ -465,7 +464,7 @@ const StudentOnlineRequirementsCollege = () => {
     }
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_data_as_applicant/${personID}`,
+        `${API_BASE_URL}/api/student_data_as_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const safePerson = {
         ...res.data,
@@ -484,7 +483,7 @@ const StudentOnlineRequirementsCollege = () => {
   const fetchDocumentStatus = async (student_number) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/document_status/${student_number}`,
+        `${API_BASE_URL}/api/document_status/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setDocumentStatus(response.data.document_status);
       setPerson((prev) => ({
@@ -589,7 +588,7 @@ const StudentOnlineRequirementsCollege = () => {
   const fetchPersons = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_upload_documents_data`,
+        `${API_BASE_URL}/api/student_upload_documents_data`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       setPersons(res.data);
@@ -691,7 +690,7 @@ const StudentOnlineRequirementsCollege = () => {
       formData.append("remarks", selectedFiles.remarks || "");
 
       await axios.post(`${API_BASE_URL}/api/student/upload`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           "x-person-id": localStorage.getItem("person_id"), // ✅ now inside headers
           ...getAuditConfig().headers,
@@ -718,7 +717,7 @@ const StudentOnlineRequirementsCollege = () => {
 
     try {
       await axios.delete(`${API_BASE_URL}/api/admin/uploads/${uploadId}`, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "x-person-id": localStorage.getItem("person_id"),
           ...getAuditConfig().headers,
         },
@@ -1241,8 +1240,9 @@ const StudentOnlineRequirementsCollege = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1277,8 +1277,9 @@ const StudentOnlineRequirementsCollege = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1307,8 +1308,9 @@ const StudentOnlineRequirementsCollege = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1338,7 +1340,9 @@ const StudentOnlineRequirementsCollege = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1385,9 +1389,10 @@ const StudentOnlineRequirementsCollege = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "120px",
-
-                  mr: 4.8,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Applying As:
@@ -1428,8 +1433,10 @@ const StudentOnlineRequirementsCollege = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "140px",
-                  mr: 2.3,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Document Status:
@@ -1513,7 +1520,9 @@ const StudentOnlineRequirementsCollege = () => {
                   sx={{
                     fontSize: "14px",
                     fontFamily: "Poppins, sans-serif",
-                    width: "90px",
+                    width: 150,
+                    minWidth: 150,
+                    flexShrink: 0,
                   }}
                 >
                   Document Type:
@@ -1596,15 +1605,13 @@ const StudentOnlineRequirementsCollege = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  marginLeft: "-25px",
                 }}
               >
                 <Typography
                   sx={{
                     fontSize: "14px",
                     fontFamily: "Poppins, sans-serif",
-                    width: "100px",
-                    textAlign: "center",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Document File:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import {
   Box,
   Button,
@@ -114,7 +114,7 @@ const EntranceExamScheduleManagement = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -171,7 +171,7 @@ const EntranceExamScheduleManagement = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -187,7 +187,7 @@ const EntranceExamScheduleManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -200,7 +200,7 @@ const EntranceExamScheduleManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -221,7 +221,7 @@ const EntranceExamScheduleManagement = () => {
 
   const fetchPersonData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAdminData(res.data);
       syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
@@ -234,7 +234,7 @@ const EntranceExamScheduleManagement = () => {
   }, [user]);
 
   useEffect(() => {
-    if (userRole !== "registrar" || !employeeID) return;
+    if (!["administrator", "superadmin", "technical"].includes(userRole) || !employeeID) return;
     refreshRegistrarCurriculumId(employeeID).catch((err) => {
       console.error("Error refreshing registrar scope:", err);
     });
@@ -254,7 +254,7 @@ const EntranceExamScheduleManagement = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
 
@@ -284,21 +284,21 @@ const EntranceExamScheduleManagement = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -348,7 +348,7 @@ const EntranceExamScheduleManagement = () => {
   const fetchSchedulesWithCount = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/exam_schedules_with_count`,
+        `${API_BASE_URL}/api/exam_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSchedules(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -363,10 +363,7 @@ const EntranceExamScheduleManagement = () => {
   }, []);
 
   useEffect(() => {
-    socket.current = io(API_BASE_URL, {
-      path: "/api/socket.io",
-      transports: ["websocket", "polling"],
-    });
+    socket.current = createAppSocket();
 
     return () => {
       socket.current.disconnect();
@@ -392,7 +389,7 @@ const EntranceExamScheduleManagement = () => {
   const fetchAllApplicants = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/verified-ecat-applicants`,
+        `${API_BASE_URL}/api/verified-ecat-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPersons(res.data);
     } catch (err) {
@@ -549,7 +546,7 @@ const EntranceExamScheduleManagement = () => {
       await axios.post(`${API_BASE_URL}/api/unassign_schedule`, {
         applicant_number,
         ...auditActor(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setPersons((prev) =>
         prev.map((p) =>
@@ -707,7 +704,7 @@ const EntranceExamScheduleManagement = () => {
         {
           schedule_id: selectedSchedule,
           ...auditActor(),
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSnack({ open: true, message: res.data.message, severity: "success" });
 
@@ -977,7 +974,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/admission_contact/active`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: { branch_id: branchId },
           },
         );
@@ -1142,7 +1139,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(

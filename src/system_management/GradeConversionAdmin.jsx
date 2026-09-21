@@ -111,7 +111,7 @@ const GradeConversionAdmin = () => {
                 localStorage.getItem("person_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     });
     const permissionHeaders = getAuditHeaders();
@@ -126,7 +126,7 @@ const GradeConversionAdmin = () => {
             setUserRole(storedRole);
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
-            if (storedRole === "registrar") checkAccess(storedEmployeeID);
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) checkAccess(storedEmployeeID);
             else window.location.href = "/login";
         } else {
             window.location.href = "/login";
@@ -135,7 +135,7 @@ const GradeConversionAdmin = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
                 setCanCreate(Number(response.data?.can_create) === 1);
@@ -172,7 +172,7 @@ const GradeConversionAdmin = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`);
+            const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setRows(res.data);
         } catch (err) {
             console.error(err);
@@ -272,7 +272,7 @@ const GradeConversionAdmin = () => {
 
     const fetchHonors = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/admin/honors-rules`);
+            const res = await axios.get(`${API_BASE_URL}/api/admin/honors-rules`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setHonors(res.data);
         } catch (err) {
             console.error(err);

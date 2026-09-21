@@ -112,7 +112,7 @@ const ProgramTagging = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -125,7 +125,7 @@ const ProgramTagging = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -189,7 +189,7 @@ const ProgramTagging = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
       "x-page-id": pageId,
     },
   });
@@ -274,7 +274,7 @@ const ProgramTagging = () => {
 
   const fetchYearLevel = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_year_level`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearlevelList(res.data);
     } catch (err) {
       console.log(err);
@@ -283,7 +283,7 @@ const ProgramTagging = () => {
 
   const fetchSemester = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_semester`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_semester`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSemesterList(res.data);
     } catch (err) {
       console.log(err);
@@ -292,7 +292,7 @@ const ProgramTagging = () => {
 
   const fetchCurriculum = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCurriculumList(res.data);
     } catch (err) {
       console.log(err);
@@ -301,7 +301,7 @@ const ProgramTagging = () => {
 
   const fetchCourse = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/course_list`);
+      const res = await axios.get(`${API_BASE_URL}/api/course_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       // 🔽 SORT COURSES alphabetically (course_code)
       setCourseList(
@@ -326,7 +326,7 @@ const ProgramTagging = () => {
 
   const fetchTaggedPrograms = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`);
+      const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const normalized = res.data;
 
@@ -515,7 +515,7 @@ const ProgramTagging = () => {
     if (!deleteAllFilter) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/program_tagging/delete_all`, {
+      await axios.delete(`${API_BASE_URL}/api/program_tagging/delete_all`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         ...getPermissionHeaders(),
         data: deleteAllFilter,
       });

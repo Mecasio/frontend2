@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
   Alert,
@@ -62,13 +62,18 @@ const AuditLogs = () => {
   const scrollRef = useRef(null);
   const requestRef = useRef(false);
   const [logs, setLogs] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [severity, setSeverity] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [action, setAction] = useState("");
+  const [actionOptions, setActionOptions] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -79,9 +84,6 @@ const AuditLogs = () => {
   }, [searchInput]);
 
   const resetList = useCallback(() => {
-    setLogs([]);
-    setPage(1);
-    setHasMore(true);
     setError("");
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, []);
@@ -105,7 +107,7 @@ const AuditLogs = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -122,7 +124,7 @@ const AuditLogs = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -134,7 +136,7 @@ const AuditLogs = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -162,33 +164,29 @@ const AuditLogs = () => {
   };
 
 
-  const fetchLogs = useCallback(async (pageToLoad = page, replace = false) => {
-    if (requestRef.current || (!replace && !hasMore)) return;
+  const fetchLogs = useCallback(async (pageToLoad = 1) => {
+    if (requestRef.current) return;
 
     requestRef.current = true;
     setLoading(true);
     setError("");
 
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/audit-logs`, {
+      const { data } = await axios.get(`${API_BASE_URL}/api/audit-logs`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           page: pageToLoad,
           limit: PAGE_SIZE,
           severity,
           search,
+          action,
+          start_date: startDate,
+          end_date: endDate,
         },
       });
 
-      const nextRows = data.data || [];
-      setLogs((prev) => {
-        if (replace) return nextRows;
-
-        const seen = new Set(prev.map((item) => item.log_key));
-        const freshRows = nextRows.filter((item) => !seen.has(item.log_key));
-        return [...prev, ...freshRows];
-      });
-      setHasMore(Boolean(data.hasMore));
-      setPage(pageToLoad + 1);
+      setLogs(data.data || []);
+      setTotalLogs(Number(data.total || 0));
+      setTotalPages(Math.max(1, Number(data.totalPages || 1)));
     } catch (err) {
       console.error("Audit logs fetch failed:", err);
       setError(err.response?.data?.message || "Failed to fetch audit logs.");
@@ -196,30 +194,43 @@ const AuditLogs = () => {
       requestRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, page, search, severity]);
+  }, [search, severity, action, startDate, endDate]);
+
+  useEffect(() => {
+    const loadActions = async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/api/audit-logs/actions`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+        });
+        setActionOptions(Array.isArray(data?.data) ? data.data : []);
+      } catch (err) {
+        console.error("Audit log actions fetch failed:", err);
+        setActionOptions([]);
+      }
+    };
+
+    loadActions();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [severity, search, action, startDate, endDate]);
 
   useEffect(() => {
     resetList();
-    fetchLogs(1, true);
-  }, [severity, search]);
+    fetchLogs(currentPage);
+  }, [currentPage, severity, search, action, startDate, endDate, fetchLogs, resetList]);
 
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
+  const paginatedLogs = logs;
 
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const logsPerPage = 100;
-
-  const totalPages = Math.ceil(logs.length / logsPerPage);
-
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * logsPerPage;
-    const endIndex = startIndex + logsPerPage;
-
-    return logs.slice(startIndex, endIndex);
-  }, [logs, currentPage]);
-
-  if (loading || hasAccess === null) {
-    return <LoadingOverlay open={loading} message="Loading..." />;
+  if (hasAccess === null) {
+    return <LoadingOverlay open message="Loading..." />;
   }
 
   if (!hasAccess) {
@@ -250,13 +261,15 @@ const AuditLogs = () => {
     <Box
       sx={{
         height: "calc(100vh - 150px)",
-        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
         backgroundColor: "transparent",
         mt: 1,
         p: 2,
       }}
     >
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} sx={{ flexShrink: 0 }}>
         <Typography
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
@@ -265,14 +278,11 @@ const AuditLogs = () => {
         </Typography>
       </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-      <br />
-
+      <hr style={{ border: "1px solid #ccc", width: "100%", flexShrink: 0 }} />
 
       <TableContainer
         component={Paper}
-        sx={{ width: "100%", border: `1px solid ${borderColor}` }}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, flexShrink: 0, mt: 2 }}
       >
         <Table size="small">
           <TableHead
@@ -485,8 +495,18 @@ const AuditLogs = () => {
           </TableHead>
         </Table>
       </TableContainer>
-      <Paper sx={{ p: 2, border: `1px solid ${borderColor}` }}>
-        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center" mb={2}>
+      <Paper
+        sx={{
+          p: 2,
+          border: `1px solid ${borderColor}`,
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center" mb={2} sx={{ flexShrink: 0 }}>
           <TextField
             label="Search audit trail"
             size="small"
@@ -508,8 +528,43 @@ const AuditLogs = () => {
               <MenuItem value="CRITICAL">CRITICAL</MenuItem>
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 240 }}>
+            <InputLabel>Action</InputLabel>
+            <Select
+              label="Action"
+              value={action}
+              onChange={(event) => setAction(event.target.value)}
+            >
+              <MenuItem value="">All Actions</MenuItem>
+              {actionOptions.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            label="Start Date"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ max: endDate || undefined }}
+            sx={{ minWidth: 180 }}
+          />
+          <TextField
+            label="End Date"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={(event) => setEndDate(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ min: startDate || undefined }}
+            sx={{ minWidth: 180 }}
+          />
           <Typography sx={{ ml: "auto", fontSize: 13, color: "text.secondary" }}>
-            Loaded {logs.length.toLocaleString()} log{logs.length === 1 ? "" : "s"}
+            {totalLogs.toLocaleString()} log{totalLogs === 1 ? "" : "s"}
           </Typography>
         </Box>
 
@@ -520,10 +575,11 @@ const AuditLogs = () => {
         )}
 
         <Box
-
+          ref={scrollRef}
           sx={{
-
-
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
             border: `1px solid ${borderColor}`,
             backgroundColor: "#f8fafc",
             p: 2,
@@ -608,7 +664,7 @@ const AuditLogs = () => {
 
                     }}
                   >
-                    {log.email || "unknown"}
+                    {log.actor_display || log.email || "unknown"}
                   </Typography>
 
                   {log.user_mac_address && (
@@ -654,230 +710,8 @@ const AuditLogs = () => {
               Loading audit logs...
             </Box>
           )}
-
-          {!hasMore && logs.length > 0 && (
-            <Box sx={{ textAlign: "center", py: 2, color: "text.secondary" }}>
-              End of audit logs.
-            </Box>
-          )}
         </Box>
       </Paper>
-
-      <TableContainer
-        component={Paper}
-        sx={{ width: "100%", border: `1px solid ${borderColor}` }}
-      >
-        <Table size="small">
-          <TableHead
-            sx={{
-              backgroundColor: headerColor,
-            }}
-          >
-            <TableRow>
-              <TableCell
-                sx={{
-                  border: `1px solid ${borderColor}`,
-                  py: 0.5,
-                  backgroundColor: headerColor,
-                  color: "white",
-                }}
-              >
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  flexWrap="wrap"
-                  gap={1}
-                  sx={{ height: "50px" }}
-                >
-                  {/* LEFT SIDE */}
-                  <Typography
-                    fontSize="16px"
-                    fontWeight="bold"
-                    color="white"
-                  >
-                    Audit Logs
-                  </Typography>
-
-                  {/* RIGHT SIDE */}
-                  <Box
-                    display="flex"
-                    alignItems="center"
-                    gap={1}
-                    flexWrap="wrap"
-                  >
-                    <Button
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      First
-                    </Button>
-
-                    <Button
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.max(prev - 1, 1))
-                      }
-                      disabled={currentPage === 1}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Prev
-                    </Button>
-
-                    <FormControl size="small" sx={{ minWidth: 90 }}>
-                      <Select
-                        value={currentPage}
-                        onChange={(e) =>
-                          setCurrentPage(Number(e.target.value))
-                        }
-                        sx={{
-                          fontSize: "12px",
-                          height: 36,
-                          color: "white",
-                          border: "1px solid white",
-                          backgroundColor: "transparent",
-                          ".MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "& svg": { color: "white" },
-                        }}
-                        MenuProps={{
-                          PaperProps: {
-                            sx: {
-                              maxHeight: 200,
-                              backgroundColor: "#fff",
-                            },
-                          },
-                        }}
-                      >
-                        {Array.from(
-                          { length: totalPages || 1 },
-                          (_, i) => (
-                            <MenuItem
-                              key={i + 1}
-                              value={i + 1}
-                            >
-                              Page {i + 1}
-                            </MenuItem>
-                          )
-                        )}
-                      </Select>
-                    </FormControl>
-
-                    <Typography
-                      fontSize="11px"
-                      color="white"
-                    >
-                      of {totalPages || 1} page
-                      {totalPages > 1 ? "s" : ""}
-                    </Typography>
-
-                    <Button
-                      onClick={() =>
-                        setCurrentPage((prev) =>
-                          Math.min(prev + 1, totalPages)
-                        )
-                      }
-                      disabled={
-                        currentPage === totalPages ||
-                        totalPages === 0
-                      }
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Next
-                    </Button>
-
-                    <Button
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={
-                        currentPage === totalPages ||
-                        totalPages === 0
-                      }
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Last
-                    </Button>
-                  </Box>
-                </Box>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-        </Table>
-      </TableContainer>
     </Box>
   );
 };

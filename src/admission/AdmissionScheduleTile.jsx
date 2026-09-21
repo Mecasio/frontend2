@@ -95,13 +95,13 @@ const AdmissionScheduleTile = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const yearsRes = await axios.get(`${API_BASE_URL}/api/get_school_year/`);
+                const yearsRes = await axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setSchoolYears(yearsRes.data);
 
-                const semRes = await axios.get(`${API_BASE_URL}/api/get_school_semester/`);
+                const semRes = await axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setSchoolSemester(semRes.data);
 
-                const activeRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+                const activeRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 if (activeRes.data.length > 0) {
                     setSelectedSchoolYear(activeRes.data[0].year_id);
                     setSelectedSchoolSemester(activeRes.data[0].semester_id);
@@ -131,7 +131,7 @@ const AdmissionScheduleTile = () => {
                 const queryString = params.toString();
                 const url = `${API_BASE_URL}/api/exam_schedules_with_count/${selectedSchoolYear}/${selectedSchoolSemester}${queryString ? `?${queryString}` : ""}`;
 
-                const res = await axios.get(url);
+                const res = await axios.get(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setSchedules(res.data);
                 setFilteredSchedules(res.data);
 

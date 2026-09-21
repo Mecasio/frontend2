@@ -182,7 +182,7 @@ const AdmissionsReportPanel = ({
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/applied_program`)
+      .get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setCurriculums(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Error fetching curriculums:", err));
   }, []);
@@ -206,7 +206,7 @@ const AdmissionsReportPanel = ({
     try {
       const res = await axios.get(
         `${API_BASE_URL}/api/reports/admissions-summary`,
-        { params: scopeParams },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: scopeParams },
       );
       setSummary(res.data);
     } catch (err) {
@@ -308,7 +308,7 @@ const AdmissionsReportPanel = ({
         params.status = resultsStatusFilter;
       }
 
-      const listRes = await axios.get(`${API_BASE_URL}${def.listEndpoint}`, {
+      const listRes = await axios.get(`${API_BASE_URL}${def.listEndpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params,
       });
       const rows = Array.isArray(listRes.data) ? listRes.data : [];
@@ -324,7 +324,7 @@ const AdmissionsReportPanel = ({
       const pdfRes = await axios.post(
         `${API_BASE_URL}/api/generate-attendance-report-pdf`,
         { html, title, fileNamePrefix: `${def.fileNamePrefix}_${period}` },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([pdfRes.data], { type: "application/pdf" });

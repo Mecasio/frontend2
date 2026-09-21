@@ -158,7 +158,7 @@ const StudentScholarshipList = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -170,7 +170,7 @@ const StudentScholarshipList = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         const userAccessDescription = response.data.access_description || "";
         setAccessDescription(userAccessDescription);
@@ -240,7 +240,7 @@ const StudentScholarshipList = () => {
 
     const fetchStudent = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/program_evaluation/${searchQuery}`);
+        const res = await fetch(`${API_BASE_URL}/api/program_evaluation/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const data = await res.json();
 
 
@@ -252,7 +252,7 @@ const StudentScholarshipList = () => {
             localStorage.setItem("admin_edit_person_id", searchQuery);
           }
 
-          const detailsRes = await fetch(`${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`);
+          const detailsRes = await fetch(`${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           const detailsData = await detailsRes.json();
           if (Array.isArray(detailsData) && detailsData.length > 0) {
             setStudentDetails(detailsData);
@@ -370,7 +370,7 @@ const StudentScholarshipList = () => {
     const fetchNotAssignedStudents = async () => {
       setNotAssignedLoading(true);
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/not_assigned`);
+        const response = await axios.get(`${API_BASE_URL}/api/not_assigned`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setNotAssignedStudents(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Failed to fetch not assigned students:", error);

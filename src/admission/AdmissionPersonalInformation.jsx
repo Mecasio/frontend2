@@ -144,7 +144,7 @@ const AdmissionPersonalInformation = () => {
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/person_with_applicant/${personID}`,
+        `${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPerson(res.data);
       setSelectedPerson(res.data);
@@ -220,7 +220,7 @@ const AdmissionPersonalInformation = () => {
   useEffect(() => {
     const fetchYearLevels = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+        const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setYearLevelOptions(res.data);
       } catch (err) {
         console.error("Error fetching year levels:", err);
@@ -267,7 +267,7 @@ const AdmissionPersonalInformation = () => {
 
   useEffect(() => {
     const fetchActiveYearAndAvailability = async () => {
-      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const activeYear = yearRes.data[0];
 
       if (activeYear) {
@@ -276,7 +276,7 @@ const AdmissionPersonalInformation = () => {
 
         const availRes = await axios.get(
           `${API_BASE_URL}/api/programs/availability`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: {
               year_id: activeYear.year_id,
               semester_id: activeYear.semester_id,
@@ -317,7 +317,7 @@ const AdmissionPersonalInformation = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -336,9 +336,9 @@ const AdmissionPersonalInformation = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -349,7 +349,7 @@ const AdmissionPersonalInformation = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -379,7 +379,7 @@ const AdmissionPersonalInformation = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -445,7 +445,7 @@ const AdmissionPersonalInformation = () => {
 
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/person_with_applicant/${userID}`,
+          `${API_BASE_URL}/api/person_with_applicant/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (res.data) {
           setPerson(res.data);
@@ -464,7 +464,7 @@ const AdmissionPersonalInformation = () => {
   useEffect(() => {
     const fetchPersons = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setPersons(res.data);
       } catch (err) {
         console.error("❌ Failed to fetch persons list", err);
@@ -733,7 +733,7 @@ const AdmissionPersonalInformation = () => {
       // ✅ Send update request
       await axios.put(
         `${API_BASE_URL}/api/person/${targetId}`,
-        withAuditActor(cleanedData),
+        withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
     } catch (error) {
       console.error("❌ SuperAdmin update failed:", {
@@ -1038,7 +1038,7 @@ const AdmissionPersonalInformation = () => {
       // ✅ Execute safe update
       await axios.put(
         `${API_BASE_URL}/api/person/${targetId}`,
-        withAuditActor(cleanedData),
+        withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
@@ -1225,7 +1225,7 @@ const AdmissionPersonalInformation = () => {
 
       await axios.put(
         `${API_BASE_URL}/api/person/${targetId}`,
-        withAuditActor(cleanedData),
+        withAuditActor(cleanedData), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
     } catch (err) {
       console.error("❌ Auto-save (manual) failed:", {
@@ -1298,7 +1298,7 @@ const AdmissionPersonalInformation = () => {
         `${API_BASE_URL}/api/upload-profile-picture`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
         },
       );
 
@@ -1491,7 +1491,7 @@ const AdmissionPersonalInformation = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data); // array of { curriculum_id: "..." }
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -1753,13 +1753,13 @@ const AdmissionPersonalInformation = () => {
       }
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
+        const res = await axios.get(`${API_BASE_URL}/api/search-person`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query },
         });
 
         if (res.data && res.data.person_id) {
           const details = await axios.get(
-            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`,
+            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           setPerson(details.data);
 
@@ -1950,10 +1950,10 @@ const AdmissionPersonalInformation = () => {
           audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id:
             employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+          audit_actor_role: userRole || "administrator",
           ...getLoginMacPayload(),
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -2000,7 +2000,7 @@ const AdmissionPersonalInformation = () => {
 
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/verified-exam-applicants`,
+        `${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
@@ -2031,10 +2031,10 @@ const AdmissionPersonalInformation = () => {
           audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id:
             employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+          audit_actor_role: userRole || "administrator",
           ...getLoginMacPayload(),
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -2098,7 +2098,7 @@ const AdmissionPersonalInformation = () => {
 
   useEffect(() => {
     if (!userID) return;
-    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`).then((res) => {
+    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }).then((res) => {
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
       setCanPrintPermit(verified);
     });

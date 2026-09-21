@@ -93,7 +93,7 @@ const ProgramManagement = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     "x-page-id": pageId,
   });
 
@@ -108,7 +108,7 @@ const ProgramManagement = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -121,7 +121,7 @@ const ProgramManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && Number(response.data.page_privilege) === 1) {
         setHasAccess(true);
@@ -160,7 +160,7 @@ const ProgramManagement = () => {
 
   const fetchPrograms = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_program`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPrograms(res.data);
     } catch (err) {
       console.error("Error fetching programs:", err);
@@ -362,7 +362,7 @@ const ProgramManagement = () => {
         `${API_BASE_URL}/api/import-program-xlsx`,
         formData,
         {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             ...getPermissionHeaders(),
             "Content-Type": "multipart/form-data",
           },

@@ -150,7 +150,7 @@ const FacultyEvaluation = () => {
         : storedEmployeeID
           ? `/api/get_prof_data_by_employee/${storedEmployeeID}`
           : `/api/get_prof_data/${id}`;
-      const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+      const res = await axios.get(`${API_BASE_URL}${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const first = res.data[0];
       localStorage.setItem("prof_id", first.prof_id || "");
       localStorage.setItem("employee_id", first.employee_id || "");
@@ -171,21 +171,21 @@ const FacultyEvaluation = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -199,7 +199,7 @@ const FacultyEvaluation = () => {
     if (selectedSchoolYear && selectedSchoolSemester) {
       axios
         .get(
-          `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+          `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           if (res.data.length > 0) {
@@ -218,7 +218,7 @@ const FacultyEvaluation = () => {
 
   const fetchFacultyData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/faculty_evaluation`, {
+      const res = await axios.get(`${API_BASE_URL}/api/faculty_evaluation`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           prof_id: profData.prof_id,
           year_id: selectedSchoolYear,
@@ -1044,7 +1044,7 @@ const FacultyEvaluation = () => {
           last_name: profData.lname || "",
           first_name: profData.fname || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blobUrl = window.URL.createObjectURL(

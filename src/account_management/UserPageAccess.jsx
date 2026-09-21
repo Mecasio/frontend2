@@ -18,6 +18,7 @@ import {
   MenuItem,
   InputLabel,
   Checkbox,
+  Stack,
   TableBody,
   Dialog,
   DialogTitle,
@@ -30,6 +31,7 @@ import {
   IconButton,
   Tabs,
   Tab,
+  CircularProgress,
 } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -45,7 +47,44 @@ import LockIcon from "@mui/icons-material/Lock";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
-const PROTECTED_PAGE_ID = 69;
+const USER_PAGE_ACCESS_PAGE_ID = 69;
+const ALWAYS_USER_PAGE_ACCESS_ROLES = ["superadmin", "technical"];
+
+const normalizeAccessRole = (role) => String(role || "").trim().toLowerCase();
+
+const hasGuaranteedUserPageAccess = (role) =>
+  ALWAYS_USER_PAGE_ACCESS_ROLES.includes(normalizeAccessRole(role));
+
+const applyGuaranteedUserPageAccess = (accessMap, role) => {
+  if (!hasGuaranteedUserPageAccess(role)) return accessMap;
+  return {
+    ...accessMap,
+    [USER_PAGE_ACCESS_PAGE_ID]: {
+      access: true,
+      can_create: true,
+      can_edit: true,
+      can_delete: true,
+    },
+  };
+};
+
+const getCurrentEmployeeId = () => {
+  const token = localStorage.getItem("token");
+
+  try {
+    const payload = token?.split(".")[1];
+    if (payload) {
+      const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+      if (decoded?.employee_id !== undefined && decoded?.employee_id !== null) {
+        return String(decoded.employee_id).trim();
+      }
+    }
+  } catch (error) {
+    console.warn("Unable to read employee ID from access token:", error);
+  }
+
+  return String(localStorage.getItem("employee_id") || "").trim();
+};
 
 // ─────────────────────────────────────────────────────────────────────────
 // Maps each page_id to the menu-group label it belongs to in the sidebar
@@ -263,18 +302,17 @@ const UserPageAccess = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
   const headerColor = colors.header || "#1976d2";
+  const mainButtonColor = colors.mainButton || "#1976d2";
 
   // UI Colors
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
 
   // Access control
-  const pageId = 69;
+  const pageId = USER_PAGE_ACCESS_PAGE_ID;
   const [hasAccess, setHasAccess] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [accessModalLoading, setAccessModalLoading] = useState(false);
   const [canCreate, setCanCreate] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
@@ -320,15 +358,15 @@ const UserPageAccess = () => {
   const getAuditConfigForPage = () =>
     getAuditConfig({
       "x-employee-id":
-        localStorage.getItem("employee_id") ||
+        getCurrentEmployeeId() ||
         localStorage.getItem("email") ||
         "unknown",
       "x-page-id": pageId,
       "x-audit-actor-id":
-        localStorage.getItem("employee_id") ||
+        getCurrentEmployeeId() ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
 
   const handleCloseSnack = (event, reason) => {
@@ -341,39 +379,56 @@ const UserPageAccess = () => {
     if (!settings) return;
     if (colors.title) setTitleColor(colors.title);
     if (colors.border) setBorderColor(colors.border);
-  }, [settings]);
+  }, [settings, colors.border, colors.title]);
 
-  // Check page privilege
+  // Check page privilege. Superadmin and technical always keep this page.
+  // Administrators can open it only when page 69 was granted to them.
   useEffect(() => {
-    const storedRole = localStorage.getItem("role");
-    const storedEmployeeID = localStorage.getItem("employee_id");
+    const storedRole = String(localStorage.getItem("role") || "").trim().toLowerCase();
+    const storedEmployeeID = getCurrentEmployeeId();
 
-    if (storedRole !== "registrar") {
+    if (!["administrator", "superadmin", "technical"].includes(storedRole)) {
       window.location.href = "/login";
       return;
     }
 
+    if (!storedEmployeeID) {
+      setHasAccess(false);
+      return;
+    }
+
+    if (hasGuaranteedUserPageAccess(storedRole)) {
+      setHasAccess(true);
+      setCanCreate(true);
+      setCanEdit(true);
+      setCanDelete(true);
+      loadAllUsers();
+      return;
+    }
+
     checkAccess(storedEmployeeID);
-    loadAllUsers();
   }, []);
 
-  const checkAccess = async (empID) => {
+  const checkAccess = async (employeeID) => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
-      if (res.data && Number(res.data.page_privilege) === 1) {
+      if (response.data && Number(response.data.page_privilege) === 1) {
         setHasAccess(true);
-        setCanCreate(Number(res.data?.can_create) === 1);
-        setCanEdit(Number(res.data?.can_edit) === 1);
-        setCanDelete(Number(res.data?.can_delete) === 1);
+        setCanCreate(Number(response.data?.can_create) === 1);
+        setCanEdit(Number(response.data?.can_edit) === 1);
+        setCanDelete(Number(response.data?.can_delete) === 1);
+        loadAllUsers();
       } else {
         setHasAccess(false);
         setCanCreate(false);
         setCanEdit(false);
         setCanDelete(false);
       }
-    } catch {
+    } catch (error) {
+      console.error("Error checking access:", error);
       setHasAccess(false);
       setCanCreate(false);
       setCanEdit(false);
@@ -384,7 +439,7 @@ const UserPageAccess = () => {
   // Load all users
   const loadAllUsers = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/registrars`);
+      const res = await axios.get(`${API_BASE_URL}/api/registrars`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAllUsers(res.data);
     } catch (err) {
       console.error("Error loading users:", err);
@@ -393,16 +448,19 @@ const UserPageAccess = () => {
 
   // Load selected user's access
   const loadUserAccess = async (user) => {
-    setLoading(true);
-    setSelectedUser(null);
+    setSelectedUser(user);
     setPageAccess({});
     setPages([]);
     setUserRole("");
+    setAccessTab(0);
+    setPageGroupFilter("");
+    setAccessModalLoading(true);
+    setOpenModal(true);
 
     try {
-      const pagesResp = await axios.get(`${API_BASE_URL}/api/pages`);
+      const pagesResp = await axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const accessResp = await axios.get(
-        `${API_BASE_URL}/api/page_access/${user.employee_id}`,
+        `${API_BASE_URL}/api/page_access/${user.employee_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const allPages = (pagesResp.data || []).sort((a, b) => a.id - b.id);
@@ -421,16 +479,12 @@ const UserPageAccess = () => {
       });
 
       setPages(allPages);
-      setSelectedUser(user); // ✅ full user object
-      setPageAccess(accessMap);
-      setAccessTab(0);
-      setPageGroupFilter("");
-
-      setOpenModal(true);
+      setPageAccess(applyGuaranteedUserPageAccess(accessMap, user.role));
     } catch {
+      setOpenModal(false);
       setSnack({ open: true, severity: "error", message: "Failed to load access" });
     } finally {
-      setLoading(false);
+      setAccessModalLoading(false);
     }
   };
 
@@ -465,6 +519,127 @@ const UserPageAccess = () => {
     can_delete: "Delete",
   };
 
+  const bulkPermissionToggleSx = {
+    width: 42,
+    height: 22,
+    padding: 0,
+    flexShrink: 0,
+    "& .MuiSwitch-switchBase": {
+      padding: "3px",
+      transition: "transform 0.2s ease",
+      "&.Mui-checked": {
+        transform: "translateX(20px)",
+        color: headerColor,
+        "& + .MuiSwitch-track": {
+          backgroundColor: "#fff",
+          opacity: 1,
+          borderColor: borderColor,
+        },
+        "& .MuiSwitch-thumb": {
+          backgroundColor: headerColor,
+        },
+      },
+      "&.Mui-disabled": {
+        opacity: 0.4,
+      },
+    },
+    "& .MuiSwitch-thumb": {
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      backgroundColor: borderColor,
+      boxShadow: "none",
+    },
+    "& .MuiSwitch-track": {
+      borderRadius: "11px",
+      backgroundColor: "#fff",
+      opacity: 1,
+      border: `1.5px solid ${borderColor}`,
+      boxSizing: "border-box",
+    },
+    "& .MuiSwitch-input": {
+      left: 0,
+      width: "100%",
+    },
+  };
+
+  const isBulkPermissionGranted = (pagesList, accessMap, permissionKey) =>
+    pagesList.length > 0 &&
+    pagesList.every((page) => Boolean(accessMap?.[page.id]?.[permissionKey]));
+
+  const renderBulkPermissionToggles = ({
+    pagesList,
+    accessMap,
+    onToggle,
+    disabled = false,
+    requireManagePermission = true,
+  }) => (
+    <Stack spacing={1.75} sx={{ width: "100%" }}>
+      {Object.entries(permissionLabels).map(([permissionKey, label]) => {
+        const checked = isBulkPermissionGranted(
+          pagesList,
+          accessMap,
+          permissionKey,
+        );
+        const toggleDisabled =
+          disabled ||
+          (requireManagePermission &&
+            !canManageUserPermissions(permissionKey)) ||
+          pagesList.length === 0;
+
+        return (
+          <Box key={permissionKey} sx={{ width: "100%" }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: titleColor || "#111",
+                mb: 0.75,
+              }}
+            >
+              {label} (ALL) :
+            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: toggleDisabled ? "text.disabled" : titleColor || "#111",
+                  lineHeight: 1,
+                }}
+              >
+                Grant
+              </Typography>
+              <Switch
+                checked={checked}
+                disabled={toggleDisabled}
+                disableRipple
+                onChange={(e) => onToggle(permissionKey, e.target.checked)}
+                sx={bulkPermissionToggleSx}
+              />
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: toggleDisabled ? "text.disabled" : titleColor || "#111",
+                  lineHeight: 1,
+                }}
+              >
+                Revoke
+              </Typography>
+            </Box>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+
   const canManageUserPermissions = (permissionKey) => {
     if (canEdit) return true;
     if (permissionKey === "can_create" && canCreate) return true;
@@ -481,9 +656,6 @@ const UserPageAccess = () => {
     const page = pages.find((p) => Number(p.id) === Number(targetPageId));
     return page?.page_description || `Page ${targetPageId}`;
   };
-
-  const isProtectedPage = (targetPageId) =>
-    Number(targetPageId) === PROTECTED_PAGE_ID;
 
   const closeAccessConfirm = () => {
     setAccessConfirmDialog({
@@ -522,12 +694,9 @@ const UserPageAccess = () => {
     currentAccess,
     permissionKey,
     enabled,
-    { skipProtectedOnClose = false } = {},
   ) => {
     const nextAccess = { ...currentAccess };
     pagesList.forEach((page) => {
-      if (!enabled && skipProtectedOnClose && isProtectedPage(page.id)) return;
-
       const current = nextAccess[page.id] || createEmptyPermission(false);
 
       // Grant / close only on pages the user/level already has access to
@@ -540,8 +709,6 @@ const UserPageAccess = () => {
     });
     return nextAccess;
   };
-
-  const getProtectedPageLabel = () => getPageLabel(PROTECTED_PAGE_ID);
 
   const buildAccessLevelPermissionState = (pagesList) => {
     const defaults = {};
@@ -660,6 +827,18 @@ const UserPageAccess = () => {
 
   const filteredPagesWithAccess = pagesWithAccess.filter(matchesGroupFilter);
   const filteredPagesWithoutAccess = pagesWithoutAccess.filter(matchesGroupFilter);
+  const bulkActionPages =
+    accessTab === 0 ? filteredPagesWithAccess : filteredPagesWithoutAccess;
+  const bulkActionScopeLabel = pageGroupFilter
+    ? ` in ${pageGroupFilter}`
+    : "";
+  const getBulkScopePayload = (pageList) =>
+    pageGroupFilter
+      ? {
+          pageIds: pageList.map((page) => page.id),
+          pageGroup: pageGroupFilter,
+        }
+      : {};
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -673,6 +852,18 @@ const UserPageAccess = () => {
   // Update access privilege
   const executeToggleChange = async (targetPageId, hasAccessNow) => {
     if (!selectedUser) return;
+    if (
+      hasAccessNow &&
+      Number(targetPageId) === USER_PAGE_ACCESS_PAGE_ID &&
+      hasGuaranteedUserPageAccess(selectedUser.role)
+    ) {
+      setSnack({
+        open: true,
+        severity: "warning",
+        message: "Superadmin and Technical users always keep User Page Access",
+      });
+      return;
+    }
     if (hasAccessNow && !canDelete) {
       setSnack({
         open: true,
@@ -758,11 +949,23 @@ const UserPageAccess = () => {
     }
 
     const isRevoke = hasAccessNow;
+    if (
+      isRevoke &&
+      Number(targetPageId) === USER_PAGE_ACCESS_PAGE_ID &&
+      hasGuaranteedUserPageAccess(selectedUser.role)
+    ) {
+      setSnack({
+        open: true,
+        severity: "warning",
+        message: "Superadmin and Technical users always keep User Page Access",
+      });
+      return;
+    }
     const employeeName = formatEmployeeName(selectedUser);
     const pageLabel = getPageLabel(targetPageId);
 
     confirmAccessChange({
-      requiresConfirm: isRevoke || isProtectedPage(targetPageId),
+      requiresConfirm: isRevoke,
       title: isRevoke ? "Revoke Page Access" : "Modify Page Access",
       message: isRevoke
         ? `Are you sure you want to revoke ${employeeName}'s access to ${pageLabel}?`
@@ -788,6 +991,19 @@ const UserPageAccess = () => {
       can_edit: false,
       can_delete: false,
     };
+
+    if (
+      Number(targetPageId) === USER_PAGE_ACCESS_PAGE_ID &&
+      hasGuaranteedUserPageAccess(selectedUser.role) &&
+      currentState[permissionKey]
+    ) {
+      setSnack({
+        open: true,
+        severity: "warning",
+        message: "Superadmin and Technical users always keep User Page Access permissions",
+      });
+      return;
+    }
 
     const nextState = {
       ...currentState,
@@ -849,7 +1065,7 @@ const UserPageAccess = () => {
     const actionLabel = permissionActionLabels[permissionKey];
 
     confirmAccessChange({
-      requiresConfirm: isProtectedPage(targetPageId),
+      requiresConfirm: false,
       title: isRevoke ? `Remove ${permissionLabels[permissionKey]} Access` : `Grant ${permissionLabels[permissionKey]} Access`,
       message: isRevoke
         ? `Are you sure you want to remove the capability of ${employeeName} to ${actionLabel} action on ${pageLabel}?`
@@ -869,7 +1085,7 @@ const UserPageAccess = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/pages`);
+      const res = await axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const pagesData = (res.data || []).sort((a, b) => a.id - b.id);
 
@@ -897,8 +1113,8 @@ const UserPageAccess = () => {
 
     try {
       const [accessRes, pagesRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/access_table`),
-        axios.get(`${API_BASE_URL}/api/pages`),
+        axios.get(`${API_BASE_URL}/api/access_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       ]);
 
       const levels = accessRes.data || [];
@@ -1202,27 +1418,47 @@ const UserPageAccess = () => {
       return;
     }
 
+    const targetPages = pageGroupFilter ? filteredPagesWithoutAccess : pages;
+    if (pageGroupFilter && targetPages.length === 0) return;
+
     try {
       await axios.post(`${API_BASE_URL}/api/page_access/grant-all`, {
         userId: selectedUser.employee_id,
+        ...getBulkScopePayload(targetPages),
       }, getAuditConfigForPage());
 
-      const newAccess = {};
-      pages.forEach((p) => {
-        newAccess[p.id] = {
-          access: true,
-          can_create: false,
-          can_edit: false,
-          can_delete: false,
-        };
-      });
-
-      setPageAccess(newAccess);
+      if (pageGroupFilter) {
+        setPageAccess((prev) => {
+          const nextAccess = { ...prev };
+          targetPages.forEach((p) => {
+            nextAccess[p.id] = {
+              access: true,
+              can_create: false,
+              can_edit: false,
+              can_delete: false,
+            };
+          });
+          return applyGuaranteedUserPageAccess(nextAccess, selectedUser.role);
+        });
+      } else {
+        const newAccess = {};
+        pages.forEach((p) => {
+          newAccess[p.id] = {
+            access: true,
+            can_create: false,
+            can_edit: false,
+            can_delete: false,
+          };
+        });
+        setPageAccess(applyGuaranteedUserPageAccess(newAccess, selectedUser.role));
+      }
 
       setSnack({
         open: true,
         severity: "success",
-        message: "All access granted",
+        message: pageGroupFilter
+          ? `Access granted${bulkActionScopeLabel}`
+          : "All access granted",
       });
     } catch (err) {
       console.error(err);
@@ -1245,27 +1481,37 @@ const UserPageAccess = () => {
       return;
     }
 
+    const targetPages = pageGroupFilter ? filteredPagesWithAccess : pages;
+    if (pageGroupFilter && targetPages.length === 0) return;
+
     try {
       await axios.post(`${API_BASE_URL}/api/page_access/revoke-all`, {
         userId: selectedUser.employee_id,
+        ...getBulkScopePayload(targetPages),
       }, getAuditConfigForPage());
 
-      const newAccess = {};
-      pages.forEach((p) => {
-        if (isProtectedPage(p.id)) {
-          newAccess[p.id] = pageAccess[p.id] || createEmptyPermission(false);
-          return;
-        }
-
-        newAccess[p.id] = createEmptyPermission(false);
-      });
-
-      setPageAccess(newAccess);
+      if (pageGroupFilter) {
+        setPageAccess((prev) => {
+          const nextAccess = { ...prev };
+          targetPages.forEach((p) => {
+            nextAccess[p.id] = createEmptyPermission(false);
+          });
+          return applyGuaranteedUserPageAccess(nextAccess, selectedUser.role);
+        });
+      } else {
+        const newAccess = {};
+        pages.forEach((p) => {
+          newAccess[p.id] = createEmptyPermission(false);
+        });
+        setPageAccess(applyGuaranteedUserPageAccess(newAccess, selectedUser.role));
+      }
 
       setSnack({
         open: true,
         severity: "success",
-        message: `All access removed except ${getProtectedPageLabel()}`,
+        message: pageGroupFilter
+          ? `Access removed${bulkActionScopeLabel}`
+          : "All access removed",
       });
     } catch (err) {
       console.error(err);
@@ -1292,8 +1538,10 @@ const UserPageAccess = () => {
 
     confirmAccessChange({
       requiresConfirm: true,
-      title: "Revoke All Page Access",
-      message: `Are you sure you want to revoke ALL of ${employeeName}'s page access? This will remove access to every page except ${getProtectedPageLabel()}, which must be changed individually.`,
+      title: pageGroupFilter ? "Revoke Group Page Access" : "Revoke All Page Access",
+      message: pageGroupFilter
+        ? `Are you sure you want to revoke ${employeeName}'s page access${bulkActionScopeLabel}?`
+        : `Are you sure you want to revoke ALL of ${employeeName}'s page access?`,
       onConfirm: () => revokeAllAccess(),
     });
   };
@@ -1309,13 +1557,18 @@ const UserPageAccess = () => {
       return;
     }
 
+    const targetPages = pageGroupFilter ? filteredPagesWithAccess : pages;
+    if (pageGroupFilter && targetPages.length === 0) return;
+
     const previousAccess = pageAccess;
-    const nextAccess = setBulkPermissionState(
-      pages,
-      pageAccess,
-      permissionKey,
-      enabled,
-      { skipProtectedOnClose: true },
+    const nextAccess = applyGuaranteedUserPageAccess(
+      setBulkPermissionState(
+        targetPages,
+        pageAccess,
+        permissionKey,
+        enabled,
+      ),
+      selectedUser.role,
     );
 
     setPageAccess(nextAccess);
@@ -1326,17 +1579,17 @@ const UserPageAccess = () => {
         {
           permission: permissionKey,
           enabled: enabled ? 1 : 0,
+          ...getBulkScopePayload(targetPages),
         },
         getAuditConfigForPage(),
       );
 
-      const protectedLabel = getProtectedPageLabel();
       setSnack({
         open: true,
         severity: "success",
         message: enabled
-          ? `Granted ${permissionLabels[permissionKey]} on pages with access`
-          : `Closed ${permissionLabels[permissionKey]} on pages with access (except ${protectedLabel})`,
+          ? `Granted ${permissionLabels[permissionKey]} on pages with access${bulkActionScopeLabel}`
+          : `Closed ${permissionLabels[permissionKey]} on pages with access${bulkActionScopeLabel}`,
       });
     } catch (err) {
       console.error(err);
@@ -1383,7 +1636,7 @@ const UserPageAccess = () => {
     }
   };
 
-  if (hasAccess === null || loading) {
+  if (hasAccess === null) {
     return <LoadingOverlay open message="Loading..." />;
   }
 
@@ -2042,8 +2295,16 @@ const UserPageAccess = () => {
       <Dialog
         open={openModal}
         onClose={() => setOpenModal(false)}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
+        PaperProps={{
+          sx: {
+            height: "80vh",
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
       >
         <DialogTitle
           sx={{
@@ -2053,6 +2314,7 @@ const UserPageAccess = () => {
             justifyContent: "space-between",
             alignItems: "center",
             fontWeight: "bold",
+            flexShrink: 0,
           }}
         >
           <Box display="flex" alignItems="center" gap={1}>
@@ -2078,15 +2340,122 @@ const UserPageAccess = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers sx={{ maxHeight: "75vh" }}>
+        <DialogContent
+          dividers
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
           {/* ─────────── TABS + GROUP FILTER (filter applies to whichever tab is active) ─────────── */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "250px minmax(0, 1fr) 180px" },
+              gap: 2,
+              alignItems: "stretch",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            {accessModalLoading ? (
+              <Box
+                sx={{
+                  gridColumn: "1 / -1",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 1.5,
+                }}
+              >
+                <CircularProgress size={36} sx={{ color: mainButtonColor }} />
+                <Typography color="text.secondary">Loading page access…</Typography>
+              </Box>
+            ) : (
+            <>
+            <Paper variant="outlined" sx={{ p: 1, height: "100%", minHeight: 0, overflowY: "auto" }}>
+              <Typography fontWeight={700} sx={{ px: 1, py: 1 }}>Filter by Group</Typography>
+              <Button
+                fullWidth
+                size="small"
+                onClick={() => setPageGroupFilter("")}
+                variant={!pageGroupFilter ? "contained" : "text"}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  mb: 0.5,
+                  ...(!pageGroupFilter
+                    ? {
+                        backgroundColor: mainButtonColor,
+                        color: "#fff",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
+                      }
+                    : {
+                        color: mainButtonColor,
+                        "&:hover": { backgroundColor: `${mainButtonColor}14` },
+                      }),
+                }}
+              >
+                All Groups
+              </Button>
+              {availablePageGroups.map((group) => (
+                <Button
+                  key={group}
+                  fullWidth
+                  size="small"
+                  onClick={() => setPageGroupFilter(group)}
+                  variant={pageGroupFilter === group ? "contained" : "text"}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    textTransform: "none",
+                    mb: 0.5,
+                    ...(pageGroupFilter === group
+                      ? {
+                          backgroundColor: mainButtonColor,
+                          color: "#fff",
+                          "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
+                        }
+                      : {
+                          color: mainButtonColor,
+                          "&:hover": { backgroundColor: `${mainButtonColor}14` },
+                        }),
+                  }}
+                >
+                  {group}
+                </Button>
+              ))}
+            </Paper>
+
+            <Box
+              sx={{
+                minWidth: 0,
+                minHeight: 0,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
           <Box
             display="flex"
             justifyContent="space-between"
             alignItems="center"
             flexWrap="wrap"
             gap={2}
-            sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
+            sx={{
+              borderBottom: 1,
+              borderColor: "divider",
+              mb: 2,
+              flexShrink: 0,
+              backgroundColor: "background.paper",
+            }}
           >
             <Tabs
               value={accessTab}
@@ -2094,6 +2463,8 @@ const UserPageAccess = () => {
               sx={{
                 minHeight: 40,
                 "& .MuiTab-root": { minHeight: 40, fontWeight: 600, textTransform: "none" },
+                "& .Mui-selected": { color: `${mainButtonColor} !important` },
+                "& .MuiTabs-indicator": { backgroundColor: mainButtonColor },
               }}
             >
               <Tab
@@ -2108,111 +2479,32 @@ const UserPageAccess = () => {
               />
             </Tabs>
 
-            <Box display="flex" alignItems="center" gap={1} sx={{ pb: 1 }}>
-              <FormControl size="small" sx={{ minWidth: 260 }}>
-                <InputLabel id="page-group-filter-label">Filter by Group</InputLabel>
-                <Select
-                  labelId="page-group-filter-label"
-                  label="Filter by Group"
-                  value={pageGroupFilter}
-                  onChange={(e) => setPageGroupFilter(e.target.value)}
-                >
-                  <MenuItem value="">All Groups</MenuItem>
-                  {availablePageGroups.map((group) => (
-                    <MenuItem key={group} value={group}>
-                      {group}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              {pageGroupFilter && (
-                <Button
-                  size="small"
-                  onClick={() => setPageGroupFilter("")}
-                  sx={{ textTransform: "none" }}
-                >
-                  Clear Filter
-                </Button>
-              )}
-            </Box>
           </Box>
 
           {/* ─────────── TAB PANEL: PAGES WITH ACCESS ─────────── */}
           {accessTab === 0 && (
-            <Box>
-              <Box
-                display="flex"
-                justifyContent="flex-end"
-                alignItems="center"
-                flexWrap="wrap"
-                gap={1}
-                mb={1}
+            <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <Paper
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
               >
-                <Button
-                  variant="contained"
-                  color="warning"
-                  size="small"
-                  startIcon={<LockIcon />}
-                  onClick={requestRevokeAllAccess}
-                  disabled={!canDelete || pagesWithAccess.length === 0}
-                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                >
-                  Remove All Access
-                </Button>
-              </Box>
-
-              <Box
-                display="flex"
-                justifyContent="flex-end"
-                gap={1}
-                flexWrap="wrap"
-                mb={1}
-              >
-                {Object.entries(permissionLabels).map(([permissionKey, label]) => (
-                  <React.Fragment key={permissionKey}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="success"
-                      onClick={() => handleUserBulkPermission(permissionKey, true)}
-                      disabled={
-                        !canManageUserPermissions(permissionKey) ||
-                        pagesWithAccess.length === 0
-                      }
-                      sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                    >
-                      Grant All {label}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="error"
-                      onClick={() => handleUserBulkPermission(permissionKey, false)}
-                      disabled={
-                        !canManageUserPermissions(permissionKey) ||
-                        pagesWithAccess.length === 0
-                      }
-                      sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                    >
-                      Close All {label}
-                    </Button>
-                  </React.Fragment>
-                ))}
-              </Box>
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 1 }}
-              >
-                Bulk close and remove actions skip {getProtectedPageLabel()} (Page{" "}
-                {PROTECTED_PAGE_ID}). Change that page using its row switches only.
-              </Typography>
-
-              <Paper sx={{ border: `1px solid ${borderColor}` }}>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
+                <TableContainer sx={{ flex: 1, overflow: "auto" }}>
+                  <Table
+                    size="small"
+                    stickyHeader
+                    sx={{
+                      "& .MuiTableCell-root": { py: "7px", px: 1, lineHeight: 1.2 },
+                      "& .MuiTableCell-head": { py: 0.75 },
+                      "& .MuiSwitch-root": { my: -0.75 },
+                    }}
+                  >
+                    <TableHead>
                       <TableRow>
                         {["#", "Page Description", "Access", "CREATE", "EDIT", "DELETE"].map(
                           (header) => (
@@ -2223,6 +2515,7 @@ const UserPageAccess = () => {
                                 textAlign: "center",
                                 fontWeight: "bold",
                                 border: `1px solid ${borderColor}`,
+                                backgroundColor: headerColor || "#1976d2",
                               }}
                             >
                               {header}
@@ -2244,15 +2537,11 @@ const UserPageAccess = () => {
                             {p.id}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                              {Number(p.id) === PROTECTED_PAGE_ID && (
-                                <LockIcon fontSize="small" color="warning" titleAccess="Protected page (ID 69)" />
-                              )}
-                              {p.page_description}
-                            </Box>
+                            {p.page_description}
                           </TableCell>    
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
+                              size="small"
                               checked={pageAccess[p.id]?.access || false}
                               onChange={() =>
                                 requestToggleChange(p.id, pageAccess[p.id]?.access || false)
@@ -2262,6 +2551,7 @@ const UserPageAccess = () => {
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
+                              size="small"
                               checked={pageAccess[p.id]?.can_create || false}
                               onChange={() => requestPermissionToggle(p.id, "can_create")}
                               disabled={!canManageUserPermissions("can_create")}
@@ -2269,6 +2559,7 @@ const UserPageAccess = () => {
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
+                              size="small"
                               checked={pageAccess[p.id]?.can_edit || false}
                               onChange={() => requestPermissionToggle(p.id, "can_edit")}
                               disabled={!canManageUserPermissions("can_edit")}
@@ -2276,6 +2567,7 @@ const UserPageAccess = () => {
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
+                              size="small"
                               checked={pageAccess[p.id]?.can_delete || false}
                               onChange={() => requestPermissionToggle(p.id, "can_delete")}
                               disabled={!canManageUserPermissions("can_delete")}
@@ -2301,32 +2593,28 @@ const UserPageAccess = () => {
 
           {/* ─────────── TAB PANEL: PAGES WITHOUT ACCESS ─────────── */}
           {accessTab === 1 && (
-            <Box>
-              <Box
-                display="flex"
-                justifyContent="flex-end"
-                alignItems="center"
-                flexWrap="wrap"
-                gap={1}
-                mb={1}
+            <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <Paper
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
               >
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  startIcon={<LockOpenIcon />}
-                  onClick={grantAllAccess}
-                  disabled={!canCreate || pagesWithoutAccess.length === 0}
-                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                >
-                  Grant All Access
-                </Button>
-              </Box>
-
-              <Paper sx={{ border: `1px solid ${borderColor}` }}>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead sx={{ backgroundColor: "#9e9e9e" }}>
+                <TableContainer sx={{ flex: 1, overflow: "auto" }}>
+                  <Table
+                    size="small"
+                    stickyHeader
+                    sx={{
+                      "& .MuiTableCell-root": { py: "7px", px: 1, lineHeight: 1.2 },
+                      "& .MuiTableCell-head": { py: 0.75 },
+                      "& .MuiSwitch-root": { my: -0.75 },
+                    }}
+                  >
+                    <TableHead>
                       <TableRow>
                         {["#", "Page Description", "Access"].map((header) => (
                           <TableCell
@@ -2336,6 +2624,7 @@ const UserPageAccess = () => {
                               textAlign: "center",
                               fontWeight: "bold",
                               border: `1px solid ${borderColor}`,
+                              backgroundColor: "#9e9e9e",
                             }}
                           >
                             {header}
@@ -2356,15 +2645,11 @@ const UserPageAccess = () => {
                             {p.id}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                              {Number(p.id) === PROTECTED_PAGE_ID && (
-                                <LockIcon fontSize="small" color="warning" titleAccess="Protected page (ID 69)" />
-                              )}
-                              {p.page_description}
-                            </Box>
+                            {p.page_description}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
+                              size="small"
                               checked={pageAccess[p.id]?.access || false}
                               onChange={() =>
                                 requestToggleChange(p.id, pageAccess[p.id]?.access || false)
@@ -2389,9 +2674,60 @@ const UserPageAccess = () => {
               </Paper>
             </Box>
           )}
+            </Box>
+
+            {/* RIGHT: bulk access actions */}
+            <Paper variant="outlined" sx={{ p: 2, height: "100%", minHeight: 0, overflowY: "auto" }}>
+              <Typography fontWeight={700} sx={{ mb: pageGroupFilter ? 0.25 : 1.5, fontSize: 15 }}>
+                Access Actions
+              </Typography>
+              {pageGroupFilter && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                  Applies to {pageGroupFilter} only
+                </Typography>
+              )}
+
+              {accessTab === 0 ? (
+                <Stack spacing={2}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="warning"
+                    size="small"
+                    startIcon={<LockIcon />}
+                    onClick={requestRevokeAllAccess}
+                    disabled={!canDelete || bulkActionPages.length === 0}
+                    sx={{ textTransform: "none", fontWeight: 600 }}
+                  >
+                    Remove All Access
+                  </Button>
+                  {renderBulkPermissionToggles({
+                    pagesList: bulkActionPages,
+                    accessMap: pageAccess,
+                    onToggle: handleUserBulkPermission,
+                  })}
+                </Stack>
+              ) : (
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<LockOpenIcon />}
+                  onClick={grantAllAccess}
+                  disabled={!canCreate || bulkActionPages.length === 0}
+                  sx={{ textTransform: "none", fontWeight: 600 }}
+                >
+                  Grant All Access
+                </Button>
+              )}
+            </Paper>
+            </>
+            )}
+          </Box>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, flexShrink: 0 }}>
           <Button
             color="error"
             variant="outlined"
@@ -2472,29 +2808,13 @@ const UserPageAccess = () => {
             InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
           />
 
-          <Box display="flex" justifyContent="flex-end" gap={1} mb={2} flexWrap="wrap">
-            {Object.entries(permissionLabels).map(([permissionKey, label]) => (
-              <React.Fragment key={permissionKey}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="success"
-                  onClick={() => handleCreateBulkPermission(permissionKey, true)}
-                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                >
-                  Grant All {label}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="error"
-                  onClick={() => handleCreateBulkPermission(permissionKey, false)}
-                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                >
-                  Close All {label}
-                </Button>
-              </React.Fragment>
-            ))}
+          <Box mb={2}>
+            {renderBulkPermissionToggles({
+              pagesList: createPages.filter((p) => createPageAccess[p.id]?.access),
+              accessMap: createPageAccess,
+              onToggle: handleCreateBulkPermission,
+              requireManagePermission: false,
+            })}
           </Box>
 
           <Paper sx={{ border: `1px solid ${borderColor}` }}>
@@ -2513,7 +2833,7 @@ const UserPageAccess = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredCreatePages.map((p, i) => (
+                  {filteredCreatePages.map((p) => (
                     <TableRow
                       key={p.id}
                       sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}
@@ -2682,32 +3002,15 @@ const UserPageAccess = () => {
               </Button>
             </Box>
 
-            {/* Right: Per-permission bulk buttons */}
-            <Box display="flex" gap={1} flexWrap="wrap" justifyContent="flex-end">
-              {Object.entries(permissionLabels).map(([permissionKey, label]) => (
-                <React.Fragment key={permissionKey}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="success"
-                    onClick={() => handleEditBulkPermission(permissionKey, true)}
-                    disabled={!editAccessId}
-                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                  >
-                    Grant All {label}
-                  </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="error"
-                    onClick={() => handleEditBulkPermission(permissionKey, false)}
-                    disabled={!editAccessId}
-                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                  >
-                    Close All {label}
-                  </Button>
-                </React.Fragment>
-              ))}
+            {/* Right: Per-permission bulk toggles */}
+            <Box>
+              {renderBulkPermissionToggles({
+                pagesList: editPages.filter((p) => editPageAccess[p.id]?.access),
+                accessMap: editPageAccess,
+                onToggle: handleEditBulkPermission,
+                disabled: !editAccessId,
+                requireManagePermission: false,
+              })}
             </Box>
           </Box>
 
@@ -2727,7 +3030,7 @@ const UserPageAccess = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredEditPages.map((p, i) => (
+                  {filteredEditPages.map((p) => (
                     <TableRow
                       key={p.id}
                       sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}

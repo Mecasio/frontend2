@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import {
   Box,
   Button,
@@ -149,10 +149,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
   const [loggedInPersonId, setLoggedInPersonId] = useState(null);
 
   useEffect(() => {
-    socket.current = io(API_BASE_URL, {
-      path: "/api/socket.io",
-      transports: ["websocket", "polling"],
-    });
+    socket.current = createAppSocket();
 
     return () => {
       socket.current.disconnect();
@@ -184,7 +181,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -202,9 +199,9 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -215,7 +212,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -245,7 +242,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
   const fetchPersonData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAdminData(res.data);
       syncRegistrarScopeFromAdminData(res.data); // { dprtmnt_id: "..." }
     } catch (err) {
@@ -294,7 +291,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
     const res = await axios.get(
       `${API_BASE_URL}/api/email-templates/active-senders`,
-      {
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           department_id: departmentId,
           program_id: programId,
@@ -341,7 +338,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -374,7 +371,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
 
@@ -411,21 +408,21 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -476,7 +473,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
   const fetchSchedulesWithCount = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/interview_schedules_with_count`,
+        `${API_BASE_URL}/api/interview_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSchedules(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -510,7 +507,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
   const fetchAllApplicants = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/interview/not-emailed-applicants`,
+        `${API_BASE_URL}/api/interview/not-emailed-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const fetchedSubjects = Array.isArray(res.data?.subjects)
@@ -542,7 +539,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/subjects`);
+      const res = await axios.get(`${API_BASE_URL}/api/active-subjects`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setSubjects(res.data);
     } catch (err) {
@@ -730,7 +727,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       await axios.post(`${API_BASE_URL}/api/unassign_interview`, {
         applicant_number,
         ...auditActor(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       await fetchAllApplicants();
       await fetchSchedulesWithCount();
@@ -889,7 +886,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
         {
           schedule_id: selectedSchedule,
           ...auditActor(),
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSnack({ open: true, message: res.data.message, severity: "success" });
 
@@ -911,7 +908,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
   const fetchRequirements = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/requirements`);
+      const res = await axios.get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRequirements(res.data);
       return res.data; // 👈 useful for email building
     } catch (err) {
@@ -1340,7 +1337,7 @@ ${requirementsSection}
             emailRes.sent.map((applicantId) =>
               axios.put(
                 `${API_BASE_URL}/api/interview_applicants/${applicantId}/email-sent`,
-                auditActor(),
+                auditActor(), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
               ),
             ),
           ).catch((err) => {
@@ -1674,7 +1671,7 @@ Please also bring:
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = restrictDepartmentsToScope(

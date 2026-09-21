@@ -5,11 +5,17 @@ import { Box, Container, Snackbar, Alert } from "@mui/material";
 import FreeTuitionImage from "../assets/FreeTuition.png";
 import EaristLogo from "../assets/EaristLogo.png";
 import "../styles/Print.css";
-import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
+import {
+  computeTotalAssessment,
+  computeTuitionAmount,
+  fetchResolvedFees,
+  filterAssessedFeeLines,
+  toNumber as toFeeNumber,
+} from "../utils/corDynamicFees";
 
 const CertificateOfRegistration = forwardRef(
   (
@@ -164,7 +170,6 @@ const CertificateOfRegistration = forwardRef(
       setCampusAddress(branding.campusAddress || "");
     }, [settings, branches, person?.campus]);
 
-    const [hasAccess, setHasAccess] = useState(null);
     const [approvedBy, setApprovedBy] = useState(null);
     const [approvedBySignatureMissing, setApprovedBySignatureMissing] =
       useState(false);
@@ -195,7 +200,7 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       const fetchApprovedBy = async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/signature-latest`);
+          const res = await fetch(`${API_BASE_URL}/api/signature-latest`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           const data = await res.json();
 
           if (data.success) {
@@ -211,7 +216,7 @@ const CertificateOfRegistration = forwardRef(
 
     useEffect(() => {
       axios
-        .get(`${API_BASE_URL}/api/get_active_school_years`)
+        .get(`${API_BASE_URL}/api/get_active_school_years`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setActiveSchoolYear(res.data))
         .catch((err) => console.error(err));
     }, []);
@@ -226,7 +231,7 @@ const CertificateOfRegistration = forwardRef(
     const fetchPersonData = async (person_id) => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/person/enrollment_data/${person_id}`,
+          `${API_BASE_URL}/api/person/enrollment_data/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setPerson(res.data);
       } catch (error) {
@@ -236,7 +241,7 @@ const CertificateOfRegistration = forwardRef(
 
     const fetchProfilePicture = async (person_id) => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/user/${person_id}`);
+        const res = await axios.get(`${API_BASE_URL}/api/user/${person_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (res.data && res.data.profile_img) {
           setProfilePicture(
             `${API_BASE_URL}/uploads/Student1by1/${res.data.profile_img}`,
@@ -321,7 +326,7 @@ const CertificateOfRegistration = forwardRef(
       student: false,
       courses: false,
       enrolled: false,
-      tosf: false,
+      fees: false,
       qr: false,
     });
 
@@ -335,7 +340,7 @@ const CertificateOfRegistration = forwardRef(
       try {
         const response = await axios.get(
           `${API_BASE_URL}/api/subject-enrollment-count`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: { sectionId },
           },
         );
@@ -360,7 +365,7 @@ const CertificateOfRegistration = forwardRef(
         student: false,
         courses: false,
         enrolled: false,
-        tosf: false,
+        fees: false,
         qr: false,
       });
       setEnrolled([]);
@@ -379,7 +384,7 @@ const CertificateOfRegistration = forwardRef(
       let cancelled = false;
       axios
         .get(
-          `${API_BASE_URL}/api/payment-status/${encodeURIComponent(student_number)}`,
+          `${API_BASE_URL}/api/payment-status/${encodeURIComponent(student_number)}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           if (!cancelled) {
@@ -411,7 +416,7 @@ const CertificateOfRegistration = forwardRef(
 
       const fetchSavedPaymentData = async () => {
         try {
-          const res = await axios.get(`${API_BASE_URL}/api${endpoint}`);
+          const res = await axios.get(`${API_BASE_URL}/api${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           const rows = Array.isArray(res.data) ? res.data : [];
           const matched = rows
             .filter(
@@ -453,7 +458,7 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       const fetchScholarship = async () => {
         try {
-          const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`);
+          const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           const activeTypes = Array.isArray(res.data)
             ? res.data.filter((item) => Number(item.scholarship_status) === 1)
             : [];
@@ -470,7 +475,7 @@ const CertificateOfRegistration = forwardRef(
       if (currId) {
         setDataLoaded((prev) => ({ ...prev, courses: false }));
         axios
-          .get(`${API_BASE_URL}/api/courses/${currId}`)
+          .get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
           .then((res) => {
             setCourses(res.data);
             setDataLoaded((prev) => ({ ...prev, courses: true }));
@@ -494,7 +499,7 @@ const CertificateOfRegistration = forwardRef(
       setEnrolled([]);
 
       axios
-        .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
+        .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: corActiveSchoolYearId
             ? { activeSchoolYearId: corActiveSchoolYearId }
             : {},
@@ -540,7 +545,7 @@ const CertificateOfRegistration = forwardRef(
         setLoading(true);
         const response = await axios.get(
           `${API_BASE_URL}/api/department-sections`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: { departmentId: selectedDepartment },
           },
         );
@@ -643,7 +648,7 @@ const CertificateOfRegistration = forwardRef(
                   ? { active_school_year_id: activeSchoolYearIdFromQuery }
                   : {}),
               },
-              { headers: { "Content-Type": "application/json" } },
+              { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
             );
             tagged = response.data;
           }
@@ -746,7 +751,7 @@ const CertificateOfRegistration = forwardRef(
         dataLoaded.student &&
         dataLoaded.courses &&
         dataLoaded.enrolled &&
-        dataLoaded.tosf &&
+        dataLoaded.fees &&
         dataLoaded.qr;
 
       if (allDataLoaded && onReady && student_number) {
@@ -766,12 +771,14 @@ const CertificateOfRegistration = forwardRef(
                 const filledInputs = Array.from(inputs).filter(
                   (inp) => inp.value && inp.value.trim() !== "",
                 );
-                const subjectRows =
-                  container.querySelectorAll("tbody tr, table tr");
+                const subjectRows = container.querySelectorAll(
+                  "tr[data-cor-subject='1']",
+                );
 
-                // Prefer waiting until subject rows exist when enrolled data is present.
+                // Prefer waiting until each enrolled subject is actually in the table.
                 const hasSubjectRows =
-                  enrolled.length === 0 || subjectRows.length > 1;
+                  enrolled.length === 0 ||
+                  subjectRows.length >= enrolled.length;
 
                 if (
                   (filledInputs.length > 5 && hasSubjectRows) ||
@@ -800,7 +807,7 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       const fetchDepartments = async () => {
         try {
-          const res = await axios.get(`${API_BASE_URL}/api/departments`);
+          const res = await axios.get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           setDepartments(res.data);
         } catch (err) {
           console.error("Error fetching departments:", err);
@@ -849,21 +856,17 @@ const CertificateOfRegistration = forwardRef(
     const LEFT_LABEL_WIDTH = "7.6em"; // fits "Email Address"
     const MID_LABEL_WIDTH = "6.2em"; // fits "Year Level"
     const RIGHT_LABEL_WIDTH = "10.5em"; // fits "Scholarship/Discount"
-    const scholarshipDiscountValue =
+    const savedScholarshipLabel =
       selectedPaymentData?.scholarship_code ||
       selectedPaymentData?.scholarship_name ||
       selectedPaymentData?.matriculation_remark ||
-      data[0]?.scholarship_code ||
-      data[0]?.scholarship_name ||
-      scholarshipTypes.find((item) => {
-        const label = String(
-          item?.scholarship_code || item?.scholarship_name || "",
-        );
-        return label.toUpperCase().includes("UNIFAST");
-      })?.scholarship_code ||
-      (savedUnifast ? "UNIFAST-FHE" : "");
+      "";
+    const scholarshipDiscountValue =
+      savedScholarshipLabel || (savedUnifast ? "UNIFAST-FHE" : "");
     const isUnifastScholarship =
-      savedUnifast || /UNIFAST/i.test(String(scholarshipDiscountValue || ""));
+      savedUnifast ||
+      (savedMatriculation &&
+        /UNIFAST/i.test(String(savedScholarshipLabel || "")));
     const showFreeTuitionStamp = isUnifastScholarship;
     const qrCodePaths = student_number
       ? [
@@ -928,41 +931,42 @@ const CertificateOfRegistration = forwardRef(
     );
     const totalCombined = totalCourseUnits + totalLabUnits;
 
-    const [tosf, setTosfData] = useState([]);
-    const baseTotalAssessment =
-      totalLecFees +
-      totalLabFees +
-      Number(tosf[0]?.cultural_fee || 0) +
-      Number(tosf[0]?.athletic_fee || 0) +
-      (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
-      Number(tosf[0]?.developmental_fee || 0) +
-      Number(tosf[0]?.guidance_fee || 0) +
-      Number(tosf[0]?.library_fee || 0) +
-      Number(tosf[0]?.medical_and_dental_fee || 0) +
-      Number(tosf[0]?.registration_fee || 0) +
-      (isFirstYearFirstSem ? Number(tosf[0]?.school_id_fees || 0) : 0) +
-      (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
-      (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
-    const displayTuitionAmount = selectedPaymentData
+    const [resolvedFeeLines, setResolvedFeeLines] = useState([]);
+    const [computedTuitionAmount, setComputedTuitionAmount] = useState(0);
+    const [computedTotalAssessment, setComputedTotalAssessment] = useState(0);
+    const shouldUseDynamicFees = resolvedFeeLines.length > 0;
+    const savedFeeLines = Array.isArray(selectedPaymentData?.fee_lines)
+      ? selectedPaymentData.fee_lines
+      : [];
+    const displayFeeLines = filterAssessedFeeLines(
+      savedFeeLines.length ? savedFeeLines : resolvedFeeLines,
+    );
+    const hasSavedAssessment = Boolean(selectedPaymentData);
+    const baseTotalAssessment = shouldUseDynamicFees
+      ? computedTotalAssessment
+      : Number(totalLecFees || 0) + Number(totalLabFees || 0);
+    const displayTuitionAmount = hasSavedAssessment
       ? Number(selectedPaymentData?.tuition_fees || 0)
-      : Number(totalLecFees) + Number(totalLabFees);
+      : shouldUseDynamicFees
+        ? computedTuitionAmount
+        : Number(totalLecFees) + Number(totalLabFees);
     const savedNetAssessment = savedUnifast
       ? 0
       : Number(selectedPaymentData?.total_tosf || 0);
-    const displayTotalAssessment = selectedPaymentData
+    const displayTotalAssessment = hasSavedAssessment
       ? savedNetAssessment
       : baseTotalAssessment;
-    const displayFinancialAidAmount = selectedPaymentData
+    const displayFinancialAidAmount = hasSavedAssessment
       ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
       : "";
-    const displayNetAssessment = selectedPaymentData ? savedNetAssessment : "";
+    const displayNetAssessment = hasSavedAssessment ? savedNetAssessment : "";
     const [curriculumOptions, setCurriculumOptions] = useState([]);
 
     useEffect(() => {
       const fetchCurriculums = async () => {
         try {
           const response = await axios.get(
-            `${API_BASE_URL}/api/applied_program`,
+            `${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           setCurriculumOptions(response.data);
         } catch (error) {
@@ -982,21 +986,85 @@ const CertificateOfRegistration = forwardRef(
         (person?.program ?? "");
     }
 
-    const fetchTosf = async () => {
-      try {
-        const res = await axios.get(`${API_BASE_URL}/api/tosf`);
-        setTosfData(res.data);
-        setDataLoaded((prev) => ({ ...prev, tosf: true }));
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        showSnackbar("Error fetching data", "error");
-        setDataLoaded((prev) => ({ ...prev, tosf: true })); // Mark as loaded even on error
-      }
-    };
-
     useEffect(() => {
-      fetchTosf();
-    }, []);
+      if (
+        !data[0] ||
+        !currId ||
+        yearlevel === "" ||
+        yearlevel == null
+      ) {
+        if (dataLoaded.student) {
+          setResolvedFeeLines([]);
+          setComputedTuitionAmount(0);
+          setComputedTotalAssessment(0);
+          setDataLoaded((prev) => ({ ...prev, fees: true }));
+        }
+        return;
+      }
+
+      let cancelled = false;
+      setDataLoaded((prev) => ({ ...prev, fees: false }));
+
+      const resolveStudentFees = async () => {
+        try {
+          const tuitionAmount =
+            Number(totalLecFees || 0) + Number(totalLabFees || 0);
+          const result = await fetchResolvedFees({
+            tuitionAmount,
+            branchId: person?.campus || "",
+            curriculumId: currId,
+            yearLevelId: yearlevel,
+            hasNstp: isHaveNSTP !== 0,
+            nstpCount: isHaveNSTP,
+            hasComputer: isHaveComputerFees,
+            hasLaboratory: isHaveLaboratory,
+            firstYearFirstSem: isFirstYearFirstSem,
+          });
+          const tuition = computeTuitionAmount({
+            yearLevelId: yearlevel,
+            hasNstpSubject: isHaveNSTP !== 0,
+            totalLecFees,
+            totalLabFees,
+            resolvedFeeLines: result.feeLines,
+          });
+
+          if (cancelled) return;
+          setResolvedFeeLines(result.feeLines);
+          setComputedTuitionAmount(tuition);
+          setComputedTotalAssessment(
+            computeTotalAssessment(tuition, result.feeLines),
+          );
+        } catch (error) {
+          if (cancelled) return;
+          console.error("Error resolving assessed fees:", error);
+          setResolvedFeeLines([]);
+          setComputedTuitionAmount(0);
+          setComputedTotalAssessment(0);
+        } finally {
+          if (!cancelled) {
+            setDataLoaded((prev) => ({ ...prev, fees: true }));
+          }
+        }
+      };
+
+      resolveStudentFees();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [
+      data,
+      currId,
+      yearlevel,
+      totalLabFees,
+      totalLecFees,
+      person?.campus,
+      isHaveNSTP,
+      isHaveComputerFees,
+      isHaveLaboratory,
+      isFirstYearFirstSem,
+      dataLoaded.student,
+    ]);
 
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -1834,7 +1902,7 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                     </tr>
                     {enrolled.map((item, index) => (
-                      <tr key={index}>
+                      <tr key={index} data-cor-subject="1">
                         <td colSpan={5} style={{ border: "1px solid black" }}>
                           <input
                             type="text"
@@ -1980,19 +2048,77 @@ const CertificateOfRegistration = forwardRef(
                             }}
                           />
                         </td>
-                        <td colSpan={4} style={{ border: "1px solid black" }}>
-                          <input
-                            type="text"
-                            value={item.description || ""}
-                            readOnly
-                            style={{
-                              width: "98%",
-                              border: "none",
-                              background: "none",
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
+                        <td
+                          colSpan={4}
+                          style={{
+                            border: "1px solid black",
+                            height: "26px",
+                            maxHeight: "26px",
+                            padding: 0,
+                            verticalAlign: "middle",
+                            overflow: "hidden",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {(() => {
+                            const program = String(item.program_code || "")
+                              .trim()
+                              .replace(/^TBA$/i, "");
+                            const section = String(
+                              item.section || item.description || "",
+                            )
+                              .trim()
+                              .replace(/^TBA$/i, "");
+                            const sectionOnly =
+                              program &&
+                              section.toUpperCase().startsWith(program.toUpperCase())
+                                ? section.slice(program.length).replace(/^[\s\-–]+/, "")
+                                : section;
+                            const line1 = program || sectionOnly || "TBA";
+                            const line2 =
+                              program && sectionOnly && sectionOnly !== program
+                                ? sectionOnly
+                                : "";
+                            const sectionFontSize = line2 ? "10px" : "12px";
+                            const sectionLineHeight = line2 ? "11px" : "13px";
+
+                            return (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: line2 ? "22px" : "26px",
+                                  maxHeight: line2 ? "22px" : "26px",
+                                  overflow: "hidden",
+                                  textAlign: "center",
+                                  fontSize: sectionFontSize,
+                                  lineHeight: sectionLineHeight,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    height: sectionLineHeight,
+                                    overflow: "hidden",
+                                    whiteSpace: "nowrap",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {line1}
+                                </div>
+                                {line2 ? (
+                                  <div
+                                    style={{
+                                      height: sectionLineHeight,
+                                      overflow: "hidden",
+                                      whiteSpace: "nowrap",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {line2}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td colSpan={7} style={{ border: "1px solid black" }}>
                           <input
@@ -2312,575 +2438,63 @@ const CertificateOfRegistration = forwardRef(
                           </td>
                         </tr>
 
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
+                        {displayFeeLines.map((fee, index) => (
+                          <tr
+                            key={
+                              fee.fee_rate_id ||
+                              fee.fee_code ||
+                              `${fee.fee_name || "fee"}-${index}`
+                            }
                           >
-                            <input
-                              type="text"
-                              value={"Athletic Fee"}
-                              readOnly
+                            <td
+                              colSpan={15}
                               style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
+                                fontSize: "62.5%",
+                                borderLeft: "1px solid black",
                               }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.athletic_fee || "0"}
-                              readOnly
+                            >
+                              <input
+                                type="text"
+                                value={fee.fee_name || ""}
+                                readOnly
+                                style={{
+                                  color: "black",
+                                  width: "98%",
+                                  border: "none",
+                                  fontFamily: "Arial",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  outline: "none",
+                                  background: "none",
+                                }}
+                              />
+                            </td>
+                            <td
+                              colSpan={5}
                               style={{
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
+                                fontSize: "62.5%",
+                                borderRight: "1px solid black",
                               }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"NSTP Fee"}
-                              readOnly
-                              style={{
-                                display: isHaveNSTP === 0 ? "none" : "block",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.nstp_fees || "0"}
-                              readOnly
-                              style={{
-                                display: isHaveNSTP === 0 ? "none" : "block",
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Cultural Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.cultural_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Developmental Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.developmental_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Guidance Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.guidance_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Library Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.library_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                color: "black",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Medical and Dental Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.medical_and_dental_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Registration Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.registration_fee || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"School ID Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                                display: isFirstYearFirstSem ? "block" : "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.school_id_fees || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                display: isFirstYearFirstSem ? "block" : "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Computer Fee"}
-                              readOnly
-                              style={{
-                                color: "black",
-                                width: "98%",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                                display:
-                                  isHaveComputerFees === 0 ? "none" : "block",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.computer_fees || "0"}
-                              readOnly
-                              style={{
-                                textAlign: "center",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                display:
-                                  isHaveComputerFees === 0 ? "none" : "block",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td
-                            colSpan={15}
-                            style={{
-                              fontSize: "62.5%",
-                              borderLeft: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={"Laboratory Fee"}
-                              readOnly
-                              style={{
-                                display:
-                                  isHaveLaboratory === 0 ? "none" : "block",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                          <td
-                            colSpan={5}
-                            style={{
-                              fontSize: "62.5%",
-                              borderRight: "1px solid black",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={tosf[0]?.laboratory_fees || "0"}
-                              readOnly
-                              style={{
-                                display:
-                                  isHaveLaboratory === 0 ? "none" : "block",
-                                textAlign: "center",
-                                fontFamily: "Arial",
-                                fontSize: "12px",
-                                fontWeight: "bold",
-                                color: "black",
-                                width: "98%",
-                                border: "none",
-                                outline: "none",
-                                background: "none",
-                              }}
-                            />
-                          </td>
-                        </tr>
+                            >
+                              <input
+                                type="text"
+                                value={toFeeNumber(fee.amount)}
+                                readOnly
+                                style={{
+                                  textAlign: "center",
+                                  fontFamily: "Arial",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  color: "black",
+                                  width: "98%",
+                                  border: "none",
+                                  outline: "none",
+                                  background: "none",
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
 
                         <tr>
                           <td
@@ -3543,7 +3157,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={shortDate}
+                              value={
+                                savedUnifast || savedMatriculation
+                                  ? shortDate
+                                  : ""
+                              }
                               readOnly
                               style={{
                                 color: "black",
@@ -3594,7 +3212,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={"Scholar"}
+                              value={
+                                savedUnifast || savedMatriculation
+                                  ? "Scholar"
+                                  : ""
+                              }
                               readOnly
                               style={{
                                 color: "black",

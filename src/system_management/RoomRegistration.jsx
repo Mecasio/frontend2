@@ -119,7 +119,7 @@ const RoomRegistration = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -135,7 +135,7 @@ const RoomRegistration = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -149,7 +149,7 @@ const RoomRegistration = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -203,7 +203,7 @@ const RoomRegistration = () => {
         ? `${API_BASE_URL}/api/room_list?branch=${branchId}`
         : `${API_BASE_URL}/api/room_list`;
 
-      const res = await axios.get(url);
+      const res = await axios.get(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRoomList(res.data);
     } catch (err) {
       console.error("Failed to fetch rooms:", err);

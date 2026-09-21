@@ -140,7 +140,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
     useEffect(() => {
         const fetchRooms = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/room_list`);
+                const res = await axios.get(`${API_BASE_URL}/api/room_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 // expect res.data = [{ room_id: 1, room_description: "Room A" }, ...]
                 setRooms(res.data);
             } catch (err) {
@@ -159,7 +159,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
     useEffect(() => {
         const fetchSchedules = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/interview_schedules_with_count`);
+                const res = await axios.get(`${API_BASE_URL}/api/interview_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
                 setSchedules(res.data);
             } catch (err) {
@@ -172,7 +172,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
     useEffect(() => {
         const fetchActiveSchoolYearId = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+                const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setActiveSchoolYearId(res.data?.[0]?.id || "");
             } catch (err) {
                 console.error("Error fetching active school year:", err);
@@ -200,7 +200,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -217,7 +217,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -229,7 +229,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -307,7 +307,7 @@ const CollegeQualifyingInterviewRoomAssignment = () => {
             setOpenSnackbar(true);
 
             const res = await axios.get(
-                `${API_BASE_URL}/api/interview_schedules_with_count`
+                `${API_BASE_URL}/api/interview_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
             );
 
             setSchedules(res.data);

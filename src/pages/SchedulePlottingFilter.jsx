@@ -92,12 +92,12 @@ const ScheduleFilterer = () => {
     "x-page-id": String(PAGE_ID),
     "x-audit-actor-id":
       employeeID || localStorage.getItem("person_id") || "unknown",
-    "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+    "x-audit-actor-role": localStorage.getItem("role") || "administrator",
   };
 
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const rows = Array.isArray(res.data) ? res.data : [];
       setDepartmentList(rows);
 
@@ -119,7 +119,7 @@ const ScheduleFilterer = () => {
     setPermissionsLoading(true);
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${resolvedEmployeeId}/${PAGE_ID}`,
+        `${API_BASE_URL}/api/page_access/${resolvedEmployeeId}/${PAGE_ID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const hasPageAccess = Number(res.data?.page_privilege) === 1;
       setCanEditAccess(hasPageAccess && Number(res.data?.can_edit) === 1);
@@ -140,7 +140,7 @@ const ScheduleFilterer = () => {
     setSchedulesLoading(true);
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/get_college_professor_schedule/${departmentId}`,
+        `${API_BASE_URL}/api/get_college_professor_schedule/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const rows = Array.isArray(res.data) ? res.data : [];
       const sortedRows = rows.slice().sort((a, b) => {

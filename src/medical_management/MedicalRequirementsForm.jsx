@@ -147,7 +147,7 @@ const MedicalRequirements = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -164,7 +164,7 @@ const MedicalRequirements = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -176,7 +176,7 @@ const MedicalRequirements = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -199,7 +199,7 @@ const MedicalRequirements = () => {
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
       setSelectedPerson(res.data);
       if (res.data?.applicant_number) {
@@ -227,7 +227,7 @@ const MedicalRequirements = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -298,7 +298,7 @@ const MedicalRequirements = () => {
       if (!userID) return;
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${userID}`);
+        const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (res.data) {
           setPerson(res.data);
           setSelectedPerson(res.data);
@@ -352,7 +352,7 @@ const MedicalRequirements = () => {
 
     try {
       console.log("🔍 Searching for:", number);
-      const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+      const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { query: number },
       });
 
@@ -394,7 +394,7 @@ const MedicalRequirements = () => {
       if (searchQuery.trim() === "") return;
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+        const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query: searchQuery }
         });
 
@@ -472,7 +472,7 @@ const MedicalRequirements = () => {
   // 🧬 Fetch Medical Record by Student Number
   const fetchMedicalData = async (number) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${number}`);
+      const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (res.data) {
         const bmi = res.data.bmi || calculateBmi(res.data.height, res.data.weight);
         setForm({
@@ -597,7 +597,7 @@ const MedicalRequirements = () => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -646,7 +646,7 @@ const MedicalRequirements = () => {
 
     // fetch info of that person
     axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.student_number) {
 
@@ -676,7 +676,7 @@ const MedicalRequirements = () => {
 
       try {
         console.log("🔍 Auto-searching:", studentNumber);
-        const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+        const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query: studentNumber },
         });
 
@@ -711,7 +711,7 @@ const MedicalRequirements = () => {
 
         const delayDebounce = setTimeout(async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+                const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     params: { query, limit: 10 },
                 });
 

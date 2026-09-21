@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { SettingsContext } from "../App";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import {
   Typography,
   Box,
@@ -230,7 +231,7 @@ const ScheduleChecker = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -242,7 +243,7 @@ const ScheduleChecker = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -313,7 +314,7 @@ const ScheduleChecker = () => {
 
   const fetchWorkloadTypeList = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/workload`);
+      const response = await axios.get(`${API_BASE_URL}/api/workload`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setWorkloadTypeList(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.log(error);
@@ -324,7 +325,7 @@ const ScheduleChecker = () => {
   const fetchRoom = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/room_list/${dprtmnt_id}`
+        `${API_BASE_URL}/api/room_list/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setRoomList(response.data);
     } catch (error) {
@@ -334,7 +335,7 @@ const ScheduleChecker = () => {
 
   const fetchCourseList = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/course_list`);
+      const response = await axios.get(`${API_BASE_URL}/api/course_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCourseList(response.data);
     } catch (error) {
       console.log(error);
@@ -343,7 +344,7 @@ const ScheduleChecker = () => {
 
   const fetchDesignationList = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/designation_list`);
+      const response = await axios.get(`${API_BASE_URL}/api/designation_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCourseList(response.data); // reusing courseList but content changes
     } catch (error) {
       console.log(error);
@@ -353,7 +354,7 @@ const ScheduleChecker = () => {
   const fetchSchoolYearList = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/get_active_school_years`
+        `${API_BASE_URL}/api/get_active_school_years`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setSchoolYearList(response.data);
     } catch (error) {
@@ -363,7 +364,7 @@ const ScheduleChecker = () => {
 
   const fetchProfList = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/professors`);
+      const res = await axios.get(`${API_BASE_URL}/api/professors`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setProfList(res.data);
     } catch (err) {
       console.error("Error fetching professors:", err);
@@ -373,7 +374,7 @@ const ScheduleChecker = () => {
   const fetchDayList = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/schedule-plotting/day_list`
+        `${API_BASE_URL}/api/schedule-plotting/day_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setDayList(response.data);
     } catch (error) {
@@ -384,7 +385,7 @@ const ScheduleChecker = () => {
   const fetchSectionList = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/section_table/${dprtmnt_id}`
+        `${API_BASE_URL}/api/section_table/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       setSectionList(response.data);
@@ -396,7 +397,7 @@ const ScheduleChecker = () => {
   const fetchProgramList = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/program_list/${dprtmnt_id}`
+        `${API_BASE_URL}/api/program_list/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       setProgramList(response.data);
@@ -408,7 +409,7 @@ const ScheduleChecker = () => {
   const fetchSchedule = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/get/all_schedule/${selectedRoom}`
+        `${API_BASE_URL}/api/get/all_schedule/${selectedRoom}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setSchedule(response.data);
     } catch (error) {
@@ -434,7 +435,7 @@ const ScheduleChecker = () => {
     setReviewScheduleLoading(true);
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/get_professor_schedule/${employeeId}`
+        `${API_BASE_URL}/api/get_professor_schedule/${employeeId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setReviewSchedules(response.data || []);
     } catch (error) {
@@ -443,6 +444,41 @@ const ScheduleChecker = () => {
     } finally {
       setReviewScheduleLoading(false);
     }
+  };
+
+  const handleExportOfficialTime = () => {
+    const activeEmployeeIds = new Set(
+      profList
+        .filter(
+          (professor) =>
+            Number(professor.status) === 1 ||
+            String(professor.status || "").toLowerCase() === "active",
+        )
+        .map((professor) => String(professor.employee_id)),
+    );
+    const exportRows = allschedules
+      .filter((row) => activeEmployeeIds.has(String(row.employee_id)))
+      .map((row) => [
+        row.employee_id || "",
+        row.day || "",
+        row.school_time_start || "",
+        row.school_time_end || "",
+      ]);
+
+    if (!exportRows.length) {
+      setMessage("No official time found for active employees in this department.");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+      return;
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["employee id", "day", "start time", "end time"],
+      ...exportRows,
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Official Time");
+    XLSX.writeFile(workbook, `official-time-${dprtmnt_id}.xlsx`);
   };
 
   const getScheduleTypeLabel = (row) => {
@@ -681,28 +717,28 @@ const ScheduleChecker = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_college_professor_schedule/${dprtmnt_id}`)
+      .get(`${API_BASE_URL}/api/get_college_professor_schedule/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchedules(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, [])
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, [])
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedAcademicSchoolYear(res.data[0].year_id);
@@ -736,7 +772,7 @@ const ScheduleChecker = () => {
     }
 
     axios
-      .get(`${API_BASE_URL}/api/professor-schedule/${selectedProf}`)
+      .get(`${API_BASE_URL}/api/professor-schedule/${selectedProf}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setProfessorSchedule(res.data || []))
       .catch(() => setProfessorSchedule([]));
   }, [isDesignationMode, selectedProf]);
@@ -839,7 +875,7 @@ const ScheduleChecker = () => {
               school_year_id: selectedSchoolYear,
               prof_id: selectedProf,
               exclude_schedule_id: editingScheduleId,
-            }
+            }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
           );
 
           if (response.data.conflict) {
@@ -897,7 +933,7 @@ const ScheduleChecker = () => {
           school_year_id: selectedSchoolYear,
           day_of_week: selectedDay,
           subject_id: selectedSubject,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (subjectResponse.data.exists) {
@@ -913,7 +949,7 @@ const ScheduleChecker = () => {
         {
           start_time: formattedStartTime,
           end_time: formattedEndTime,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (timeValidation.data.conflict) {
@@ -933,7 +969,7 @@ const ScheduleChecker = () => {
           prof_id: selectedProf,
           room_id: selectedRoom,
           subject_id: selectedSubject,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (timeResponse.data.conflict) {
@@ -994,7 +1030,7 @@ const ScheduleChecker = () => {
           ishonorarium: isHonorarium ? 1 : 0,
           is_servicecredit: isServiceCredit ? 1 : 0,
           is_temporary_substitution: isTemporarySubstitution ? 1 : 0,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (response.status === 200) {
@@ -1064,7 +1100,7 @@ const ScheduleChecker = () => {
           {
             update_mode: "substitution",
             prof_id: selectedProf,
-          }
+          }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
         await insertAuditLog("schedule_substituted", {
           page_name: "Schedule Checker",
@@ -1077,7 +1113,7 @@ const ScheduleChecker = () => {
             ishonorarium: isHonorarium ? 1 : 0,
             is_servicecredit: isServiceCredit ? 1 : 0,
             is_temporary_substitution: 0,
-          }
+          }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
         await insertAuditLog("schedule_load_type_updated", {
           schedule_type: getSelectedScheduleType(),
@@ -1116,7 +1152,7 @@ const ScheduleChecker = () => {
         {
           start_time: formattedStartTime,
           end_time: formattedEndTime,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (timeValidation.data.conflict) {
@@ -1136,7 +1172,7 @@ const ScheduleChecker = () => {
           prof_id: selectedProf,
           room_id: selectedRoom,
           subject_id: selectedSubject,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (timeResponse.data.conflict) {
@@ -1195,7 +1231,7 @@ const ScheduleChecker = () => {
           prof_id: selectedProf,
           room_id: selectedRoom,
           subject_id: selectedSubject,
-        }
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       if (response.status === 200) {
@@ -1225,7 +1261,7 @@ const ScheduleChecker = () => {
   const handleDelete = async (scheduleId) => {
     try {
       const res = await axios.delete(
-        `${API_BASE_URL}/api/delete/schedule/${scheduleId}`
+        `${API_BASE_URL}/api/delete/schedule/${scheduleId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setMessage(res.data.message);
       setOpenSnackbar(true);
@@ -1955,6 +1991,21 @@ const ScheduleChecker = () => {
             }}
           >
             View Schedule
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={handleExportOfficialTime}
+            disabled={!dprtmnt_id || !allschedules.length}
+            sx={{
+              height: "40px",
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Export Official Time
           </Button>
 
           <Tooltip title={!selectedSection ? "Select a section first" : "Download the printable class program"}>

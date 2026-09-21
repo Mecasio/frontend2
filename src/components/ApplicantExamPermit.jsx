@@ -116,12 +116,12 @@ const ApplicantExamPermit = ({ personId, steps }) => {
     const fetchData = async () => {
       try {
         // Fetch person
-        const res = await axios.get(`${API_BASE_URL}/api/person/${pid}`);
+        const res = await axios.get(`${API_BASE_URL}/api/person/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         let personData = res.data;
 
         // Fetch applicant number separately
         const applicantRes = await axios.get(
-          `${API_BASE_URL}/api/applicant_number/${pid}`,
+          `${API_BASE_URL}/api/applicant_number/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (applicantRes.data?.applicant_number) {
           personData.applicant_number = applicantRes.data.applicant_number;
@@ -134,7 +134,7 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
           // ✅ Use new unified verification route
           const verifyStatusRes = await axios.get(
-            `${API_BASE_URL}/api/verification-status/${applicant_number}`,
+            `${API_BASE_URL}/api/verification-status/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
 
           const { verified, totalRequired, totalVerified, hasSchedule } =
@@ -151,18 +151,18 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
           // Always load exam schedule (for display)
           const schedRes = await axios.get(
-            `${API_BASE_URL}/api/exam-schedule/${applicant_number}`,
+            `${API_BASE_URL}/api/exam-schedule/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           setExamSchedule(schedRes.data);
         }
 
         // Fetch programs
-        const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(progRes.data);
 
         // ✅ Fetch registrar (Scheduled By)
         const registrarRes = await axios.get(
-          `${API_BASE_URL}/api/scheduled-by/registrar`,
+          `${API_BASE_URL}/api/scheduled-by/registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (registrarRes.data?.fullName) {
           setScheduledBy(registrarRes.data.fullName);
@@ -182,13 +182,13 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
     // fetch person
     axios
-      .get(`${API_BASE_URL}/api/person/${pid}`)
+      .get(`${API_BASE_URL}/api/person/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(async (res) => {
         let personData = res.data;
 
         // fetch applicant_number separately
         const applicantRes = await axios.get(
-          `${API_BASE_URL}/api/applicant_number/${pid}`,
+          `${API_BASE_URL}/api/applicant_number/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (applicantRes.data?.applicant_number) {
           personData.applicant_number = applicantRes.data.applicant_number;
@@ -200,12 +200,12 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
     // fetch applicant number then schedule
     axios
-      .get(`${API_BASE_URL}/api/applicant_number/${pid}`)
+      .get(`${API_BASE_URL}/api/applicant_number/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const applicant_number = res.data?.applicant_number;
         if (applicant_number) {
           return axios.get(
-            `${API_BASE_URL}/api/exam-schedule/${applicant_number}`,
+            `${API_BASE_URL}/api/exam-schedule/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
         }
       })
@@ -214,13 +214,13 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
     // fetch curriculum/programs
     axios
-      .get(`${API_BASE_URL}/api/applied_program`)
+      .get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setCurriculumOptions(res.data))
       .catch((err) => console.error(err));
 
     // ✅ Fetch registrar name again for refresh
     axios
-      .get(`${API_BASE_URL}/api/scheduled-by/registrar`)
+      .get(`${API_BASE_URL}/api/scheduled-by/registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.fullName) setScheduledBy(res.data.fullName);
       })
@@ -236,13 +236,13 @@ const ApplicantExamPermit = ({ personId, steps }) => {
     const fetchScores = async () => {
       try {
         const applicantNumberRes = await axios.get(
-          `${API_BASE_URL}/api/applicant_number/${personId}`,
+          `${API_BASE_URL}/api/applicant_number/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const applicantNumber = applicantNumberRes.data?.applicant_number;
 
         // 2️⃣ Entrance exam scores (already working)
         const res = await axios.get(
-          `${API_BASE_URL}/api/applicants-with-number`,
+          `${API_BASE_URL}/api/applicants-with-number`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const applicants = Array.isArray(res.data)
           ? res.data
@@ -276,7 +276,7 @@ const ApplicantExamPermit = ({ personId, steps }) => {
 
         // 3️⃣ Get Qualifying / Interview / Total Ave from person_status_table
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/person_status/${personId}`,
+          `${API_BASE_URL}/api/person_status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const data = statusRes.data;
 

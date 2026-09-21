@@ -129,7 +129,7 @@ const CollegeStudentGradeFile = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -142,7 +142,7 @@ const CollegeStudentGradeFile = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${PAGE_ID}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${PAGE_ID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -156,7 +156,7 @@ const CollegeStudentGradeFile = () => {
     // Dynamic grade conversion keeps the displayed ratings aligned with the
     // grade_conversion table — same as the editable Student Grade File.
     axios
-      .get(`${API_BASE_URL}/api/admin/grade-conversion`)
+      .get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setGradeConversions(res.data))
       .catch((err) => {
         console.error("Failed to fetch grade conversions:", err);
@@ -345,7 +345,7 @@ const CollegeStudentGradeFile = () => {
 
     try {
       setIsLoadingStudentDirectory(true);
-      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
+      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           employee_id: empId,
           q: trimmedQuery,
@@ -380,7 +380,7 @@ const CollegeStudentGradeFile = () => {
 
     try {
       const empId = employeeID || localStorage.getItem("employee_id") || "";
-      const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
+      const res = await axios.get(`${API_BASE_URL}/api/student-info`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           searchQuery: student_number,
           ...(empId ? { employee_id: empId } : {}),
@@ -403,7 +403,7 @@ const CollegeStudentGradeFile = () => {
       const empId = employeeID || localStorage.getItem("employee_id") || "";
       const res = await axios.get(
         `${API_BASE_URL}/api/student-info/${student_number}`,
-        {
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: empId ? { employee_id: empId } : undefined,
         },
       );
@@ -501,7 +501,7 @@ const CollegeStudentGradeFile = () => {
     if (!personIdFromUrl) return;
 
     axios
-      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const resolvedStudentNumber = res.data?.student_number;
         if (resolvedStudentNumber) {

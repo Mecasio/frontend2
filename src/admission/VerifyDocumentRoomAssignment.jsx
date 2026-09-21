@@ -76,7 +76,7 @@ const VerifyDocumentRoomAssignment = () => {
   const [schoolYearId, setSchoolYearId] = useState("");
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/active_school_year`).then((res) => {
+    axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }).then((res) => {
       const row = Array.isArray(res.data) ? res.data[0] : res.data;
       setSchoolYearId(row?.school_year_id ?? row?.id ?? "");
     });
@@ -85,7 +85,7 @@ const VerifyDocumentRoomAssignment = () => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/room_list`);
+        const res = await axios.get(`${API_BASE_URL}/api/room_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         setRooms(res.data);
       } catch (err) {
@@ -102,7 +102,7 @@ const VerifyDocumentRoomAssignment = () => {
     const fetchSchedules = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/verify_document_schedule_list`,
+          `${API_BASE_URL}/api/verify_document_schedule_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setSchedules(res.data);
       } catch (err) {
@@ -128,7 +128,7 @@ const VerifyDocumentRoomAssignment = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+        userRole || localStorage.getItem("role") || "administrator",
     });
 
   useEffect(() => {
@@ -143,7 +143,7 @@ const VerifyDocumentRoomAssignment = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -156,7 +156,7 @@ const VerifyDocumentRoomAssignment = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -244,7 +244,7 @@ const VerifyDocumentRoomAssignment = () => {
 
       // Refresh schedules
       const res = await axios.get(
-        `${API_BASE_URL}/api/verify_document_schedule_list`,
+        `${API_BASE_URL}/api/verify_document_schedule_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSchedules(res.data);
     } catch (err) {
@@ -400,7 +400,7 @@ const VerifyDocumentRoomAssignment = () => {
 
       // Refresh schedules
       const res = await axios.get(
-        `${API_BASE_URL}/api/verify_document_schedule_list`,
+        `${API_BASE_URL}/api/verify_document_schedule_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setSchedules(res.data);
     } catch (err) {

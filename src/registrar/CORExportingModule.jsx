@@ -16,13 +16,13 @@ import {
   TableCell,
   TableBody,
   TableContainer,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   Grid,
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   LinearProgress,
 } from "@mui/material";
 import axios from "axios";
@@ -31,7 +31,6 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
 import API_BASE_URL from "../apiConfig";
-import LoadingOverlay from "../components/LoadingOverlay";
 import CertificateOfRegistration from "../components/CertificateOfRegistration";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -92,12 +91,6 @@ const CORExportingModule = () => {
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
   const [employeeID, setEmployeeID] = useState("");
-  const [hasAccess, setHasAccess] = useState(null);
-
-  const [loading, setLoading] = useState(false);
-
-  const pageId = 117;
-
   const getAuditHeaders = () => ({
     ...getFlatAuditHeaders(),
     "x-audit-actor-id":
@@ -105,7 +98,7 @@ const CORExportingModule = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
   });
 
   useEffect(() => {
@@ -147,42 +140,12 @@ const CORExportingModule = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-
-      if (storedRole === "registrar") {
-        checkAccess(storedEmployeeID);
-      } else {
-        window.location.href = "/login";
-      }
-    } else {
-      window.location.href = "/login";
     }
   }, []);
 
-  const checkAccess = async (employeeID) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
-      );
-      if (response.data && response.data.page_privilege === 1) {
-        setHasAccess(true);
-      } else {
-        setHasAccess(false);
-      }
-    } catch (error) {
-      console.error("Error checking access:", error);
-      setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_student_number`)
+      .get(`${API_BASE_URL}/api/get_student_number`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         setArrayOfStudentNumber(res.data);
         console.log("Fetched student data:", res.data);
@@ -210,8 +173,8 @@ const CORExportingModule = () => {
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_BASE_URL}/api/get_school_year/`),
-      axios.get(`${API_BASE_URL}/api/active_school_year`),
+      axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
     ])
       .then(([yearsRes, activeRes]) => {
         const active =
@@ -229,14 +192,14 @@ const CORExportingModule = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_year_level`)
+      .get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setYearLevels(res.data))
       .catch((err) => console.error(err));
   }, []);
@@ -281,7 +244,7 @@ const CORExportingModule = () => {
 
   const fetchDepartments = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDepartment(res.data);
       console.log(res.data);
     } catch (err) {
@@ -293,7 +256,7 @@ const CORExportingModule = () => {
     if (!dprtmnt_id) return;
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/applied_program/${dprtmnt_id}`,
+        `${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPrograms(res.data);
     } catch (err) {
@@ -312,29 +275,34 @@ const CORExportingModule = () => {
   };
 
   const loadBatchStudentTagging = async (students) => {
-    const studentNumbers = students.map(
-      (student) => student.student_number,
-    );
     const activeSchoolYearId = students[0]?.active_school_year_id || "";
 
-    if (studentNumbers.length === 0) {
+    if (students.length === 0) {
       setBatchByStudentNumber({});
       return {};
     }
 
-    console.log("studentNumbers sent:", studentNumbers);
+    const byNumber = {};
+    const batchSize = 200;
 
-    const res = await axios.post(
-      `${API_BASE_URL}/api/student-tagging-batch`,
-      { studentNumbers, selectedYearLevel, activeSchoolYearId },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    for (let index = 0; index < students.length; index += batchSize) {
+      const batch = students.slice(index, index + batchSize);
+      const studentNumbers = batch.map((student) => student.student_number);
+      console.log(
+        `student-tagging-batch ${Math.floor(index / batchSize) + 1}:`,
+        studentNumbers.length,
+      );
 
-    const studentsWithPreload = res.data?.students || [];
-    const byNumber = studentsWithPreload.reduce((acc, student) => {
-      acc[student.student_number] = student;
-      return acc;
-    }, {});
+      const res = await axios.post(
+        `${API_BASE_URL}/api/student-tagging-batch`,
+        { studentNumbers, selectedYearLevel, activeSchoolYearId },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
+      );
+
+      for (const student of res.data?.students || []) {
+        byNumber[student.student_number] = student;
+      }
+    }
 
     setBatchByStudentNumber(byNumber);
     return byNumber;
@@ -488,7 +456,7 @@ const CORExportingModule = () => {
 
     setExportStatus("Loading COR data for server export...");
     setExportProgress(0);
-    const preloadedByNumber = await loadBatchStudentTagging(listToExport);
+    let preloadedByNumber = await loadBatchStudentTagging(listToExport);
 
     setExportStatus("Starting server export...");
 
@@ -512,11 +480,16 @@ const CORExportingModule = () => {
     const jobId = startRes.data?.job_id;
     if (!jobId) throw new Error("Server did not return an export job id.");
 
+    // The server has copied the prepared payload into its export jobs. Release
+    // the frontend copy while the batch workers generate the PDFs.
+    preloadedByNumber = null;
+    setBatchByStudentNumber({});
+
     let job = null;
     while (true) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const statusRes = await axios.get(
-        `${API_BASE_URL}/api/cor-export/jobs/${jobId}`,
+        `${API_BASE_URL}/api/cor-export/jobs/${jobId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       job = statusRes.data;
       setExportCurrent(Number(job.current || 0));
@@ -530,14 +503,19 @@ const CORExportingModule = () => {
       }
     }
 
-    setExportStatus("Downloading server ZIP...");
+    setExportStatus("Downloading completed COR package...");
     const downloadRes = await axios.get(
       `${API_BASE_URL}/api/cor-export/jobs/${jobId}/download`,
-      { responseType: "blob" },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
     );
-    downloadBlob(downloadRes.data, job?.file_name || `${zipFileName}.zip`);
+    downloadBlob(
+      downloadRes.data,
+      job?.file_name || `${zipFileName}.${listToExport.length > 1 ? "zip" : "pdf"}`,
+    );
     setExportProgress(100);
-    setExportStatus("Download complete.");
+    setExportStatus(
+      `Download complete: ${Number(job?.completed || 0)} completed, ${Number(job?.failed || 0)} failed.`,
+    );
 
     Promise.resolve().then(async () => {
       const selectedProgramInfo =
@@ -546,7 +524,7 @@ const CORExportingModule = () => {
         await axios.post(
           `${API_BASE_URL}/api/cor-export/audit`,
           {
-            exported_count: Number(job?.total || listToExport.length),
+            exported_count: Number(job?.completed || 0),
             department_label:
               selectedDept.dprtmnt_code || selectedDept.dprtmnt_name || "",
             program_label:
@@ -594,9 +572,10 @@ const CORExportingModule = () => {
         setExportList([]);
         return;
       } catch (serverExportError) {
-        console.error("Server COR export failed; falling back to browser export:", serverExportError);
-        setExportStatus("Server export failed. Trying browser export...");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        console.error("Server COR export failed:", serverExportError);
+        setExportStatus("Server export failed. No browser fallback was started.");
+        alert(serverExportError?.message || "Server COR export failed.");
+        return;
       }
 
       setExportStatus("Loading student COR data...");
@@ -933,14 +912,6 @@ const CORExportingModule = () => {
     }
   };
 
-  if (loading || hasAccess === null) {
-    return <LoadingOverlay open={loading} message="Loading..." />;
-  }
-
-  if (!hasAccess) {
-    return <Unauthorized />;
-  }
-
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -972,21 +943,23 @@ const CORExportingModule = () => {
         padding: 2,
       }}
     >
-      <Dialog open={exporting} maxWidth="xs" fullWidth>
-        <DialogTitle>PROCESSING</DialogTitle>
+      <Dialog open={exporting} maxWidth="xs" fullWidth disableEscapeKeyDown>
+        <DialogTitle>Exporting Certificates of Registration</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            {exportTotal > 0 ? `${exportCurrent}/${exportTotal}` : "0/0"}
-          </Typography>
-          <Typography variant="caption" sx={{ mb: 1, display: "block" }}>
-            {exportStatus || "Preparing export..."}
+            {exportTotal > 0
+              ? `${exportCurrent} of ${exportTotal} CORs processed`
+              : "Preparing export..."}
           </Typography>
           <LinearProgress
             variant="determinate"
-            value={exportProgress}
+            value={Math.max(0, Math.min(100, Number(exportProgress) || 0))}
           />
           <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
-            {exportProgress}%
+            {exportStatus || "Preparing export..."}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Please keep this window open until the export is complete.
           </Typography>
         </DialogContent>
       </Dialog>

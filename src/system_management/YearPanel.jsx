@@ -58,7 +58,7 @@ const YearPanel = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -81,7 +81,7 @@ const YearPanel = () => {
       setUserID(storedID);
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") checkAccess(storedEmployeeID);
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) checkAccess(storedEmployeeID);
       else window.location.href = "/login";
     } else window.location.href = "/login";
   }, []);
@@ -89,7 +89,7 @@ const YearPanel = () => {
   const checkAccess = async (employeeID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
       setHasAccess(false);
@@ -102,7 +102,7 @@ const YearPanel = () => {
   // 📊 Fetch Year Data
   const fetchYears = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year_table`);
+      const res = await axios.get(`${API_BASE_URL}/api/year_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYears(res.data);
     } catch {
       setSnackbar({ open: true, message: "Failed to fetch years", severity: "error" });

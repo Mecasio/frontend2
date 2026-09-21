@@ -60,7 +60,7 @@ const SectionPanel = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -113,7 +113,7 @@ const SectionPanel = () => {
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -126,7 +126,7 @@ const SectionPanel = () => {
   const checkAccess = async (employeeID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const allowed = response.data?.page_privilege === 1;
       setHasAccess(allowed);
       setCanCreate(allowed && Number(response.data?.can_create) === 1);
@@ -146,7 +146,7 @@ const SectionPanel = () => {
 
   const fetchSections = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/section_table`);
+      const response = await axios.get(`${API_BASE_URL}/api/section_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSections(response.data);
     } catch (err) {
       console.log(err);

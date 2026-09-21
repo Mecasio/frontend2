@@ -164,13 +164,13 @@ export default function PhotoCaptureDialog({
     try {
       setUploading(true);
 
-      const blob = await (await fetch(capturedImage)).blob();
+      const blob = await (await fetch(capturedImage, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })).blob();
       const formData = new FormData();
       formData.append(fieldName, blob, `capture_${Date.now()}.jpg`);
       formData.append("person_id", personId);
 
       const res = await axios.post(`${API_BASE_URL}${uploadUrl}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
       });
 
       if (onUploaded) onUploaded(res.data?.filename);

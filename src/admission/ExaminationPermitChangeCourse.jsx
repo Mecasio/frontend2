@@ -182,7 +182,7 @@ const ExaminationPermitChangeCourse = () => {
           applicant_number: selectedPerson?.applicant_number,
           person_id: selectedPerson?.person_id,
           action_type: actionType,
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const number = res.data.control_number;
       const campusId = res.data.campus_id;
@@ -203,8 +203,8 @@ const ExaminationPermitChangeCourse = () => {
             control_number: number,
             audit_actor_id:
               employeeID || localStorage.getItem("employee_id") || "unknown",
-            audit_actor_role: localStorage.getItem("role") || "registrar",
-          })
+            audit_actor_role: localStorage.getItem("role") || "administrator",
+          }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
           .catch((logErr) =>
             console.error("Failed to log realignment:", logErr),
           );
@@ -241,7 +241,7 @@ const ExaminationPermitChangeCourse = () => {
     const personIdFromUrl = queryParams.get("person_id");
     if (!personIdFromUrl) return;
     axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.person_id) {
           setSelectedPerson(res.data);
@@ -282,7 +282,7 @@ const ExaminationPermitChangeCourse = () => {
     const storedID = localStorage.getItem("person_id");
     const storedEmployeeID = localStorage.getItem("employee_id");
     if (storedUser && storedRole && storedID) {
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         setEmployeeID(storedEmployeeID || "");
         checkAccess(storedEmployeeID);
       } else window.location.href = "/login";
@@ -294,7 +294,7 @@ const ExaminationPermitChangeCourse = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1 ? true : false);
     } catch (error) {
@@ -344,7 +344,7 @@ const ExaminationPermitChangeCourse = () => {
   useEffect(() => {
     const fetchPersons = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setPersons(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Error fetching persons:", err);
@@ -355,7 +355,7 @@ const ExaminationPermitChangeCourse = () => {
 
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
     } catch (error) {
       console.error("Failed to fetch person:", error);
@@ -373,7 +373,7 @@ const ExaminationPermitChangeCourse = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -393,7 +393,7 @@ const ExaminationPermitChangeCourse = () => {
     if (selectedPerson?.applicant_number) {
       axios
         .get(
-          `${API_BASE_URL}/api/exam-attendance/token/${selectedPerson.applicant_number}`,
+          `${API_BASE_URL}/api/exam-attendance/token/${selectedPerson.applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           setAttendanceToken(res.data?.qr_token || null);
@@ -414,7 +414,7 @@ const ExaminationPermitChangeCourse = () => {
     if (selectedPerson?.applicant_number) {
       axios
         .get(
-          `${API_BASE_URL}/api/document-verification/${selectedPerson.applicant_number}`,
+          `${API_BASE_URL}/api/document-verification/${selectedPerson.applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => {
           setIsVerified(Boolean(res.data?.verified));
@@ -434,7 +434,7 @@ const ExaminationPermitChangeCourse = () => {
     if (selectedPerson?.applicant_number) {
       axios
         .get(
-          `${API_BASE_URL}/api/applicant-schedule/${selectedPerson.applicant_number}`,
+          `${API_BASE_URL}/api/applicant-schedule/${selectedPerson.applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         )
         .then((res) => setExamSchedule(res.data))
         .catch((err) => {
@@ -448,7 +448,7 @@ const ExaminationPermitChangeCourse = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/scheduled-by/registrar`)
+      .get(`${API_BASE_URL}/api/scheduled-by/registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.fullName) setScheduledBy(res.data.fullName);
       })
@@ -585,7 +585,7 @@ const ExaminationPermitChangeCourse = () => {
           audit_print_action: DOWNLOAD_EXAM_PDF_ACTION,
           audit_actor_id:
             employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: localStorage.getItem("role") || "registrar",
+          audit_actor_role: localStorage.getItem("role") || "administrator",
           ...getLoginMacPayload(),
         },
         {
@@ -631,7 +631,7 @@ const ExaminationPermitChangeCourse = () => {
   useEffect(() => {
     const fetchSignatures = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/signature`);
+        const res = await axios.get(`${API_BASE_URL}/api/signature`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setSignatures(res.data?.success ? res.data.data || [] : []);
         setSignaturePage(0);
       } catch (err) {
@@ -652,7 +652,7 @@ const ExaminationPermitChangeCourse = () => {
       .post(`${API_BASE_URL}/api/generate-permit-number`, {
         person_id: selectedPerson.person_id,
         applicant_number: selectedPerson.applicant_number,
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setPermitNumber(res.data?.control_number || ""))
       .catch((err) => {
         console.error("Failed to generate permit number:", err);

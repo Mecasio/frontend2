@@ -18,11 +18,15 @@ import {
   DialogTitle,
   TableRow,
   MenuItem,
+  Modal,
+  IconButton,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
 import Search from "@mui/icons-material/Search";
 import { useLocation } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CloseIcon from "@mui/icons-material/Close";
+import FormalExample from "../assets/formalexample.png";
 import { Snackbar, Alert } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -91,7 +95,7 @@ const MedicalRequirements = () => {
   const [selectedPerson, setSelectedPerson] = useState(null);
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/requirements`)
+      .get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const allRequirements = res.data;
 
@@ -136,7 +140,7 @@ const MedicalRequirements = () => {
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_data_as_applicant/${personID}`,
+        `${API_BASE_URL}/api/student_data_as_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const data = res.data;
 
@@ -167,6 +171,10 @@ const MedicalRequirements = () => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState({});
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoVersion, setPhotoVersion] = useState(Date.now());
   const [remarksMap, setRemarksMap] = useState({});
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -192,7 +200,7 @@ const MedicalRequirements = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -236,7 +244,7 @@ const MedicalRequirements = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -252,7 +260,7 @@ const MedicalRequirements = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -265,7 +273,7 @@ const MedicalRequirements = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -376,7 +384,7 @@ const MedicalRequirements = () => {
     if (!student_number) return;
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/uploads/by-student/${student_number}`,
+        `${API_BASE_URL}/api/uploads/by-student/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setUploads(res.data);
     } catch (err) {
@@ -463,7 +471,7 @@ const MedicalRequirements = () => {
 
     const delayDebounce = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query, limit: 10 },
         });
 
@@ -565,7 +573,7 @@ const MedicalRequirements = () => {
   const fetchPersons = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_upload_documents_data`,
+        `${API_BASE_URL}/api/student_upload_documents_data`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setPersons(res.data);
     } catch (err) {
@@ -665,7 +673,7 @@ const MedicalRequirements = () => {
       formData.append("remarks", selectedFiles.remarks || "");
 
       await axios.post(`${API_BASE_URL}/api/student/upload`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           "x-person-id": localStorage.getItem("person_id"),
           ...getAuditHeaders().headers,
@@ -684,6 +692,102 @@ const MedicalRequirements = () => {
     }
   };
 
+  const handlePhotoFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const maxSize = 2 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      showSnackbar("Invalid file type. Please select a JPEG or PNG file.", "error");
+      return;
+    }
+    if (file.size > maxSize) {
+      showSnackbar("File is too large. Maximum allowed size is 2MB.", "error");
+      return;
+    }
+
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setPhotoPreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!photoFile) {
+      showSnackbar("Please select a file first.", "warning");
+      return;
+    }
+
+    const targetPersonId = selectedPerson?.person_id || person?.person_id;
+    if (!targetPersonId) {
+      showSnackbar("No student selected.", "warning");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("profile_picture", photoFile);
+    formData.append("person_id", targetPersonId);
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/enrollment/upload-profile-picture`,
+        formData,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } }
+      );
+
+      const fileName = response.data.filename || response.data.profile_img;
+
+      setPerson((prev) => ({ ...prev, profile_img: fileName }));
+      setSelectedPerson((prev) =>
+        prev ? { ...prev, profile_img: fileName } : prev
+      );
+
+      setPhotoVersion(Date.now());
+
+      showSnackbar("✅ Photo uploaded successfully!", "success");
+      setPhotoModalOpen(false);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      showSnackbar("❌ Photo upload failed. Please try again.", "error");
+    }
+  };
+
+  const handleDeleteExistingPhoto = async () => {
+    const targetPersonId = selectedPerson?.person_id || person?.person_id;
+    if (!targetPersonId) return;
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/enrollment/person/${targetPersonId}`,
+        { profile_img: "" },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+            ...getAuditHeaders().headers,
+          },
+        },
+      );
+
+      setPerson((prev) => ({ ...prev, profile_img: "" }));
+      setSelectedPerson((prev) =>
+        prev ? { ...prev, profile_img: "" } : prev
+      );
+
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      setPhotoVersion(Date.now());
+
+      showSnackbar("Image removed successfully.", "info");
+    } catch (err) {
+      console.error("Failed to remove photo:", err);
+      showSnackbar("❌ Failed to remove photo.", "error");
+    }
+  };
+
   const handleDelete = async (uploadId) => {
     if (!canDelete) {
       showSnackbar("You do not have permission to delete documents.", "warning");
@@ -692,7 +796,7 @@ const MedicalRequirements = () => {
 
     try {
       await axios.delete(`${API_BASE_URL}/api/admin/uploads/${uploadId}`, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "x-person-id": localStorage.getItem("person_id"),
           ...getAuditHeaders().headers,
         },
@@ -1143,8 +1247,9 @@ const MedicalRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1179,8 +1284,9 @@ const MedicalRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1209,8 +1315,9 @@ const MedicalRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1240,7 +1347,9 @@ const MedicalRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1286,9 +1395,11 @@ const MedicalRequirements = () => {
               <Typography
                 sx={{
                   fontSize: "14px",
-                  fontFamily: "Arial",
-                  minWidth: "120px",
-                  mr: 4.8,
+                  fontFamily: "Poppins, sans-serif",
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Applying As:
@@ -1328,9 +1439,11 @@ const MedicalRequirements = () => {
               <Typography
                 sx={{
                   fontSize: "14px",
-                  fontFamily: "Arial",
-                  minWidth: "140px",
-                  mr: 2.3,
+                  fontFamily: "Poppins, sans-serif",
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Document Status:
@@ -1388,8 +1501,10 @@ const MedicalRequirements = () => {
                 <Typography
                   sx={{
                     fontSize: "14px",
-                    fontFamily: "Arial",
-                    width: "90px",
+                    fontFamily: "Poppins, sans-serif",
+                    width: 150,
+                    minWidth: 150,
+                    flexShrink: 0,
                   }}
                 >
                   Document Type:
@@ -1428,15 +1543,13 @@ const MedicalRequirements = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  marginLeft: "-25px",
                 }}
               >
                 <Typography
                   sx={{
                     fontSize: "14px",
-                    fontFamily: "Arial",
-                    width: "100px",
-                    textAlign: "center",
+                    fontFamily: "Poppins, sans-serif",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Document File:
@@ -1520,25 +1633,59 @@ const MedicalRequirements = () => {
             </Box>
           </Box>
 
-          {/* Profile Image — uses Applicant1by1 (clinic version) */}
-          {person.profile_img && (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginTop: "-360px",
+              gap: 1,
+            }}
+          >
             <Box
               sx={{
                 width: "2.10in",
                 height: "2.10in",
                 border: "1px solid #ccc",
                 overflow: "hidden",
-                marginTop: "-400px",
                 borderRadius: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#f5f5f5",
               }}
             >
-              <img
-                src={`${API_BASE_URL}/uploads/Student1by1/${person.profile_img}`}
-                alt="Profile"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
+              {person.profile_img ? (
+                <img
+                  src={`${API_BASE_URL}/uploads/Student1by1/${person.profile_img}?v=${photoVersion}`}
+                  alt="Profile"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <Typography fontSize={11} color="textSecondary" textAlign="center" px={1}>
+                  No Photo Uploaded
+                </Typography>
+              )}
             </Box>
-          )}
+
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<CloudUploadIcon />}
+              onClick={() => setPhotoModalOpen(true)}
+              disabled={!selectedPerson?.person_id && !person?.person_id}
+              sx={{
+                backgroundColor: mainButtonColor,
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: "bold",
+                width: "2.10in",
+                "&:hover": { backgroundColor: "#000" },
+              }}
+            >
+              Upload Photo
+            </Button>
+          </Box>
         </Box>
       </TableContainer>
 
@@ -1650,6 +1797,261 @@ const MedicalRequirements = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Photo Upload Modal */}
+        <Modal
+          open={photoModalOpen}
+          onClose={() => {
+            setPhotoModalOpen(false);
+            setPhotoFile(null);
+            setPhotoPreview(null);
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100vh",
+            }}
+          >
+            <Box
+              sx={{
+                position: "relative",
+                width: 900,
+                maxWidth: "95vw",
+                bgcolor: "background.paper",
+                borderRadius: 3,
+                boxShadow: 24,
+                maxHeight: "90vh",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  bgcolor: headerColor || "#1976d2",
+                  color: "white",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  py: 2,
+                  px: 3,
+                }}
+              >
+                <Typography variant="h6" fontWeight="bold">
+                  Upload Student 2×2 Photo
+                </Typography>
+                <IconButton
+                  onClick={() => {
+                    setPhotoModalOpen(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                  sx={{
+                    color: "white",
+                    border: "2px solid rgba(255,255,255,0.6)",
+                    borderRadius: "50%",
+                    width: 40,
+                    height: 40,
+                    padding: 0,
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      border: "2px solid white",
+                    },
+                  }}
+                >
+                  <CloseIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 3,
+                  overflowY: "auto",
+                  borderTop: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #e0e0e0",
+                }}
+              >
+                <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                      ✅ Sample Format (Follow this exactly)
+                    </Typography>
+
+                    <Box
+                      component="img"
+                      src={FormalExample}
+                      alt="Formal Photo Example"
+                      sx={{
+                        width: "100%",
+                        maxWidth: 420,
+                        height: 260,
+                        mx: "auto",
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: 2,
+                        backgroundColor: "#fff",
+                      }}
+                    />
+
+                    <Box
+                      sx={{
+                        border: "2px dashed #ccc",
+                        p: 2,
+                        borderRadius: 2,
+                        backgroundColor: "#f9f9f9",
+                      }}
+                    >
+                      <Typography variant="body1" fontWeight="bold" mb={1}>
+                        Guidelines:
+                      </Typography>
+                      <Box sx={{ ml: 1, fontSize: "14px" }}>
+                        - Size: 2" x 2"
+                        <br />
+                        - Color: Your photo must be in colored.
+                        <br />
+                        - Background: White.
+                        <br />
+                        - Head size and position: Look directly into the camera at a
+                        straight angle, face centered.
+                        <br />
+                        - File types: JPEG, JPG, PNG
+                        <br />
+                        - Attire must be formal.
+                        <br />
+                        - Required File Size: 2mb
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                      📤 Student&apos;s Photo
+                    </Typography>
+
+                    {(photoPreview || person.profile_img) && (
+                      <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
+                        <Box
+                          component="img"
+                          src={
+                            photoPreview
+                              ? photoPreview
+                              : `${API_BASE_URL}/uploads/Student1by1/${person.profile_img}?v=${photoVersion}`
+                          }
+                          alt="Preview"
+                          sx={{
+                            width: "192px",
+                            height: "192px",
+                            objectFit: "cover",
+                            border: `1px solid ${borderColor}`,
+                            borderRadius: 2,
+                          }}
+                        />
+
+                        <Button
+                          size="small"
+                          onClick={async () => {
+                            if (photoPreview) {
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                            } else {
+                              await handleDeleteExistingPhoto();
+                            }
+                          }}
+                          sx={{
+                            position: "absolute",
+                            top: -8,
+                            right: "calc(50% - 103px)",
+                            minWidth: 0,
+                            width: 28,
+                            height: 28,
+                            fontSize: "18px",
+                            p: 0,
+                            color: "#fff",
+                            bgcolor: "#d32f2f",
+                            borderRadius: "50%",
+                            "&:hover": { bgcolor: "#b71c1c" },
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </Box>
+                    )}
+
+                    {!photoPreview && !person.profile_img && (
+                      <Box
+                        sx={{
+                          height: 192,
+                          border: "1px dashed #ccc",
+                          borderRadius: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "text.secondary",
+                          fontSize: 13,
+                          textAlign: "center",
+                          px: 2,
+                        }}
+                      >
+                        No photo selected yet — match the sample on the left.
+                      </Box>
+                    )}
+
+                    <Typography
+                      sx={{ fontSize: "16px", color: mainButtonColor, fontWeight: "bold" }}
+                    >
+                      Select Your Image:
+                    </Typography>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      onClick={(e) => (e.target.value = null)}
+                      onChange={handlePhotoFileChange}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "10px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                      }}
+                    />
+
+                    <Typography variant="caption" color="text.secondary">
+                      Click the × on your preview to remove it, choose a new file, then
+                      press Upload.
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              <Box sx={{ p: 2, display: "flex", justifyContent: "space-between" }}>
+                <Button
+                  onClick={() => {
+                    setPhotoModalOpen(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                  color="error"
+                  variant="outlined"
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  onClick={handlePhotoUpload}
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  disabled={!photoFile}
+                  sx={{ minWidth: "140px", height: "40px" }}
+                >
+                  Upload
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        </Modal>
       </>
     </Box>
   );

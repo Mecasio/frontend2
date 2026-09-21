@@ -91,7 +91,7 @@ const SemesterPanel = () => {
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -128,7 +128,7 @@ const SemesterPanel = () => {
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -142,7 +142,7 @@ const SemesterPanel = () => {
   const checkAccess = async (empID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const privilege = response.data?.page_privilege;
       setHasAccess(privilege === 1);
 
@@ -162,7 +162,7 @@ const SemesterPanel = () => {
   // ── Fetch semesters ───────────────────────────────────────────────────────────
   const fetchSemesters = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_semester`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_semester`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSemesters(res.data);
     } catch (err) {
       console.error("Error fetching semesters:", err);

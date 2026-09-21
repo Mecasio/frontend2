@@ -59,7 +59,7 @@ const EntranceExamRoomAssignment = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
   const [hasAccess, setHasAccess] = useState(null);
 
@@ -98,7 +98,7 @@ const EntranceExamRoomAssignment = () => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/room_list`);
+        const res = await axios.get(`${API_BASE_URL}/api/room_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         setRooms(res.data);
       } catch (err) {
@@ -112,7 +112,7 @@ const EntranceExamRoomAssignment = () => {
   const [schoolYearId, setSchoolYearId] = useState('');
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/active_school_year`)
+    axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => {
         const row = Array.isArray(res.data) ? res.data[0] : res.data;
         setSchoolYearId(row?.school_year_id ?? row?.id ?? "");
@@ -122,7 +122,7 @@ const EntranceExamRoomAssignment = () => {
   useEffect(() => {
     const fetchSchedules = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/exam_schedules_with_count`);
+        const res = await axios.get(`${API_BASE_URL}/api/exam_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setSchedules(res.data);
       } catch (err) {
         console.error("Error fetching schedules:", err);
@@ -144,7 +144,7 @@ const EntranceExamRoomAssignment = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -156,7 +156,7 @@ const EntranceExamRoomAssignment = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -288,7 +288,7 @@ const EntranceExamRoomAssignment = () => {
       setRoomQuota("");
       setOpenFormDialog(false);
 
-      const res = await axios.get(`${API_BASE_URL}/api/exam_schedules_with_count`);
+      const res = await axios.get(`${API_BASE_URL}/api/exam_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSchedules(res.data);
 
     } catch (err) {

@@ -83,7 +83,7 @@ const ApplicantCollegeFamilyBackground = () => {
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       let siblingsVal = res.data.siblings;
       if (typeof siblingsVal === "string") {
@@ -191,7 +191,7 @@ const ApplicantCollegeFamilyBackground = () => {
       }
 
       // ✅ Execute safe update
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
@@ -314,7 +314,7 @@ const ApplicantCollegeFamilyBackground = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
@@ -352,9 +352,9 @@ const ApplicantCollegeFamilyBackground = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -364,7 +364,7 @@ const ApplicantCollegeFamilyBackground = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -404,7 +404,7 @@ const ApplicantCollegeFamilyBackground = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -490,7 +490,7 @@ const ApplicantCollegeFamilyBackground = () => {
 
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       // Sanitize null values and set state
       const safePerson = Object.fromEntries(
@@ -765,10 +765,10 @@ const ApplicantCollegeFamilyBackground = () => {
           document_label: config.label,
           audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+          audit_actor_role: userRole || "administrator",
           ...getLoginMacPayload(),
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -815,7 +815,7 @@ const ApplicantCollegeFamilyBackground = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
@@ -839,7 +839,7 @@ const ApplicantCollegeFamilyBackground = () => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -893,7 +893,7 @@ const ApplicantCollegeFamilyBackground = () => {
 
   useEffect(() => {
     if (!userID) return;
-    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`)
+    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => {
         const verified = res.data.some(a => a.person_id === parseInt(userID));
         setCanPrintPermit(verified);

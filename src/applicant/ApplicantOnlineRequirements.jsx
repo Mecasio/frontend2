@@ -96,7 +96,7 @@ const ApplicantOnlineRequirements = () => {
       fetchUploads(id);
     }
     axios
-      .get(`${API_BASE_URL}/api/requirements/${id}`)
+      .get(`${API_BASE_URL}/api/requirements/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setRequirements(res.data))
       .catch((err) => console.error("Error loading requirements:", err));
   }, []);
@@ -207,7 +207,7 @@ const ApplicantOnlineRequirements = () => {
       setUserRole(storedRole);
       setUserID(storedID);
 
-      if (storedRole === "applicant" || storedRole === "registrar") {
+      if (storedRole === "applicant" || storedRole === "administrator") {
         fetchPersonData(storedID);
       } else {
         window.location.href = "/login";
@@ -220,7 +220,7 @@ const ApplicantOnlineRequirements = () => {
   // ✅ Fetch person data from backend
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data); // make sure backend returns the correct format
     } catch (error) {
       console.error("Failed to fetch person:", error);
@@ -229,7 +229,7 @@ const ApplicantOnlineRequirements = () => {
 
   const fetchUploads = async (personId) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/uploads/${personId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/uploads/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const uploadsData = res.data;
       setUploads(uploadsData);
 
@@ -240,11 +240,11 @@ const ApplicantOnlineRequirements = () => {
       setSelectedFiles(rebuiltSelectedFiles);
 
       // ✅ Actually fetch the status from the DB first
-      const statusRes = await axios.get(`${API_BASE_URL}/api/applicant-status/${personId}`);
+      const statusRes = await axios.get(`${API_BASE_URL}/api/applicant-status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const alreadySubmitted = statusRes.data.requirements === 1;
 
       if (!alreadySubmitted) {
-        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/${personId}`);
+        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const verifiableRequirements = reqRes.data.filter(
           (r) => r.is_verifiable === 1 && r.category === "Main",
         );
@@ -283,7 +283,7 @@ const ApplicantOnlineRequirements = () => {
     formData.append("person_id", personId);
     try {
       await axios.post(`${API_BASE_URL}/api/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" },
       });
       await fetchUploads(personId);
       setSnack({ open: true, severity: "success", message: "File uploaded successfully." });
@@ -296,7 +296,7 @@ const ApplicantOnlineRequirements = () => {
   const handleDelete = async (uploadId) => {
     try {
       await axios.delete(`${API_BASE_URL}/api/uploads/${uploadId}`, {
-        headers: { "x-person-id": userID },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "x-person-id": userID },
       });
       setSnack({ open: true, severity: "success", message: "File deleted successfully" });
       setTimeout(() => fetchUploads(userID), 300);
@@ -824,7 +824,7 @@ const ApplicantOnlineRequirements = () => {
               try {
                 await axios.post(`${API_BASE_URL}/api/submit-requirements`, {
                   person_id: userID || localStorage.getItem("person_id"),
-                });
+                }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                 setAllRequirementsCompleted(true);
                 setOpenConfirmModal(false);
                 setOpenModal(true);

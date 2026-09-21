@@ -108,7 +108,7 @@ const ApplicantResetPassword = () => {
       const person_id = localStorage.getItem("person_id");
       const response = await axios.post(`${API_BASE_URL}/api/applicant-change-password`, {
         person_id, currentPassword, newPassword,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSnack({ open: true, message: response.data.message, severity: "success" });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
       localStorage.removeItem("force_password_change");

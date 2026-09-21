@@ -66,7 +66,7 @@ const StudentNumberAdmin = () => {
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
     const storedEmployeeID = localStorage.getItem("employee_id");
-    if (storedRole === "registrar") {
+    if (["administrator", "superadmin", "technical"].includes(storedRole)) {
       checkAccess(storedEmployeeID);
     } else {
       window.location.href = "/login";
@@ -76,7 +76,7 @@ const StudentNumberAdmin = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -118,9 +118,9 @@ const StudentNumberAdmin = () => {
     setDataLoading(true);
     try {
       const [dRes, bRes, yRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/admin/dept-numbers`),
-        axios.get(`${API_BASE_URL}/api/admin/branch-letters`),
-        axios.get(`${API_BASE_URL}/api/admin/active-year`),
+        axios.get(`${API_BASE_URL}/api/admin/dept-numbers`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/admin/branch-letters`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/admin/active-year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       ]);
       setDepts(dRes.data || []);
       setBranches(bRes.data || []);
@@ -401,7 +401,7 @@ const StudentNumberAdmin = () => {
     }
     setSavingDepts(true);
     try {
-      await axios.put(`${API_BASE_URL}/api/admin/dept-numbers`, { departments: depts });
+      await axios.put(`${API_BASE_URL}/api/admin/dept-numbers`, { departments: depts }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       showSnack("Department numbers saved.", "success");
     } catch (e) {
       showSnack(`Save failed: ${e.response?.data?.error || e.message}`, "error");
@@ -428,7 +428,7 @@ const StudentNumberAdmin = () => {
     }
     setSavingBranches(true);
     try {
-      await axios.put(`${API_BASE_URL}/api/admin/branch-letters`, { branches });
+      await axios.put(`${API_BASE_URL}/api/admin/branch-letters`, { branches }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       showSnack("Branch letters saved.", "success");
     } catch (e) {
       showSnack(`Save failed: ${e.response?.data?.error || e.message}`, "error");

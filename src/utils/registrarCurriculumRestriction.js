@@ -145,7 +145,7 @@ export const syncRegistrarScopeFromPayload = ({
   curriculum_id = "",
 } = {}) => {
   if (typeof window === "undefined") return null;
-  if (localStorage.getItem("role") !== "registrar") return null;
+  if (localStorage.getItem("role") !== "administrator") return null;
 
   const cache = setRegistrarScopeCache({
     scopes,
@@ -241,7 +241,7 @@ export const syncRegistrarScopeFromEmployeeResponse = (employeeData = {}) =>
 
 export const refreshRegistrarCurriculumId = async (employeeId) => {
   if (typeof window === "undefined") return "";
-  if (localStorage.getItem("role") !== "registrar") return "";
+  if (localStorage.getItem("role") !== "administrator") return "";
 
   const currentEmployeeId = employeeId || localStorage.getItem("employee_id");
   if (!currentEmployeeId) return "";

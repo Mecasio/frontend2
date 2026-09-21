@@ -125,7 +125,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
 
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
     } catch (error) {
       console.error("Failed to fetch person:", error);
@@ -149,7 +149,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "student"];
+      const allowedRoles = ["administrator", "superadmin", "technical", "applicant", "student"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -275,7 +275,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
           applicant_number: person?.applicant_number,
           person_id: userID,
           action_type: actionType,
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setOwnControlNumber(res.data.control_number);
       return res.data.control_number;
@@ -303,7 +303,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -338,7 +338,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);

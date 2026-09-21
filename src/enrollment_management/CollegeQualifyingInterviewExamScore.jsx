@@ -31,7 +31,7 @@ import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
 import { FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import PeopleIcon from "@mui/icons-material/People";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
@@ -142,10 +142,7 @@ const CollegeQualifyingInterviewExamScore = () => {
   }, [settings]);
 
   useEffect(() => {
-    socket.current = io(API_BASE_URL, {
-      path: "/api/socket.io",
-      transports: ["websocket", "polling"],
-    });
+    socket.current = createAppSocket();
 
     return () => {
       socket.current.disconnect();
@@ -349,7 +346,7 @@ const CollegeQualifyingInterviewExamScore = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -379,9 +376,9 @@ const CollegeQualifyingInterviewExamScore = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -392,7 +389,7 @@ const CollegeQualifyingInterviewExamScore = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -438,7 +435,7 @@ const CollegeQualifyingInterviewExamScore = () => {
 
   const fetchApplicants = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicants-with-number`);
+      const res = await axios.get(`${API_BASE_URL}/api/applicants-with-number`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       const data = Array.isArray(res.data?.data) ? res.data.data : [];
       const fetchedSubjects = Array.isArray(res.data?.subjects)
@@ -473,7 +470,7 @@ const CollegeQualifyingInterviewExamScore = () => {
 
   const fetchPersonData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAdminData(res.data);
       syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
@@ -485,7 +482,7 @@ const CollegeQualifyingInterviewExamScore = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/subjects`);
+      const res = await axios.get(`${API_BASE_URL}/api/active-subjects`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setSubjects(res.data);
     } catch (err) {
@@ -521,7 +518,7 @@ const CollegeQualifyingInterviewExamScore = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -556,7 +553,7 @@ const CollegeQualifyingInterviewExamScore = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
 
@@ -614,21 +611,21 @@ const CollegeQualifyingInterviewExamScore = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -841,7 +838,7 @@ const CollegeQualifyingInterviewExamScore = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -946,7 +943,7 @@ const CollegeQualifyingInterviewExamScore = () => {
         {
           status: nextStatus,
           ...auditPayload(),
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       setSnack({
@@ -1195,7 +1192,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
         { html: innerHtml },
         {
           responseType: "blob",
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "x-audit-actor-id":
               employeeID ||
               localStorage.getItem("employee_id") ||
@@ -1304,7 +1301,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
       const res = await axios.post(
         `${API_BASE_URL}/api/qualifying_exam/import`,
         { userID, data: sheet, ...auditPayload() },
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
       );
 
       const errors = res.data.errors || [];
@@ -1389,7 +1386,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
       const stillPending = [];
       for (const p of pending) {
         try {
-          await axios.post(`${API_BASE_URL}/api/interview`, p);
+          await axios.post(`${API_BASE_URL}/api/interview`, p, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
           console.log("✅ Synced pending qualifying:", p);
         } catch {
           stillPending.push(p); // keep if still failing
@@ -1487,7 +1484,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
     axios
       .put(
         `${API_BASE_URL}/api/interview_applicants/assign/${applicant_number}`,
-        auditPayload({ assignment_mode: "single" }),
+        auditPayload({ assignment_mode: "single" }), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         console.log("Assign response:", res.data);
@@ -1580,7 +1577,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
           assignment_mode: "max",
           selected_department: selectedDepartmentFilter,
         }),
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         console.log("Updated statuses:", res.data);
         setSnack({
@@ -1706,7 +1703,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
           assignment_mode: "custom",
           selected_department: selectedDepartmentFilter,
         }),
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         console.log("Updated statuses:", res.data);
         setSnack({
@@ -1730,7 +1727,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
     axios
       .put(
         `${API_BASE_URL}/api/interview_applicants/unassign/${applicant_number}`,
-        auditPayload({ assignment_mode: "single" }),
+        auditPayload({ assignment_mode: "single" }), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       )
       .then((res) => {
         setSnack({
@@ -1777,7 +1774,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
       .put(`${API_BASE_URL}/api/interview_applicants/unassign-all`, {
         applicant_numbers: persons.map((a) => a.applicant_number),
         ...auditPayload({ assignment_mode: "all" }),
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         console.log("Updated statuses:", res.data);
         setSnack({
@@ -1829,7 +1826,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
 
     const res = await axios.get(
       `${API_BASE_URL}/api/email-templates/active-senders`,
-      {
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: {
           department_id: departmentId,
           program_id: programId, // send the raw value — backend will resolve it
@@ -1855,7 +1852,7 @@ const handleExportQualifyingInterviewScorePdf = async () => {
     const fetchDepartment = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/dprtmnt_curriculum/${primaryDepartmentId}`,
+          `${API_BASE_URL}/api/dprtmnt_curriculum/${primaryDepartmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setDepartmentName(res.data[0]?.dprtmnt_name);
       } catch (err) {
@@ -1905,7 +1902,7 @@ You have until ${getReminderDeadline()} to complete the admission process.`,
 
   const fetchRequirements = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/requirements`);
+      const res = await axios.get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setRequirements(res.data);
       return res.data; // 👈 useful for email building
     } catch (err) {
@@ -2246,7 +2243,7 @@ Thank you, best regards
             applicant.last_name,
           ].filter(Boolean).join(" "),
           ...auditPayload(),
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         successCount++;
         successfulApplicantNumbers.add(applicant.applicant_number);
@@ -2334,7 +2331,7 @@ Thank you, best regards
             applicant.last_name,
           ].filter(Boolean).join(" "),
           ...auditPayload(),
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         successCount++;
         successfulApplicantNumbers.add(applicant.applicant_number);
@@ -2375,7 +2372,7 @@ Thank you, best regards
     const fetchSchedules = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/interview_schedules_with_count`,
+          `${API_BASE_URL}/api/interview_schedules_with_count`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         setSchedules(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
@@ -2494,7 +2491,7 @@ Thank you, best regards
             assignment_mode: "top",
             selected_department: selectedDepartmentFilter,
           }),
-        })
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => {
           console.log("Updated statuses:", res.data);
           setSnack({

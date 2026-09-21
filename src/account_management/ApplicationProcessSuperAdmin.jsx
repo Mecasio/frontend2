@@ -146,7 +146,7 @@ const ApplicantProcessSuperAdmin = () => {
   useEffect(() => {
     const fetchRequirements = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/requirements`);
+        const res = await axios.get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const formatted = res.data.map((r) => ({
           applicant_type: String(r.applicant_type ?? 0),
           category: r.category ?? "Regular",
@@ -241,7 +241,7 @@ const ApplicantProcessSuperAdmin = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -254,7 +254,7 @@ const ApplicantProcessSuperAdmin = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -287,7 +287,7 @@ const ApplicantProcessSuperAdmin = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+        const allowedRoles = ["administrator", "superadmin", "technical"];
     if (allowedRoles.includes(storedRole)) {
       const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
       sessionStorage.setItem("admin_edit_person_id", targetId);
@@ -300,7 +300,7 @@ const ApplicantProcessSuperAdmin = () => {
 
   const fetchPersonData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAdminData(res.data);
       syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
@@ -315,7 +315,7 @@ const ApplicantProcessSuperAdmin = () => {
   }, [user]);
 
   useEffect(() => {
-    if (userRole !== "registrar" || !employeeID) return;
+    if (!["administrator"].includes(userRole) || !employeeID) return;
     refreshRegistrarCurriculumId(employeeID).catch((err) => {
       console.error("Error refreshing registrar scope:", err);
     });
@@ -505,7 +505,7 @@ const ApplicantProcessSuperAdmin = () => {
   // ⬇️ Add this inside ApplicantList component, before useEffect
   const fetchApplicants = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/all-applicants`);
+      const res = await fetch(`${API_BASE_URL}/api/all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const data = await res.json();
       setPersons(data);
     } catch (err) {
@@ -528,7 +528,7 @@ const ApplicantProcessSuperAdmin = () => {
         {
           submitted_documents: checked ? 1 : 0,
           user_person_id: localStorage.getItem("person_id"),
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       if (checked && res.data.allCompleted) {
@@ -573,7 +573,7 @@ const ApplicantProcessSuperAdmin = () => {
 
       await axios.put(`${API_BASE_URL}/api/registrar-status/${person_id}`, {
         registrar_status: status,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       fetchApplicants();
     } catch (err) {
@@ -583,14 +583,14 @@ const ApplicantProcessSuperAdmin = () => {
 
   useEffect(() => {
     // Replace this with your actual API endpoint
-    fetch(`${API_BASE_URL}/api/all-applicants`)
+    fetch(`${API_BASE_URL}/api/all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => res.json())
       .then((data) => setPersons(data)); // ✅ Correct
   }, []);
 
   useEffect(() => {
     socket.current.on("document_status_updated", () => {
-      fetch(`${API_BASE_URL}/api/all-applicants`)
+      fetch(`${API_BASE_URL}/api/all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => res.json())
         .then((data) => setPersons(data));
     });
@@ -624,7 +624,7 @@ const ApplicantProcessSuperAdmin = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -659,7 +659,7 @@ const ApplicantProcessSuperAdmin = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
 
@@ -734,21 +734,21 @@ const ApplicantProcessSuperAdmin = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolYears(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data.length > 0) {
           setSelectedSchoolYear(res.data[0].year_id);
@@ -953,7 +953,7 @@ const ApplicantProcessSuperAdmin = () => {
   }
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/all-applicants`) // 👈 This is the new endpoint
+    fetch(`${API_BASE_URL}/api/all-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }) // 👈 This is the new endpoint
       .then((res) => res.json())
 
       .catch((err) => console.error("Error fetching applicants:", err));
@@ -973,7 +973,7 @@ const ApplicantProcessSuperAdmin = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = responses.flatMap(
@@ -1062,7 +1062,7 @@ const ApplicantProcessSuperAdmin = () => {
         `${API_BASE_URL}/api/missing-documents/${activePerson.person_id}`,
         {
           missing_documents: selected, // this is your array of checked keys
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       setSnack({
@@ -1421,7 +1421,7 @@ const ApplicantProcessSuperAdmin = () => {
 
   useEffect(() => {
     const fetchActiveYearAndAvailability = async () => {
-      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const activeYear = yearRes.data[0];
 
       if (activeYear) {
@@ -1430,7 +1430,7 @@ const ApplicantProcessSuperAdmin = () => {
 
         const availRes = await axios.get(
           `${API_BASE_URL}/api/programs/availability`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: {
               year_id: activeYear.year_id,
               semester_id: activeYear.semester_id,
@@ -1931,20 +1931,27 @@ const ApplicantProcessSuperAdmin = () => {
         sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}
       >
         <Box
-          display="flex"
-          justifyContent="space-between"
-          flexWrap="wrap"
-          rowGap={3}
-          columnGap={5}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              md: "minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr)",
+            },
+            columnGap: 4,
+            rowGap: 2,
+            alignItems: "start",
+          }}
         >
           {/* LEFT COLUMN: Sorting & Status Filters */}
           <Box display="flex" flexDirection="column" gap={2}>
-            {/* Sort By */}
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "10px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 140, minWidth: 140, flexShrink: 0 }}
+              >
                 Sort By:
               </Typography>
-              <FormControl size="small" sx={{ width: "200px" }}>
+              <FormControl size="small" sx={{ width: 180, flexShrink: 0 }}>
                 <Select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -1956,10 +1963,13 @@ const ApplicantProcessSuperAdmin = () => {
                   <MenuItem value="email">Email Address</MenuItem>
                 </Select>
               </FormControl>
-              <Typography fontSize={13} sx={{ minWidth: "10px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 90, minWidth: 90, flexShrink: 0 }}
+              >
                 Sort Order:
               </Typography>
-              <FormControl size="small" sx={{ width: "200px" }}>
+              <FormControl size="small" sx={{ width: 160, flexShrink: 0 }}>
                 <Select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
@@ -1972,12 +1982,14 @@ const ApplicantProcessSuperAdmin = () => {
               </FormControl>
             </Box>
 
-            {/* Applicant Status */}
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "140px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 140, minWidth: 140, flexShrink: 0 }}
+              >
                 Applicant Status:
               </Typography>
-              <FormControl size="small" sx={{ width: "275px" }}>
+              <FormControl size="small" sx={{ width: 440, maxWidth: "100%" }}>
                 <Select
                   value={selectedApplicantStatus}
                   onChange={(e) => setSelectedApplicantStatus(e.target.value)}
@@ -2009,35 +2021,19 @@ const ApplicantProcessSuperAdmin = () => {
                               </Select>
                           </FormControl> */}
 
-            <FormControl
-              size="small"
-              sx={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Checkbox
-                checked={showSubmittedOnly}
-                onChange={(e) => setShowSubmittedOnly(e.target.checked)}
-                sx={{ color: "maroon", "&.Mui-checked": { color: "maroon" } }}
-              />
-              <Typography fontSize={13}>Show Submitted Only</Typography>
-            </FormControl>
-
-
           </Box>
 
           {/* MIDDLE COLUMN: SY & Semester */}
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 110, minWidth: 110, flexShrink: 0 }}
+              >
                 School Year:
               </Typography>
-              <FormControl size="small" sx={{ width: "200px" }}>
-                <InputLabel id="school-year-label">School Years</InputLabel>
+              <FormControl size="small" sx={{ width: 200 }}>
                 <Select
-                  labelId="school-year-label"
                   value={selectedSchoolYear}
                   onChange={handleSchoolYearChange}
                   displayEmpty
@@ -2056,13 +2052,14 @@ const ApplicantProcessSuperAdmin = () => {
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 110, minWidth: 110, flexShrink: 0 }}
+              >
                 Semester:
               </Typography>
-              <FormControl size="small" sx={{ width: "200px" }}>
-                <InputLabel>School Semester</InputLabel>
+              <FormControl size="small" sx={{ width: 200 }}>
                 <Select
-                  label="School Semester"
                   value={selectedSchoolSemester}
                   onChange={handleSchoolSemesterChange}
                   displayEmpty
@@ -2079,17 +2076,18 @@ const ApplicantProcessSuperAdmin = () => {
                 </Select>
               </FormControl>
             </Box>
-
-
           </Box>
 
           {/* RIGHT COLUMN: Department & Program */}
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 110, minWidth: 110, flexShrink: 0 }}
+              >
                 Department:
               </Typography>
-              <FormControl size="small" sx={{ width: "400px" }}>
+              <FormControl size="small" sx={{ width: 400, maxWidth: "100%" }}>
                 <Select
                   value={selectedDepartmentFilter}
                   onChange={(e) => {
@@ -2107,15 +2105,16 @@ const ApplicantProcessSuperAdmin = () => {
                   ))}
                 </Select>
               </FormControl>
-
             </Box>
 
-
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+              <Typography
+                fontSize={13}
+                sx={{ width: 110, minWidth: 110, flexShrink: 0 }}
+              >
                 Program:
               </Typography>
-              <FormControl size="small" sx={{ width: "350px" }}>
+              <FormControl size="small" sx={{ width: 400, maxWidth: "100%" }}>
                 <Select
                   value={selectedProgramFilter}
                   onChange={(e) => setSelectedProgramFilter(e.target.value)}
@@ -2132,27 +2131,55 @@ const ApplicantProcessSuperAdmin = () => {
                   ))}
                 </Select>
               </FormControl>
-
             </Box>
-
           </Box>
-
         </Box>
 
-        <Box display="flex" flexDirection="column" alignItems="center" gap={1} mb={1}>
-          <Typography fontSize={16} fontWeight="bold">Color Indication</Typography>
-          <Box display="flex" justifyContent="center" gap={2} flexWrap="wrap">
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 16, height: 16, backgroundColor: "#A5D6A7", border: "1px solid #ccc", borderRadius: 0.5 }} />
-              <Typography fontSize={12}>Submitted Documents</Typography>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 16, height: 16, backgroundColor: "#EF9A9A", border: "1px solid #ccc", borderRadius: 0.5 }} />
-              <Typography fontSize={12}>Exam Schedule Sent</Typography>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 16, height: 16, backgroundColor: "#FFCC80", border: "1px solid #ccc", borderRadius: 0.5 }} />
-              <Typography fontSize={12}>Duplicate / Suspicious / Re-registration Detected</Typography>
+        <Box
+          sx={{
+            position: "relative",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            mt: 2,
+            mb: 1,
+            minHeight: 56,
+          }}
+        >
+          <FormControl
+            size="small"
+            sx={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <Checkbox
+              checked={showSubmittedOnly}
+              onChange={(e) => setShowSubmittedOnly(e.target.checked)}
+              sx={{ color: "maroon", "&.Mui-checked": { color: "maroon" } }}
+            />
+            <Typography fontSize={13}>Show Submitted Only</Typography>
+          </FormControl>
+
+          <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+            <Typography fontSize={16} fontWeight="bold">Color Indication</Typography>
+            <Box display="flex" justifyContent="center" gap={2} flexWrap="wrap">
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Box sx={{ width: 16, height: 16, backgroundColor: "#A5D6A7", border: "1px solid #ccc", borderRadius: 0.5 }} />
+                <Typography fontSize={12}>Submitted Documents</Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Box sx={{ width: 16, height: 16, backgroundColor: "#EF9A9A", border: "1px solid #ccc", borderRadius: 0.5 }} />
+                <Typography fontSize={12}>Exam Schedule Sent</Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Box sx={{ width: 16, height: 16, backgroundColor: "#FFCC80", border: "1px solid #ccc", borderRadius: 0.5 }} />
+                <Typography fontSize={12}>Duplicate / Suspicious / Re-registration Detected</Typography>
+              </Box>
             </Box>
           </Box>
         </Box>

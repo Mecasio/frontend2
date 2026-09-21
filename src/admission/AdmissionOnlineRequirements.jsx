@@ -106,7 +106,7 @@ const AdmissionOnlineRequirements = () => {
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
       setSelectedPerson(res.data);
       if (res.data?.applicant_number) {
@@ -148,7 +148,7 @@ const AdmissionOnlineRequirements = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -168,7 +168,7 @@ const AdmissionOnlineRequirements = () => {
 
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/requirements`)
+    axios.get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const allRequirements = res.data;
 
@@ -199,7 +199,7 @@ const AdmissionOnlineRequirements = () => {
 
     // fetch info of that person
     axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         if (res.data?.applicant_number) {
 
@@ -254,9 +254,9 @@ const AdmissionOnlineRequirements = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -266,7 +266,7 @@ const AdmissionOnlineRequirements = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
@@ -299,14 +299,14 @@ const AdmissionOnlineRequirements = () => {
         setUserID(storedID);
       }
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
 
         if (storedID !== "undefined") {
 
         } else {
           console.warn("Stored person_id is invalid:", storedID);
         }
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else if (storedRole !== "applicant" && !["administrator", "superadmin", "technical"].includes(storedRole)) {
         window.location.href = "/login";
       }
     } else {
@@ -331,7 +331,7 @@ const AdmissionOnlineRequirements = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
     if (!allowedRoles.includes(storedRole)) {
       window.location.href = "/login";
       return;
@@ -403,7 +403,7 @@ const AdmissionOnlineRequirements = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -416,7 +416,7 @@ const AdmissionOnlineRequirements = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
       ...extraHeaders,
     });
 
@@ -474,7 +474,7 @@ const AdmissionOnlineRequirements = () => {
   const fetchUploadsByApplicantNumber = async (applicant_number) => {
     if (!applicant_number) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/uploads/by-applicant/${applicant_number}`);
+      const res = await axios.get(`${API_BASE_URL}/api/uploads/by-applicant/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setUploads(res.data);
 
 
@@ -491,7 +491,7 @@ const AdmissionOnlineRequirements = () => {
       return;
     }
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const { evaluator: _evaluator, ...personData } = res.data;
       const safePerson = {
         ...personData,
@@ -510,7 +510,7 @@ const AdmissionOnlineRequirements = () => {
 
   const fetchDocumentStatus = async (applicant_number) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/document_status/${applicant_number}`);
+      const response = await axios.get(`${API_BASE_URL}/api/document_status/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setDocumentStatus(response.data.document_status);
       setPerson((prev) => ({
         ...prev,
@@ -561,7 +561,7 @@ const AdmissionOnlineRequirements = () => {
   const effectiveApplyingAs = selectedPerson?.applyingAs ?? person?.applyingAs;
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/requirements`)
+    axios.get(`${API_BASE_URL}/api/requirements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const allRequirements = res.data;
         const filtered = allRequirements.filter(
@@ -660,7 +660,7 @@ const AdmissionOnlineRequirements = () => {
 
   const fetchPersons = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+      const res = await axios.get(`${API_BASE_URL}/api/upload_documents`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPersons(res.data);
     } catch (err) {
       console.error('Error fetching persons:', err);
@@ -687,7 +687,7 @@ const AdmissionOnlineRequirements = () => {
           status: remarkValue,
           user_id: userID,
         }),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setUploads((prev) =>
         prev.map((u) =>
@@ -802,7 +802,7 @@ const AdmissionOnlineRequirements = () => {
       formData.append("remarks", selectedFiles.remarks || "");
 
       await axios.post(`${API_BASE_URL}/api/upload`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           "x-person-id": localStorage.getItem("person_id"), // ✅ now inside headers
           ...getAuditHeaders(),
@@ -870,7 +870,7 @@ const AdmissionOnlineRequirements = () => {
       const response = await axios.post(
         `${API_BASE_URL}/api/upload-profile-picture`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "multipart/form-data" } }
       );
 
       const fileName = response.data.filename || response.data.profile_img;
@@ -892,7 +892,7 @@ const AdmissionOnlineRequirements = () => {
     try {
       await axios.put(`${API_BASE_URL}/api/person/${targetPersonId}`, {
         profile_img: "",
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson((prev) => ({ ...prev, profile_img: "" }));
       setPhotoPreview(null);
       setPhotoFile(null);
@@ -907,7 +907,7 @@ const AdmissionOnlineRequirements = () => {
 
     try {
       await axios.delete(`${API_BASE_URL}/api/admin/uploads/${uploadId}`, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "x-person-id": localStorage.getItem("person_id"),
           ...getAuditHeaders(),
         },
@@ -989,7 +989,7 @@ const AdmissionOnlineRequirements = () => {
                 await axios.put(`${API_BASE_URL}/api/uploads/remarks/${uploadId}`, {
                   remarks: finalRemark,
                   user_id: userID,
-                });
+                }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
                 if (selectedPerson?.applicant_number) {
                   await fetchUploadsByApplicantNumber(selectedPerson.applicant_number);
@@ -1005,7 +1005,7 @@ const AdmissionOnlineRequirements = () => {
                   await axios.put(`${API_BASE_URL}/api/uploads/remarks/${uploadId}`, {
                     remarks: finalRemark,
                     user_id: userID,
-                  });
+                  }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
                   if (selectedPerson?.applicant_number) {
                     await fetchUploadsByApplicantNumber(selectedPerson.applicant_number);
@@ -1355,8 +1355,9 @@ const AdmissionOnlineRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1391,8 +1392,9 @@ const AdmissionOnlineRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1421,8 +1423,9 @@ const AdmissionOnlineRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
-
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1452,7 +1455,9 @@ const AdmissionOnlineRequirements = () => {
               sx={{
                 fontSize: "14px",
                 fontFamily: "Poppins, sans-serif",
-                minWidth: "100px",
+                width: 150,
+                minWidth: 150,
+                flexShrink: 0,
                 mr: 1,
               }}
             >
@@ -1500,9 +1505,10 @@ const AdmissionOnlineRequirements = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "120px",
-
-                  mr: 4.8,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Applying As:
@@ -1553,8 +1559,10 @@ const AdmissionOnlineRequirements = () => {
                 sx={{
                   fontSize: "14px",
                   fontFamily: "Poppins, sans-serif",
-                  minWidth: "140px",
-                  mr: 2.3,
+                  width: 150,
+                  minWidth: 150,
+                  flexShrink: 0,
+                  mr: 1,
                 }}
               >
                 Document Status:
@@ -1641,7 +1649,15 @@ const AdmissionOnlineRequirements = () => {
 
               {/* ---------------------------------------------------------------------- */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontSize: "14px", fontFamily: "Poppins, sans-serif", width: "90px" }}>
+                <Typography
+                  sx={{
+                    fontSize: "14px",
+                    fontFamily: "Poppins, sans-serif",
+                    width: 150,
+                    minWidth: 150,
+                    flexShrink: 0,
+                  }}
+                >
                   Document Type:
                 </Typography>
                 <TextField
@@ -1709,13 +1725,12 @@ const AdmissionOnlineRequirements = () => {
                   </TextField>
                 </Box>
 */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginLeft: "-25px" }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography
                   sx={{
                     fontSize: "14px",
                     fontFamily: "Poppins, sans-serif",
-                    width: "100px",
-                    textAlign: "center"
+                    whiteSpace: "nowrap",
                   }}
                 >
                   Document File:

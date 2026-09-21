@@ -94,7 +94,7 @@ const UploadApplicants = () => {
     localStorage.getItem("person_id") ||
     localStorage.getItem("email") ||
     "unknown";
-  const auditActorRole = localStorage.getItem("role") || "registrar";
+  const auditActorRole = localStorage.getItem("role") || "administrator";
 
   const pageId = 166;
 
@@ -111,7 +111,7 @@ const UploadApplicants = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
 
   useEffect(() => {
@@ -126,7 +126,7 @@ const UploadApplicants = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -139,7 +139,7 @@ const UploadApplicants = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -265,7 +265,7 @@ const UploadApplicants = () => {
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/uploaded-applicants/check-student-number`,
-          { params: { student_number: value } },
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { student_number: value } },
         );
         setStudentNumberError(res.data?.exists ? "This student number already exists." : "");
       } catch {
@@ -298,7 +298,7 @@ const UploadApplicants = () => {
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/uploaded-applicants/check-student-number`,
-          {
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
             params: {
               student_number: value,
               exclude_student_number: currentValue || undefined,
@@ -330,7 +330,7 @@ const UploadApplicants = () => {
       const allRows = [];
 
       do {
-        const res = await axios.get(`${API_BASE_URL}/api/get_uploaded_applicants`, {
+        const res = await axios.get(`${API_BASE_URL}/api/get_uploaded_applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { page, limit: pageLimit },
         });
         const rows = Array.isArray(res.data) ? res.data : res.data?.data;
@@ -356,7 +356,7 @@ const UploadApplicants = () => {
 
     try {
       setActionLoadingId(deleteTarget.id);
-      await axios.delete(`${API_BASE_URL}/api/uploaded-applicants/${deleteTarget.id}`);
+      await axios.delete(`${API_BASE_URL}/api/uploaded-applicants/${deleteTarget.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setApplicants((prev) => prev.filter((row) => row.id !== deleteTarget.id));
       setSnackbar({
         open: true,
@@ -388,7 +388,7 @@ const UploadApplicants = () => {
         student_number: studentNumber,
         audit_actor_id: auditActorId,
         audit_actor_role: auditActorRole,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const result = res.data?.assigned?.[0];
 
       if (!res.data?.success && !res.data?.partial) {
@@ -426,7 +426,7 @@ const UploadApplicants = () => {
           uploaded_applicant_id: assignTarget.id,
           audit_actor_id: auditActorId,
           audit_actor_role: auditActorRole,
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const result = res.data?.assigned?.[0];
@@ -478,7 +478,7 @@ const UploadApplicants = () => {
           uploaded_applicant_id: row.id,
           audit_actor_id: auditActorId,
           audit_actor_role: auditActorRole,
-        },
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const result = res.data?.assigned?.[0];
@@ -561,7 +561,7 @@ const UploadApplicants = () => {
         student_number: changeWarningTarget.nextStudentNumber,
         audit_actor_id: auditActorId,
         audit_actor_role: auditActorRole,
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       setSnackbar({
         open: true,
@@ -607,7 +607,7 @@ const UploadApplicants = () => {
       formData.append("file", selectedFile);
 
       const res = await axios.post(`${API_BASE_URL}/api/import-xlsx-into-uploaded-applicants`, formData, {
-        headers: {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
           "Content-Type": "multipart/form-data",
           ...getAuditHeaders().headers,
         },

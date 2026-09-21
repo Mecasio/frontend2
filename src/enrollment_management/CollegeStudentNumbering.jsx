@@ -24,7 +24,7 @@ import {
     DialogActions,
 } from '@mui/material';
 import { Search } from '@mui/icons-material';
-import { io } from "socket.io-client";
+import { createAppSocket } from "../utils/socketClient";
 import { Snackbar, Alert } from '@mui/material';
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { IconButton, InputAdornment } from "@mui/material";
@@ -109,10 +109,7 @@ const CollegeStudentNumbering = () => {
     }, [settings]);
 
     useEffect(() => {
-        socket.current = io(API_BASE_URL, {
-           path: "/api/socket.io",
-           transports: ["websocket", "polling"],
-        });
+        socket.current = createAppSocket();
 
         return () => {
             socket.current.disconnect();
@@ -188,7 +185,7 @@ const CollegeStudentNumbering = () => {
             const res = await axios.post(`${API_BASE_URL}/api/verify-password`, {
                 person_id: personId,
                 password: authPassword,
-            });
+            }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
             if (res.data.success) {
                 setAuthPassed(true);
@@ -247,7 +244,7 @@ const CollegeStudentNumbering = () => {
         const personId = localStorage.getItem("person_id");
         if (!personId) return;
 
-        axios.get(`${API_BASE_URL}/api/check-lock-status/${personId}`)
+        axios.get(`${API_BASE_URL}/api/check-lock-status/${personId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 if (res.data.locked) {
                     setIsLocked(true);
@@ -339,7 +336,7 @@ const CollegeStudentNumbering = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -352,7 +349,7 @@ const CollegeStudentNumbering = () => {
     const checkAccess = async (employeeID) => {
         setAccessLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -386,7 +383,7 @@ const CollegeStudentNumbering = () => {
         if (userID) {
             const fetchPersonData = async () => {
                 try {
-                    const res = await axios.get(`${API_BASE_URL}/api/admin_data/${userID}`);
+                    const res = await axios.get(`${API_BASE_URL}/api/admin_data/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
                     setAdminData(res.data);
                     syncRegistrarScopeFromAdminData(res.data);
                 } catch (err) {
@@ -411,7 +408,7 @@ const CollegeStudentNumbering = () => {
             try {
                 const responses = await Promise.all(
                     departmentIds.map((departmentId) =>
-                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
                     ),
                 );
                 const mergedDepartments = responses.flatMap(
@@ -448,7 +445,7 @@ const CollegeStudentNumbering = () => {
             try {
                 const responses = await Promise.all(
                     departmentIds.map((departmentId) =>
-                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
                     ),
                 );
                 const merged = responses.flatMap((response) => response.data || []);
@@ -465,21 +462,21 @@ const CollegeStudentNumbering = () => {
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
+            .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
     }, [])
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, [])
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/active_school_year`)
+            .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 if (res.data.length > 0) {
                     setSelectedSchoolYear(res.data[0].year_id);
@@ -492,7 +489,7 @@ const CollegeStudentNumbering = () => {
 
     const fetchPersons = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/college/persons`);
+            const res = await axios.get(`${API_BASE_URL}/api/college/persons`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setPersons(res.data);
         } catch (err) {
             console.error(err);
@@ -643,7 +640,7 @@ const CollegeStudentNumbering = () => {
                     localStorage.getItem("employee_id") ||
                     localStorage.getItem("email") ||
                     "unknown",
-                audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+                audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
                 ...getLoginMacPayload(),
             });
 

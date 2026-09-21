@@ -90,7 +90,7 @@ const EvaluatorApplicantList = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -111,7 +111,7 @@ const EvaluatorApplicantList = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -124,7 +124,7 @@ const EvaluatorApplicantList = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -160,7 +160,7 @@ const EvaluatorApplicantList = () => {
 
   const handleSearchByEvaluator = async (evaluatorName, scheduleID) => {
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/evaluator-applicants`, {
+      const { data } = await axios.get(`${API_BASE_URL}/api/evaluator-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { query: evaluatorName, schedule_id: scheduleID },
       });
 
@@ -181,7 +181,7 @@ const EvaluatorApplicantList = () => {
 
   const handleSearch = async () => {
     try {
-      const { data } = await axios.get(`${API_BASE_URL}/api/evaluator-applicants`, {
+      const { data } = await axios.get(`${API_BASE_URL}/api/evaluator-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { query: searchQuery },
       });
 
@@ -230,7 +230,7 @@ const EvaluatorApplicantList = () => {
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setCurriculumOptions(response.data);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
@@ -892,7 +892,7 @@ const EvaluatorApplicantList = () => {
               try {
                 await axios.post(
                   `${API_BASE_URL}/api/unassign_verify_evaluator_applicant_list`,
-                  withAuditActor({ applicant_number: applicantToDelete.applicant_number }),
+                  withAuditActor({ applicant_number: applicantToDelete.applicant_number }), { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
                 );
                 setSnack({ open: true, message: "Applicant successfully removed.", severity: "success", key: Date.now() });
                 if (evaluator) {

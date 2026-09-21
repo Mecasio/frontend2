@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import API_BASE_URL from "../apiConfig";
+import {
+    FALLBACK_DETAIL_THEME,
+    buildDetailThemesForSlides,
+} from "../utils/announcementDetailColor";
 
 import IconButton from "@mui/material/IconButton";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -24,7 +28,7 @@ const useIsMobile = (breakpoint = 768) => {
 };
 
 /* ─── Formats announcement content into JSX with bullets / line-breaks ─── */
-const FormattedContent = ({ text }) => {
+const FormattedContent = ({ text, bulletColor = "#fff" }) => {
     if (!text) return null;
     const lines = text.split("\n");
     return (
@@ -37,7 +41,7 @@ const FormattedContent = ({ text }) => {
                 if (bulletMatch) {
                     return (
                         <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                            <span style={{ color: "#fff", marginTop: "2px", flexShrink: 0, fontSize: "14px" }}>•</span>
+                            <span style={{ color: bulletColor, marginTop: "2px", flexShrink: 0, fontSize: "14px" }}>•</span>
                             <span style={{ color: "rgba(255,255,255,0.92)", fontSize: "13.5px", lineHeight: 1.55 }}>
                                 {bulletMatch[2]}
                             </span>
@@ -76,20 +80,84 @@ const FormattedContent = ({ text }) => {
     );
 };
 
-const AnnouncementSlider = () => {
+const DETAIL_TAB_STYLE = {
+    border: "none",
+    borderRadius: "12px 0 0 12px",
+    padding: "27px 11px",
+    minWidth: 42,
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    boxShadow: "-2px 2px 10px rgba(0,0,0,0.35)",
+};
+
+const DETAIL_TAB_LABEL_STYLE = {
+    color: "#fff",
+    fontSize: "13px",
+    fontWeight: 700,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    writingMode: "vertical-rl",
+    textOrientation: "mixed",
+    transform: "rotate(180deg)",
+    lineHeight: 1,
+};
+
+const DetailToggleTab = ({
+    open,
+    onClick,
+    tabColor = FALLBACK_DETAIL_THEME.tab,
+}) => (
+    <div
+        onClick={onClick}
+        title={open ? "Hide details" : "Show details"}
+        style={{
+            position: "absolute",
+            // Flush to the poster’s right edge, directly under the zoom control.
+            top: 44,
+            right: 0,
+            zIndex: 25,
+            cursor: "pointer",
+        }}
+    >
+        <div style={{ ...DETAIL_TAB_STYLE, background: tabColor }}>
+            <motion.div
+                animate={{ rotate: open ? 0 : 180 }}
+                transition={{ duration: 0.3 }}
+            >
+                <ChevronRightIcon sx={{ color: "#fff", fontSize: 20 }} />
+            </motion.div>
+            <span style={DETAIL_TAB_LABEL_STYLE}>
+                {open ? "Close" : "Details"}
+            </span>
+        </div>
+    </div>
+);
+
+const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = false }) => {
+    const desktopOffset = { margin: 0 };
+    const desktopSize = alignCenter
+        ? { width: "100%", height: "100%", position: "absolute", inset: 0 }
+        : { width: "min(900px, 70vw)", height: "min(700px, 70vh)" };
     const [slides, setSlides] = useState([]);
     const [index, setIndex] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [contentOpen, setContentOpen] = useState(true);
+    // Compact register layout keeps the carousel image-first; details stay in lightbox.
+    const [contentOpen, setContentOpen] = useState(!alignCenter && !stack);
     const isMobile = useIsMobile();
+    const useStackLayout = stack || isMobile;
 
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    const [detailThemes, setDetailThemes] = useState({});
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/announcements`)
+            .get(`${API_BASE_URL}/api/announcements`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then(res => {
                 if (Array.isArray(res.data.data)) {
                     setSlides(res.data.data);
@@ -98,6 +166,19 @@ const AnnouncementSlider = () => {
             })
             .catch(err => console.error("Announcement fetch error:", err));
     }, []);
+
+    /* Sample each poster so the details panel + DETAILS/CLOSE tabs match it. */
+    useEffect(() => {
+        let cancelled = false;
+        if (!slides.length) {
+            setDetailThemes({});
+            return undefined;
+        }
+        buildDetailThemesForSlides(slides, API_BASE_URL).then((map) => {
+            if (!cancelled) setDetailThemes(map);
+        });
+        return () => { cancelled = true; };
+    }, [slides]);
 
     /* Auto-advance */
     useEffect(() => {
@@ -123,15 +204,14 @@ const AnnouncementSlider = () => {
     if (!slides.length) {
         return (
             <div style={{
-                width: isMobile ? "100%" : "900px",
-                height: isMobile ? "300px" : "700px",
+                width: useStackLayout ? "100%" : desktopSize.width,
+                height: useStackLayout ? undefined : desktopSize.height,
+                aspectRatio: useStackLayout ? "16 / 9" : undefined,
+                maxWidth: useStackLayout ? "100%" : desktopSize.maxWidth,
                 background: "#f2f2f2",
-                borderRadius: "30px",
-                ...(isMobile ? {} : {
-                    marginRight: "300px",
-                    marginTop: "-130px",
-                    marginLeft: "125px",
-                }),
+                borderRadius: embedded ? "10px 10px 0 0" : "10px",
+                ...(alignCenter ? { position: "absolute", inset: 0 } : {}),
+                ...(useStackLayout ? {} : desktopOffset),
             }} />
         );
     }
@@ -155,6 +235,12 @@ const AnnouncementSlider = () => {
     const current = slides[index];
     const lightboxCurrent = slides[lightboxIndex];
     if (!current) return null;
+
+    // Panel + DETAILS/CLOSE tabs share the poster-sampled theme (navy fallback).
+    const themeFor = (slide) =>
+        detailThemes[slide?.id ?? slide?.file_path] || FALLBACK_DETAIL_THEME;
+    const theme = themeFor(current);
+    const lightboxTheme = themeFor(lightboxCurrent);
 
     const hasImage = !!current.file_path;
     const hasContent = !!(current.content?.trim());
@@ -182,39 +268,39 @@ const AnnouncementSlider = () => {
                     <IconButton
                         onClick={e => { e.stopPropagation(); closeLightbox(); }}
                         sx={{
-                            position: "fixed", top: 25, left: 50, zIndex: 10000,
-                            width: 75, height: 75,
+                            position: "fixed", top: 18, left: 32, zIndex: 10000,
+                            width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(220,50,50,0.75)" },
                         }}
                     >
-                        <CloseIcon sx={{ fontSize: 28 }} />
+                        <CloseIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* Prev */}
                     <IconButton
                         onClick={e => { e.stopPropagation(); lightboxPrev(); }}
                         sx={{
-                            position: "fixed", left: 50, top: "50%", transform: "translateY(-50%)",
-                            zIndex: 10000, width: 75, height: 75,
+                            position: "fixed", left: 32, top: "50%", transform: "translateY(-50%)",
+                            zIndex: 10000, width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(255,255,255,0.3)" },
                         }}
                     >
-                        <ArrowBackIosNewIcon sx={{ fontSize: 28 }} />
+                        <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* Next */}
                     <IconButton
                         onClick={e => { e.stopPropagation(); lightboxNext(); }}
                         sx={{
-                            position: "fixed", right: 50, top: "50%", transform: "translateY(-50%)",
-                            zIndex: 10000, width: 75, height: 75,
+                            position: "fixed", right: 32, top: "50%", transform: "translateY(-50%)",
+                            zIndex: 10000, width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(255,255,255,0.3)" },
                         }}
                     >
-                        <ArrowForwardIosIcon sx={{ fontSize: 28 }} />
+                        <ArrowForwardIosIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* ── Main lightbox card: image left + details right ── */}
@@ -268,7 +354,7 @@ const AnnouncementSlider = () => {
                             flex: 1,
                             display: "flex",
                             flexDirection: "column",
-                            background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)",
+                            background: lightboxTheme.panel,
                             padding: isMobile ? "20px 16px" : "32px 28px",
                             overflowY: "auto",
                             scrollbarWidth: "thin",
@@ -288,14 +374,14 @@ const AnnouncementSlider = () => {
                             {/* Divider */}
                             <div style={{
                                 width: "40px", height: "3px",
-                                background: "rgba(255,255,255,0.35)",
+                                background: lightboxTheme.divider,
                                 borderRadius: "2px",
                                 margin: "10px 0 18px",
                             }} />
 
                             {/* Content */}
                             <div style={{ flex: 1 }}>
-                                <FormattedContent text={lightboxCurrent.content} />
+                                <FormattedContent text={lightboxCurrent.content} bulletColor={lightboxTheme.bullet} />
                             </div>
 
                             {/* Slide counter */}
@@ -329,76 +415,103 @@ const AnnouncementSlider = () => {
     );
 
     /* ─────────────────────────────────────────
-       MOBILE LAYOUT
+       STACKED LAYOUT (tablet / phone)
     ───────────────────────────────────────── */
-    if (isMobile) {
+    if (useStackLayout) {
         return (
             <>
-                <div style={{
-                    width: "100%",
-                    background: "#111",
-                    borderRadius: "20px",
-                    overflow: "hidden",
-                    position: "relative",
-                    display: "flex",
-                    flexDirection: "column",
-                }}>
-                    {/* Image */}
-                    {hasImage && (
-                        <div
-                            style={{ position: "relative", width: "100%", aspectRatio: "16/9", cursor: "zoom-in" }}
-                            onClick={() => openLightbox()}
+                <div style={{ width: "100%", position: "relative" }}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}>
+                    <div style={{
+                        width: "100%",
+                        background: "#111",
+                        borderRadius: embedded ? "10px 10px 0 0" : "16px",
+                        overflow: "hidden",
+                        position: "relative",
+                        aspectRatio: "16 / 9",
+                    }}>
+                        <AnimatePresence initial={false}>
+                        <motion.div
+                            key={current.id ?? index}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.35, ease: "easeInOut" }}
+                            style={{ position: "absolute", inset: 0 }}
                         >
-                            <img
-                                src={`${API_BASE_URL}/uploads/Announcement/${current.file_path}`}
-                                alt={current.title}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }}
-                                draggable={false}
-                            />
-
-                            {/* Zoom hint */}
-                            <div style={{
-                                position: "absolute", top: 10, right: 10,
-                                background: "rgba(0,0,0,0.55)", borderRadius: "50%",
-                                padding: "6px", display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                                <ZoomInIcon sx={{ color: "#fff", fontSize: 18 }} />
-                            </div>
-
-                            {/* Prev/Next */}
-                            <IconButton onClick={e => { e.stopPropagation(); goPrev(); }}
-                                sx={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.55)", color: "#fff", width: 36, height: 36, "&:hover": { background: "rgba(0,0,0,0.85)" } }}>
-                                <ArrowBackIosNewIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                            <IconButton onClick={e => { e.stopPropagation(); goNext(); }}
-                                sx={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.55)", color: "#fff", width: 36, height: 36, "&:hover": { background: "rgba(0,0,0,0.85)" } }}>
-                                <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-
-                            {/* Dots */}
-                            {slides.length > 1 && (
-                                <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", gap: "6px", zIndex: 5 }}>
-                                    {slides.map((_, i) => (
-                                        <div key={i} onClick={e => { e.stopPropagation(); setIndex(i); }}
-                                            style={{ width: i === index ? 18 : 6, height: 6, borderRadius: 3, background: i === index ? "#fff" : "rgba(255,255,255,0.4)", transition: "all 0.3s", cursor: "pointer" }} />
-                                    ))}
+                        {hasImage ? (
+                            <div
+                                style={{ position: "relative", width: "100%", height: "100%", cursor: "zoom-in" }}
+                                onClick={() => openLightbox()}
+                            >
+                                <img
+                                    src={`${API_BASE_URL}/uploads/Announcement/${current.file_path}`}
+                                    alt={current.title}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }}
+                                    draggable={false}
+                                />
+                                <div style={{
+                                    position: "absolute", top: 10, right: 10,
+                                    background: "rgba(0,0,0,0.55)", borderRadius: "50%",
+                                    padding: "6px", display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                    <ZoomInIcon sx={{ color: "#fff", fontSize: 18 }} />
                                 </div>
-                            )}
+                            </div>
+                        ) : (
+                            <div style={{
+                                width: "100%",
+                                height: "100%",
+                                background: theme.panel,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "16px",
+                                boxSizing: "border-box",
+                            }}>
+                                <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", textAlign: "center" }}>
+                                    {current.title || "Announcement"}
+                                </h3>
+                            </div>
+                        )}
+
+                        </motion.div>
+                        </AnimatePresence>
+
+                        <IconButton onClick={e => { e.stopPropagation(); goPrev(); }}
+                            sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 26, height: 26, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                            <ArrowBackIosNewIcon sx={{ fontSize: 11 }} />
+                        </IconButton>
+                        <IconButton onClick={e => { e.stopPropagation(); goNext(); }}
+                            sx={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 26, height: 26, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                            <ArrowForwardIosIcon sx={{ fontSize: 11 }} />
+                        </IconButton>
+                    </div>
+
+                    {slides.length > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", gap: "8px", position: "absolute", bottom: 10, left: 0, right: 0 }}>
+                            {slides.map((_, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    aria-label={`Show announcement ${i + 1}`}
+                                    aria-pressed={i === index}
+                                    onClick={() => setIndex(i)}
+                                    style={{
+                                        width: i === index ? 18 : 8,
+                                        height: 8,
+                                        borderRadius: 4,
+                                        border: "1px solid rgba(0,0,0,0.5)",
+                                        padding: 0,
+                                        background: i === index ? "#fff" : "#777",
+                                        transition: "all 0.3s",
+                                        cursor: "pointer",
+                                    }}
+                                />
+                            ))}
                         </div>
                     )}
-
-                    {/* Content — always fully visible, no toggle */}
-                    <div style={{
-                        background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)",
-                        padding: "16px",
-                        display: "flex", flexDirection: "column", gap: "8px",
-                    }}>
-                        <h3 style={{ margin: 0, color: "#fff", fontSize: "15px", fontWeight: 700, lineHeight: 1.4 }}>
-                            {current.title}
-                        </h3>
-                        <div style={{ width: "36px", height: "3px", background: "rgba(255,255,255,0.35)", borderRadius: "2px" }} />
-                        {hasContent && <FormattedContent text={current.content} />}
-                    </div>
                 </div>
 
                 <LightboxModal />
@@ -412,38 +525,42 @@ const AnnouncementSlider = () => {
     return (
         <>
             <div
+                className={alignCenter ? "registration-announcement" : undefined}
                 style={{
-                    width: "900px", height: "700px",
-                    marginRight: "300px", marginTop: "-130px", marginLeft: "125px",
-                    background: "#111", borderRadius: "30px",
-                    overflow: "hidden", position: "relative", display: "flex", flexDirection: "column",
+                    ...desktopSize,
+                    ...desktopOffset,
+                    background: "#111", borderRadius: "10px",
+                    overflow: "hidden", position: alignCenter ? "absolute" : "relative", display: "flex", flexDirection: "column",
+                    flexShrink: 0,
                 }}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
                 <IconButton onClick={goPrev}
-                    sx={{ position: "absolute", left: 10, top: "35%", transform: "translateY(-35%)", zIndex: 10, background: "rgba(0,0,0,0.6)", color: "#fff", "&:hover": { background: "rgba(0,0,0,0.85)" } }}>
-                    <ArrowBackIosNewIcon />
+                    sx={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 28, height: 28, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                    <ArrowBackIosNewIcon sx={{ fontSize: 13 }} />
                 </IconButton>
                 <IconButton onClick={goNext}
-                    sx={{ position: "absolute", right: 10, top: "35%", transform: "translateY(-35%)", zIndex: 10, background: "rgba(0,0,0,0.6)", color: "#fff", "&:hover": { background: "rgba(0,0,0,0.85)" } }}>
-                    <ArrowForwardIosIcon />
+                    sx={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 28, height: 28, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                    <ArrowForwardIosIcon sx={{ fontSize: 13 }} />
                 </IconButton>
 
-                <AnimatePresence mode="wait">
+                <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "inherit" }}>
+                <AnimatePresence initial={false}>
                     <motion.div
-                        key={current.id}
+                        key={current.id ?? index}
                         drag="x" dragDirectionLock
                         dragConstraints={{ left: 0, right: 0 }} dragElastic={0.02}
                         onDragStart={() => setIsDragging(true)}
                         onDragEnd={handleDragEnd}
-                        initial={{ x: 300, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -300, opacity: 0 }}
-                        transition={{ duration: 0.5 }}
-                        style={{ width: "100%", height: "100%", display: "flex", flexDirection: "row", cursor: isDragging ? "grabbing" : "grab", position: "relative" }}
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        transition={{ duration: 0.35, ease: "easeInOut" }}
+                        style={{ width: "100%", height: "100%", display: "flex", flexDirection: "row", cursor: isDragging ? "grabbing" : "grab", position: "absolute", inset: 0, touchAction: "pan-y" }}
                     >
                         {/* Image pane */}
                         {hasImage && (
                             <motion.div
+                                initial={false}
                                 animate={{ flex: hasContent && contentOpen ? "0 0 55%" : "1 1 100%" }}
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
                                 style={{ position: "relative", overflow: "hidden", background: "#000", flexShrink: 0 }}
@@ -456,7 +573,7 @@ const AnnouncementSlider = () => {
                                     draggable={false}
                                 />
 
-                                <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.55)", borderRadius: "50%", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ position: "absolute", top: 10, right: 10, zIndex: 26, background: "rgba(0,0,0,0.55)", borderRadius: "50%", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <ZoomInIcon sx={{ color: "#fff", fontSize: 20 }} />
                                 </div>
 
@@ -467,20 +584,14 @@ const AnnouncementSlider = () => {
                                 )}
 
                                 {hasContent && (
-                                    <div
-                                        onClick={e => { e.stopPropagation(); setContentOpen(prev => !prev); }}
-                                        title={contentOpen ? "Hide details" : "Show details"}
-                                        style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 20, cursor: "pointer" }}
-                                    >
-                                        <div style={{ background: "black", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "12px 0 0 12px", padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                                            <motion.div animate={{ rotate: contentOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
-                                                <ChevronRightIcon sx={{ color: "#fff", fontSize: 20 }} />
-                                            </motion.div>
-                                            <span style={{ color: "rgba(255,255,255,0.85)", fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", writingMode: "vertical-rl", textOrientation: "mixed", transform: "rotate(180deg)", lineHeight: 1 }}>
-                                                {contentOpen ? "Close" : "Details"}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <DetailToggleTab
+                                        open={contentOpen}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setContentOpen((prev) => !prev);
+                                        }}
+                                        tabColor={theme.tab}
+                                    />
                                 )}
                             </motion.div>
                         )}
@@ -492,14 +603,34 @@ const AnnouncementSlider = () => {
                                     key="content-panel"
                                     initial={{ width: 0, opacity: 0 }} animate={{ width: "45%", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
                                     transition={{ duration: 0.4, ease: "easeInOut" }}
-                                    style={{ flexShrink: 0, display: "flex", flexDirection: "column", background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)", padding: "24px 20px 20px", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.2) transparent" }}
+                                    style={{
+                                        position: "relative",
+                                        flexShrink: 0,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        background: theme.panel,
+                                        overflow: "hidden",
+                                    }}
                                 >
+                                    <div
+                                        style={{
+                                            flex: 1,
+                                            minHeight: 0,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            padding: "24px 20px 20px",
+                                            overflowY: "auto",
+                                            overflowX: "hidden",
+                                            scrollbarWidth: "thin",
+                                            scrollbarColor: "rgba(255,255,255,0.2) transparent",
+                                        }}
+                                    >
                                     <h3 style={{ margin: "0 0 4px", color: "#fff", fontSize: "15px", fontWeight: 700, lineHeight: 1.4, flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {current.title}
                                     </h3>
-                                    <div style={{ width: "36px", height: "3px", background: "rgba(255,255,255,0.35)", borderRadius: "2px", margin: "8px 0 14px", flexShrink: 0 }} />
+                                    <div style={{ width: "36px", height: "3px", background: theme.divider, borderRadius: "2px", margin: "8px 0 14px", flexShrink: 0 }} />
                                     <div style={{ flex: 1, overflow: "visible" }}>
-                                        <FormattedContent text={current.content} />
+                                        <FormattedContent text={current.content} bulletColor={theme.bullet} />
                                     </div>
                                     {slides.length > 1 && (
                                         <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
@@ -510,6 +641,7 @@ const AnnouncementSlider = () => {
                                             <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginLeft: "4px" }}>{index + 1} / {slides.length}</span>
                                         </div>
                                     )}
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -524,6 +656,7 @@ const AnnouncementSlider = () => {
                         )}
                     </motion.div>
                 </AnimatePresence>
+                </div>
             </div>
 
             <LightboxModal />

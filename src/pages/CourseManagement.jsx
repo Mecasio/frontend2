@@ -45,7 +45,7 @@ const CourseManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
         fetchUserAccessList(storedEmployeeID);
       } else {
@@ -60,7 +60,7 @@ const CourseManagement = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -74,7 +74,7 @@ const CourseManagement = () => {
   const fetchUserAccessList = async (employeeID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}`
+        `${API_BASE_URL}/api/page_access/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const accessMap = data.reduce((acc, item) => {

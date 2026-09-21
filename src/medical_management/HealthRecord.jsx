@@ -167,7 +167,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
             setUserRole(storedRole);
             setUserID(storedStudentNumber || storedID);
 
-            if (storedRole === "applicant" || storedRole === "registrar") {
+            if (storedRole === "applicant" || ["administrator", "superadmin", "technical"].includes(storedRole)) {
                 fetchPersonBySearch(storedStudentNumber || storedID);
             } else {
                 window.location.href = "/login";
@@ -199,7 +199,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
                     last_name: person?.last_name,
                     first_name: person?.first_name,
                 },
-                { responseType: "blob" }
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" }
             );
             const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
             const link = document.createElement("a");
@@ -218,7 +218,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
     const [curriculumOptions, setCurriculumOptions] = useState([]);
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/applied_program`)
+            .get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setCurriculumOptions(res.data))
             .catch((err) => console.error("Error fetching curriculum options:", err));
     }, []);
@@ -255,7 +255,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
             setUserRole(storedRole);
             setUserID(storedStudentNumber || storedID);
 
-            if (storedRole === "applicant" || storedRole === "registrar") {
+            if (storedRole === "applicant" || ["administrator", "superadmin", "technical"].includes(storedRole)) {
                 fetchPersonBySearch(storedStudentNumber || storedID);
             } else {
                 window.location.href = "/login";
@@ -291,7 +291,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
     const fetchDentalData = async (studentNumber) => {
         try {
             const res = await axios.get(
-                `${API_BASE_URL}/api/dental-assessment/${studentNumber}`
+                `${API_BASE_URL}/api/dental-assessment/${studentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
             );
 
             const parsed = {
@@ -317,7 +317,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
 
     const fetchNeuroData = async (studentNumber) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/physical-neuro/${studentNumber}`);
+            const res = await axios.get(`${API_BASE_URL}/api/physical-neuro/${studentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setNeuroData(res.data);
         } catch (err) {
             console.warn("No neuro record found");
@@ -328,7 +328,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
 
     const fetchMedicalData = async (studentNumber) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`);
+            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setMedicalData(res.data);
         } catch (err) {
             console.warn("No medical record found");
@@ -367,7 +367,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
 
     const fetchPersonBySearch = async (query) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+            const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                 params: { query }
             });
 
@@ -399,7 +399,7 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
             if (searchQuery.trim() === "") return;
 
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
+                const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     params: { query: searchQuery }
                 });
 

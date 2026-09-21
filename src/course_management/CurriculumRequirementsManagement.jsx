@@ -54,7 +54,7 @@ const CurriculumRequirementsManagement = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": localStorage.getItem("role") || "administrator",
     },
   });
   const pageId = 112; // 🔁 change if needed
@@ -64,7 +64,7 @@ const CurriculumRequirementsManagement = () => {
     const role = localStorage.getItem("role");
     const employeeID = localStorage.getItem("employee_id");
 
-    if (role !== "registrar") {
+    if (!["administrator", "superadmin", "technical"].includes(role)) {
       window.location.href = "/login";
       return;
     }
@@ -75,7 +75,7 @@ const CurriculumRequirementsManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       const allowed = res.data?.page_privilege === 1;
       setHasAccess(allowed);
@@ -93,12 +93,12 @@ const CurriculumRequirementsManagement = () => {
   }, []);
 
   const fetchCurriculum = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`);
+    const res = await axios.get(`${API_BASE_URL}/api/get_active_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
     setCurriculumList(res.data);
   };
 
   const fetchTaggedPrograms = async () => {
-    const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`);
+    const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
     const unique = Array.from(
       new Map(res.data.map((item) => [item.program_tagging_id, item])).values(),
     );
@@ -226,7 +226,7 @@ const CurriculumRequirementsManagement = () => {
 
   const fetchYearLevels = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearLevelList(res.data);
     } catch (err) {
       console.error("Error fetching year levels:", err);
@@ -235,7 +235,7 @@ const CurriculumRequirementsManagement = () => {
 
   const fetchSemesters = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSemesterList(res.data);
     } catch (err) {
       console.error("Error fetching semesters:", err);

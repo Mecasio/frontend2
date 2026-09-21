@@ -364,7 +364,7 @@ const StudentEnrollment = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": localStorage.getItem("role") || "administrator",
     },
   });
 
@@ -377,7 +377,7 @@ const StudentEnrollment = () => {
       return;
     }
 
-    if (storedRole !== "registrar") {
+    if (!["administrator", "superadmin", "technical"].includes(storedRole)) {
       window.location.href = "/login";
       return;
     }
@@ -385,7 +385,7 @@ const StudentEnrollment = () => {
     const checkAccess = async () => {
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/page_access/${storedEmployeeID}/${pageId}`,
+          `${API_BASE_URL}/api/page_access/${storedEmployeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (response.data?.page_privilege === 1) {
           setHasAccess(true);
@@ -442,7 +442,7 @@ const StudentEnrollment = () => {
   const fetchAllStudents = async () => {
     try {
       setIsLoadingStudentDirectory(true);
-      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`);
+      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAllStudents(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error preloading students:", err);
@@ -461,7 +461,7 @@ const StudentEnrollment = () => {
 
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student_enrollment/${student_number}`,
+        `${API_BASE_URL}/api/student_enrollment/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setStudentData(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -479,7 +479,7 @@ const StudentEnrollment = () => {
 
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/student-info-for-enrollment/${student_number}`,
+        `${API_BASE_URL}/api/student-info-for-enrollment/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
 
       const normalizedCourses = Array.isArray(res.data)
@@ -741,7 +741,7 @@ const StudentEnrollment = () => {
   const fetchCourseList = async () => {
     try {
       setIsLoadingCourseList(true);
-      const res = await axios.get(`${API_BASE_URL}/api/course_list`);
+      const res = await axios.get(`${API_BASE_URL}/api/course_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCourseList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error fetching course list:", err);
@@ -755,9 +755,9 @@ const StudentEnrollment = () => {
   const fetchAddCourseFilters = async () => {
     try {
       const [departmentRes, yearLevelRes, taggedCourseRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/get_department`),
-        axios.get(`${API_BASE_URL}/api/get_year_level`),
-        axios.get(`${API_BASE_URL}/api/program_tagging_list`),
+        axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/program_tagging_list`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       ]);
 
       setDepartments(Array.isArray(departmentRes.data) ? departmentRes.data : []);
@@ -778,7 +778,7 @@ const StudentEnrollment = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setAddPrograms(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error loading curriculum list:", err);
@@ -816,7 +816,7 @@ const StudentEnrollment = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`);
+      const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setChangePrograms(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Error loading replacement curriculum list:", err);
@@ -893,7 +893,7 @@ const StudentEnrollment = () => {
           course_id: course.course_id,
           semester_id: course.semester_id,
           curriculum_id: selectedAddCurriculum,
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
         message += data.allowed
           ? "\n\nThe student meets the prerequisite qualification.\n\nDo you want to continue enrolling this subject?"

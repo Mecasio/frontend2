@@ -85,7 +85,7 @@ const PaymentExportingModule = () => {
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     });
 
@@ -120,7 +120,7 @@ const PaymentExportingModule = () => {
             setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -132,7 +132,7 @@ const PaymentExportingModule = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -170,14 +170,14 @@ const PaymentExportingModule = () => {
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
+            .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
     }, [])
 
     useEffect(() => {
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, [])
@@ -192,7 +192,7 @@ const PaymentExportingModule = () => {
         if (!endpoint) return;
 
         axios
-            .get(`${API_BASE_URL}/api${endpoint}`)
+            .get(`${API_BASE_URL}/api${endpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then(res => {
                 setRawData(res.data);
                 setDataFetched(true);
@@ -245,7 +245,7 @@ const PaymentExportingModule = () => {
 
     const fetchDepartments = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setDepartment(res.data);
             console.log(res.data);
         } catch (err) {
@@ -256,7 +256,7 @@ const PaymentExportingModule = () => {
     const fetchPrograms = async (dprtmnt_id) => {
         if (!dprtmnt_id) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`);
+            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setPrograms(res.data);
         } catch (err) {
             console.error("❌ Department fetch error:", err);
@@ -272,7 +272,7 @@ const PaymentExportingModule = () => {
 
     const fetchActiveSchoolYear = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+            const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
             if (res.data.length > 0) {
                 const active = res.data[0];

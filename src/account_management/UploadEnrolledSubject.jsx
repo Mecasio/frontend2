@@ -206,7 +206,7 @@ const UploadEnrolledSubject = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -307,7 +307,7 @@ const UploadEnrolledSubject = () => {
     const checkAccess = async (employeeID) => {
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -336,7 +336,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchUploadedStudent = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_uploaded_students`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_uploaded_students`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setStudentUploaded(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error('Failed in fetching uploaded students:', err);
@@ -345,7 +345,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchDepartments = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setDepartmentFilters(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error("Failed in fetching departments:", err);
@@ -354,7 +354,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchPrograms = async (departmentId) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setProgramFilters(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error("Failed in fetching programs:", err);
@@ -364,7 +364,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchSchoolYears = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_school_year/`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setSchoolYearFilters(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error("Failed in fetching school years:", err);
@@ -373,7 +373,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchSemesters = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_school_semester/`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setSemesterFilters(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error("Failed in fetching semesters:", err);
@@ -382,7 +382,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchYearLevels = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_year_level`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setYearLevelFilters(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error("Failed in fetching year levels:", err);
@@ -391,7 +391,7 @@ const UploadEnrolledSubject = () => {
 
     const fetchActiveSchoolYear = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+            const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (Array.isArray(res.data) && res.data.length > 0) {
                 const active = res.data[0];
                 if (active?.year_id) setSelectedSchoolYearFilter(active.year_id);
@@ -465,7 +465,7 @@ const UploadEnrolledSubject = () => {
                 `${API_BASE_URL}/api/import-xlsx-into-enrolled-subject`,
                 formData,
                 {
-                    headers: {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
                         'Content-Type': 'multipart/form-data',
                         ...getAuditHeaders(),
                     },

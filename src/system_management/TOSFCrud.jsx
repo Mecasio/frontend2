@@ -473,7 +473,7 @@ const TOSF = () => {
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     },
   };
 
@@ -489,7 +489,7 @@ const TOSF = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -501,7 +501,7 @@ const TOSF = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -682,7 +682,7 @@ const TOSF = () => {
   // =====================================================================
   const fetchScholarshipTypes = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`);
+      const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setScholarshipTypes(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error("Error fetching scholarship types:", error);
@@ -696,7 +696,7 @@ const TOSF = () => {
 
   const fetchScholarshipRuleOptions = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fee-options`);
+      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fee-options`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const schoolYears = Array.isArray(res.data?.schoolYears) ? res.data.schoolYears : [];
       const semesters = Array.isArray(res.data?.semesters) ? res.data.semesters : [];
       const activeSchoolYear = res.data?.activeSchoolYear || null;
@@ -733,7 +733,7 @@ const TOSF = () => {
       return;
     }
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fees`, {
+      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fees`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         params: { scholarship_id: scholarshipId },
       });
       setScholarshipRules(Array.isArray(res.data) ? res.data : []);
@@ -746,11 +746,11 @@ const TOSF = () => {
   const fetchDynamicFees = async () => {
     try {
       const [catalogRes, ratesRes, optionsRes, feeGroupsRes, accountTypesRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-rates`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-options`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-groups`),
-        axios.get(`${API_BASE_URL}/api/tosf/account-types`),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-rates`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-options`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-groups`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/tosf/account-types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       ]);
 
       setFeeCatalog(Array.isArray(catalogRes.data) ? catalogRes.data : []);

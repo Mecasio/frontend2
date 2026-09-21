@@ -112,7 +112,7 @@ const ApplicantForgotPasswordTotpModal = ({
         type: "applicant",
         token: code,
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data?.success) {
         setTempPassword(res.data.temp_password || "");
@@ -669,7 +669,7 @@ const ApplicantForgotPassword = () => {
         email: email.trim(),
         birthdate,
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       if (res.data?.success) {
         setQrDataUrl(res.data.qrDataUrl);

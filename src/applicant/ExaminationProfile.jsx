@@ -30,7 +30,7 @@ const ExaminationProfile = () => {
             try {
                 // 1. Get person_id by applicant_number
                 const res = await axios.get(
-                    `${API_BASE_URL}/api/person-by-applicant/${searchQuery}`
+                    `${API_BASE_URL}/api/person-by-applicant/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
 
                 if (!res.data?.person_id) {
@@ -43,7 +43,7 @@ const ExaminationProfile = () => {
 
                 // 2. Check if all 4 documents are verified
                 const statusRes = await axios.get(
-                    `${API_BASE_URL}/api/document_status/check/${searchQuery}`
+                    `${API_BASE_URL}/api/document_status/check/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
 
                 if (!statusRes.data.verified) {

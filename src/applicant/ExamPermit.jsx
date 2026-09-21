@@ -77,11 +77,11 @@ const ExamPermit = ({ personId }) => {
 
     const fetchData = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/person/${pid}`);
+        const res = await axios.get(`${API_BASE_URL}/api/person/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         let personData = res.data;
 
         const applicantRes = await axios.get(
-          `${API_BASE_URL}/api/applicant_number/${pid}`,
+          `${API_BASE_URL}/api/applicant_number/${pid}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (applicantRes.data?.applicant_number) {
           personData.applicant_number = applicantRes.data.applicant_number;
@@ -94,7 +94,7 @@ const ExamPermit = ({ personId }) => {
 
           try {
             const verifyRes = await axios.get(
-              `${API_BASE_URL}/api/document-verification/${applicant_number}`,
+              `${API_BASE_URL}/api/document-verification/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             setIsVerified(Boolean(verifyRes.data?.verified));
             setVerifiedAt(
@@ -107,7 +107,7 @@ const ExamPermit = ({ personId }) => {
           // ✅ FIXED — correct endpoint (was /api/exam-schedule/:x, which doesn't exist)
           try {
             const schedRes = await axios.get(
-              `${API_BASE_URL}/api/applicant-schedule/${applicant_number}`,
+              `${API_BASE_URL}/api/applicant-schedule/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             setExamSchedule(schedRes.data);
           } catch (schedErr) {
@@ -117,7 +117,7 @@ const ExamPermit = ({ personId }) => {
 
           try {
             const attRes = await axios.get(
-              `${API_BASE_URL}/api/exam-attendance/token/${applicant_number}`,
+              `${API_BASE_URL}/api/exam-attendance/token/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             setAttendanceToken(attRes.data?.qr_token || null);
             setAttendanceStatus(attRes.data?.status || null);
@@ -130,7 +130,7 @@ const ExamPermit = ({ personId }) => {
 
         try {
           const progRes = await axios.get(
-            `${API_BASE_URL}/api/applied_program`,
+            `${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           setCurriculumOptions(progRes.data);
         } catch (progErr) {
@@ -139,7 +139,7 @@ const ExamPermit = ({ personId }) => {
 
         try {
           const registrarRes = await axios.get(
-            `${API_BASE_URL}/api/scheduled-by/registrar`,
+            `${API_BASE_URL}/api/scheduled-by/registrar`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           if (registrarRes.data?.fullName)
             setScheduledBy(registrarRes.data.fullName);
@@ -174,7 +174,7 @@ const ExamPermit = ({ personId }) => {
       .post(`${API_BASE_URL}/api/generate-permit-number`, {
         person_id: person.person_id,
         applicant_number: person.applicant_number,
-      })
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setPermitNumber(res.data?.control_number || ""))
       .catch((err) => {
         console.error("Failed to generate permit number:", err);

@@ -203,7 +203,7 @@ const StudentGradeFile = () => {
 
     const fetchGwaPrintingStatus = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/honors/gwa_printing_status`);
+            const res = await axios.get(`${API_BASE_URL}/api/honors/gwa_printing_status`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setGwaPrintStatus({
                 overall: Boolean(res.data?.overall),
                 per_semester: Boolean(res.data?.per_semester),
@@ -293,7 +293,7 @@ const StudentGradeFile = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     });
 
@@ -360,7 +360,7 @@ const StudentGradeFile = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -373,7 +373,7 @@ const StudentGradeFile = () => {
     const checkAccess = async (employeeID) => {
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -403,7 +403,7 @@ const StudentGradeFile = () => {
     useEffect(() => {
         // Dynamic grade conversion keeps this editor aligned with the grade_conversion table.
         axios
-            .get(`${API_BASE_URL}/api/admin/grade-conversion`)
+            .get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setGradeConversions(res.data))
             .catch((err) => {
                 console.error("Failed to fetch grade conversions:", err);
@@ -592,7 +592,7 @@ const StudentGradeFile = () => {
 
         try {
             setIsLoadingStudentDirectory(true);
-            const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
+            const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                 params: {
                     q: trimmedQuery,
                     limit: 10,
@@ -625,7 +625,7 @@ const StudentGradeFile = () => {
         }
 
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
+            const res = await axios.get(`${API_BASE_URL}/api/student-info`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                 params: {
                     searchQuery: student_number,
                 },
@@ -645,7 +645,7 @@ const StudentGradeFile = () => {
     const fetchStudentGrade = async (student_number) => {
         try {
             const res = await axios.get(
-                `${API_BASE_URL}/api/student-info/${student_number}`,
+                `${API_BASE_URL}/api/student-info/${student_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             setStudentGradeList(res.data);
         } catch {
@@ -658,7 +658,7 @@ const StudentGradeFile = () => {
         const currId = studentGradeList[0].curriculum_id;
         try {
             setLoadingCourses(true);
-            const res = await axios.get(`${API_BASE_URL}/api/courses/${currId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setCourseList(res.data);
         } catch (err) {
             setSnackbar({
@@ -673,7 +673,7 @@ const StudentGradeFile = () => {
 
     const fetchYearLevels = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+            const res = await axios.get(`${API_BASE_URL}/api/year-levels`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setYearLevel(res.data);
         } catch (err) {
             console.error("Failed to fetch year levels:", err);

@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { SettingsContext } from "../App";
 import DefaultLogo from "../assets/EaristLogo.png";
 
-const LoadingOverlay = ({ open, message }) => {
+const LoadingOverlay = ({ open, message, preserve = false }) => {
   const settings = useContext(SettingsContext);
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
@@ -22,7 +22,13 @@ const LoadingOverlay = ({ open, message }) => {
     setCompanyName(branding.companyName || "Your Institution");
   }, [settings]);
 
-  if (!open) return null;
+  const genericPageLoading =
+    !message || message === "Loading..." || message === "Checking Access...";
+
+  // Generic full-screen loaders make every normal page transition look stuck.
+  // Keep the component available for authentication and explicit long-running
+  // operations by requiring those callers to opt in with `preserve`.
+  if (!open || (genericPageLoading && !preserve)) return null;
 
   return (
     <Box

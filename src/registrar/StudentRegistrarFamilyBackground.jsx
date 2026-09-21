@@ -112,7 +112,7 @@ const StudentRegistrarFamilyBackground = () => {
             setUserID(storedID);
             setEmployeeID(storedEmployeeID);
 
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -124,7 +124,7 @@ const StudentRegistrarFamilyBackground = () => {
 
     const checkAccess = async (employeeID) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
             } else {
@@ -163,7 +163,7 @@ const StudentRegistrarFamilyBackground = () => {
         setUser(storedUser);
         setUserRole(storedRole);
 
-        const allowedRoles = ["registrar", "applicant", "superadmin"];
+    const allowedRoles = ["administrator", "superadmin", "technical", "applicant"];
         if (!allowedRoles.includes(storedRole)) {
             window.location.href = "/login";
             return;
@@ -198,7 +198,7 @@ const StudentRegistrarFamilyBackground = () => {
     useEffect(() => {
         const fetchStudent = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
+                const res = await axios.get(`${API_BASE_URL}/api/student-info`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     params: { person_id, student_number }
                 });
                 setStudentData(res.data);
@@ -216,7 +216,7 @@ const StudentRegistrarFamilyBackground = () => {
 
     const fetchByPersonId = async (personID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/person/${personID}`);
+            const res = await axios.get(`${API_BASE_URL}/api/person/enrollment/${personID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
             let siblingsVal = res.data.siblings;
             if (typeof siblingsVal === "string") {
@@ -324,7 +324,7 @@ const StudentRegistrarFamilyBackground = () => {
     const handleUpdate = async (updatedPerson) => {
         try {
             // ✅ force the request to the enrollment route
-            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, updatedPerson);
+            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, updatedPerson, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             console.log("✅ Auto-saved to ENROLLMENT DB3");
         } catch (error) {
             console.error("❌ Auto-save failed:", error);
@@ -441,7 +441,7 @@ const StudentRegistrarFamilyBackground = () => {
             }
 
             // ✅ Execute safe update
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/enrollment/person/${targetId}`, cleanedData, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
         } catch (err) {
             console.error("❌ Auto-save (on blur) failed:", {
@@ -637,9 +637,9 @@ const StudentRegistrarFamilyBackground = () => {
                     last_name: person?.last_name || "",
                     first_name: person?.first_name || "",
                     audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
-                    audit_actor_role: userRole || "registrar",
+                    audit_actor_role: userRole || "administrator",
                 },
-                { responseType: "blob" },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
             );
 
             const blob = new Blob([response.data], { type: "application/pdf" });
@@ -699,7 +699,7 @@ const StudentRegistrarFamilyBackground = () => {
 
     useEffect(() => {
         if (!userID) return;
-        axios.get(`${API_BASE_URL}/api/verified-exam-applicants`)
+        axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then(res => {
                 const verified = res.data.some(a => a.person_id === parseInt(userID));
                 setCanPrintPermit(verified);

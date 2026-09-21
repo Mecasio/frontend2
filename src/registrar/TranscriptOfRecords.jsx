@@ -255,7 +255,7 @@ const TranscriptOfRecords = () => {
   });
   const toDataUri = async (url) => {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const blob = await res.blob();
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -449,7 +449,7 @@ const TranscriptOfRecords = () => {
 
   const fetchTorSettings = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tor-settings`);
+      const res = await axios.get(`${API_BASE_URL}/api/tor-settings`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const data = res.data?.data;
       if (data) {
         setRemarks(data.remarks ?? "");
@@ -561,7 +561,7 @@ const TranscriptOfRecords = () => {
 
   const fetchTorGradingSystem = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tor-grading-system`);
+      const res = await axios.get(`${API_BASE_URL}/api/tor-grading-system`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setGradingSystemRows(res.data?.data || []);
     } catch (err) {
       console.error("Failed to fetch TOR grading system:", err);
@@ -740,7 +740,7 @@ const TranscriptOfRecords = () => {
   // ✅ Fetch person data from backend
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/enrollment/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data); // make sure backend returns the correct format
     } catch (error) {
       console.error("Failed to fetch person:", error);
@@ -760,7 +760,7 @@ const TranscriptOfRecords = () => {
       setUserRole(storedRole);
       setUserID(storedID);
 
-      if (storedRole === "applicant" || storedRole === "registrar") {
+      if (storedRole === "applicant" || ["administrator", "superadmin", "technical"].includes(storedRole)) {
         fetchPersonData(storedID);
       } else {
         window.location.href = "/login";
@@ -860,7 +860,7 @@ const TranscriptOfRecords = () => {
       if (!listYearId || !listSemesterId) return false;
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         const active =
           Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
         if (!active) return false;
@@ -904,7 +904,7 @@ const TranscriptOfRecords = () => {
 
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`,
+          `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (cancelled) return;
         const resolvedStudentNumber = res.data?.student_number;
@@ -951,7 +951,7 @@ const TranscriptOfRecords = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -964,7 +964,7 @@ const TranscriptOfRecords = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -993,7 +993,7 @@ const TranscriptOfRecords = () => {
     const fetchStudent = async () => {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`,
+          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         const data = await res.json();
 
@@ -1006,7 +1006,7 @@ const TranscriptOfRecords = () => {
           }
 
           const detailsRes = await fetch(
-            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`,
+            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           const detailsData = await detailsRes.json();
           if (Array.isArray(detailsData) && detailsData.length > 0) {
@@ -1048,7 +1048,7 @@ const TranscriptOfRecords = () => {
 
     const delayDebounce = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query, limit: 10 },
         });
 
@@ -1087,7 +1087,7 @@ const TranscriptOfRecords = () => {
 
   const fetchGradeConversionDic = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`);
+      const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setGradeConversions(Array.isArray(res.data) ? res.data : []);
 
       console.log("Fetch successful");
@@ -1219,7 +1219,7 @@ const TranscriptOfRecords = () => {
 
     const fetchTorQrStatus = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/tor-qr-status/${studentNumberValue}`);
+        const res = await axios.get(`${API_BASE_URL}/api/tor-qr-status/${studentNumberValue}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         if (!cancelled) {
           setTorQrStatus({
             has_qr: Boolean(res.data?.has_qr),
@@ -1778,7 +1778,7 @@ ${subjectsTableHtml}
     }
 
     if (
-      role !== "registrar" &&
+      !["administrator", "superadmin", "technical"].includes(role) &&
       selectedRegistrar?.id === signatureId
     ) {
       return true;
@@ -1828,7 +1828,7 @@ ${subjectsTableHtml}
   const fetchTorSignatories = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/tor-signatories`
+        `${API_BASE_URL}/api/tor-signatories`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const data = response.data?.data || {};

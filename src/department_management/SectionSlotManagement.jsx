@@ -115,7 +115,7 @@ const SectionSlotManagement = () => {
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
         },
     });
 
@@ -138,7 +138,7 @@ const SectionSlotManagement = () => {
         setLoading(true);
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -162,7 +162,7 @@ const SectionSlotManagement = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
+            .get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess]);
@@ -170,7 +170,7 @@ const SectionSlotManagement = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess])
@@ -178,7 +178,7 @@ const SectionSlotManagement = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/get_year_level`)
+            .get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => setYearLevels(res.data))
             .catch((err) => console.error(err));
     }, [hasAccess]);
@@ -186,7 +186,7 @@ const SectionSlotManagement = () => {
     useEffect(() => {
         if (hasAccess !== true) return;
         axios
-            .get(`${API_BASE_URL}/api/active_school_year`)
+            .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 if (res.data.length > 0) {
                     const active = res.data[0];
@@ -203,7 +203,7 @@ const SectionSlotManagement = () => {
     useEffect(() => {
         if (selectedSchoolYear && selectedSchoolSemester) {
             axios
-                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`)
+                .get(`${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => {
                     if (res.data.length > 0) {
                         setSelectedActiveSchoolYear(res.data[0].school_year_id);
@@ -249,7 +249,7 @@ const SectionSlotManagement = () => {
     const fetchDepartments = async () => {
         if (hasAccess !== true) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_department`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setDepartment(res.data);
             console.log(res.data);
         } catch (err) {
@@ -261,7 +261,7 @@ const SectionSlotManagement = () => {
         if (hasAccess !== true) return;
         if (!dprtmnt_id) return;
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`);
+            const res = await axios.get(`${API_BASE_URL}/api/applied_program/${dprtmnt_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const allPrograms = Array.isArray(res.data) ? res.data : [];
             const filteredPrograms = campusFilter
                 ? allPrograms.filter(
@@ -320,7 +320,7 @@ const SectionSlotManagement = () => {
             return;
         }
         axios
-            .get(`${API_BASE_URL}/api/courses/${selectedCurriculumId}`)
+            .get(`${API_BASE_URL}/api/courses/${selectedCurriculumId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
             .then((res) => {
                 const taggedCourses = (res.data || []).filter((course) => {
                     const matchesYearLevel =
@@ -354,7 +354,7 @@ const SectionSlotManagement = () => {
             try {
                 const sectionResponse = await axios.get(
                     `${API_BASE_URL}/api/section-slot/sections`,
-                    {
+                    { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                         params: buildSectionSlotParams(),
                         ...getSectionSlotHeaders(),
                     },
@@ -389,7 +389,7 @@ const SectionSlotManagement = () => {
             try {
                 const slotResponse = await axios.get(
                     `${API_BASE_URL}/api/section-slot/sections`,
-                    {
+                    { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                         params: buildSectionSlotParams(
                             selectedCourse ? { courseId: selectedCourse } : {},
                         ),
@@ -425,7 +425,7 @@ const SectionSlotManagement = () => {
                         sectionIds,
                         activeSchoolYearId: selectedActiveSchoolYear,
                         ...(selectedCourse ? { courseId: selectedCourse } : {}),
-                    },
+                    }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
                 );
 
                 const enrolledMap = new Map(
@@ -695,7 +695,7 @@ const SectionSlotManagement = () => {
         try {
             const response = await axios.get(
                 `${API_BASE_URL}/api/section-slot/tagged-subjects/${sectionId}`,
-                { params: { activeSchoolYearId: selectedActiveSchoolYear } },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { activeSchoolYearId: selectedActiveSchoolYear } },
             );
             setTaggedSubjects(response.data || []);
         } catch (err) {
@@ -819,7 +819,7 @@ const SectionSlotManagement = () => {
         }
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/section-slot/tag/${tagRow.section_subject_id}/check`,
+                `${API_BASE_URL}/api/section-slot/tag/${tagRow.section_subject_id}/check`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             setUntagCheck(response.data);
             setUntagTarget(tagRow);
@@ -877,7 +877,7 @@ const SectionSlotManagement = () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             try {
-                const response = await fetch(url, {
+                const response = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
                     mode: "cors",
                     signal: controller.signal,
                 });

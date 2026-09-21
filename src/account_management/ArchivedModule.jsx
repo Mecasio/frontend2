@@ -192,7 +192,7 @@ const ArchivedModule = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/archived-accounts`,
+        `${API_BASE_URL}/api/archived-accounts`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setArchivedAccounts(response.data?.data || []);
     } catch (error) {
@@ -213,7 +213,7 @@ const ArchivedModule = () => {
     if (!employeeID) return;
 
     axios
-      .get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`)
+      .get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((response) => {
         setCanDelete(Number(response.data?.can_delete) === 1);
         setCanEdit(Number(response.data?.can_edit) === 1);

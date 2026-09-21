@@ -71,13 +71,13 @@ const StudentTable = ({ data, paymentType, onRemove }) => {
           ? `/api/delete_matriculation/${row.student_number}/${row.id}`
           : `/api/delete_unifast/${row.student_number}/${row.id}`;
 
-      const saveRes = await axios.post(`${API_BASE_URL}${saveEndpoint}`, row);
+      const saveRes = await axios.post(`${API_BASE_URL}${saveEndpoint}`, row, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const generatedId =
         paymentType === 1
           ? saveRes.data.unifast_id
           : saveRes.data.matriculation_id;
 
-      await axios.delete(`${API_BASE_URL}${deleteEndpoint}`, {
+      await axios.delete(`${API_BASE_URL}${deleteEndpoint}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
         data: { generatedId },
       });
 

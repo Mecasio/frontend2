@@ -111,7 +111,7 @@ const CurriculumManagement = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
   });
 
   useEffect(() => {
@@ -126,7 +126,7 @@ const CurriculumManagement = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -140,7 +140,7 @@ const CurriculumManagement = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       if (response.data && Number(response.data.page_privilege) === 1) {
         setHasAccess(true);
@@ -176,7 +176,7 @@ const CurriculumManagement = () => {
 
   const fetchYear = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/year_table`);
+      const res = await axios.get(`${API_BASE_URL}/api/year_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setYearList(res.data);
     } catch (err) {
       console.error(err);
@@ -185,7 +185,7 @@ const CurriculumManagement = () => {
 
   const fetchProgram = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_program`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setProgramList(res.data);
     } catch (err) {
       console.error(err);
@@ -194,7 +194,7 @@ const CurriculumManagement = () => {
 
   const fetchCurriculum = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/get_curriculum`);
+      const res = await axios.get(`${API_BASE_URL}/api/get_curriculum`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setCurriculumList(res.data);
     } catch (err) {
       console.error(err);
@@ -439,7 +439,7 @@ const CurriculumManagement = () => {
         `${API_BASE_URL}/api/import-curriculum-xlsx`,
         formData,
         {
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "Content-Type": "multipart/form-data",
             ...getPermissionHeaders(),
           },

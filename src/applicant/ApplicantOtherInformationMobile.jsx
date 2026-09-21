@@ -122,7 +122,7 @@ const ApplicantOtherInformationMobile = (props) => {
   // ── Fetch active school year ────────────────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const active = res.data?.[0];
         if (active) {
@@ -164,7 +164,7 @@ const ApplicantOtherInformationMobile = (props) => {
   // ── Fetch person (do not alter) ─────────────────────────────────────────
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setPerson(res.data);
     } catch (error) { }
   };
@@ -176,7 +176,7 @@ const ApplicantOtherInformationMobile = (props) => {
       created_at: person.created_at,
     };
     try {
-      await axios.put(`${API_BASE_URL}/api/person/${userID}`, updatedPerson);
+      await axios.put(`${API_BASE_URL}/api/person/${userID}`, updatedPerson, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log("Auto-saved with created_at:", updatedPerson.created_at);
     } catch (error) {
       console.error("Auto-save failed:", error);
@@ -186,7 +186,7 @@ const ApplicantOtherInformationMobile = (props) => {
   // ── handleBlur (do not alter) ───────────────────────────────────────────
   const handleBlur = async () => {
     try {
-      await axios.put(`${API_BASE_URL}/api/person/${userID}`, person);
+      await axios.put(`${API_BASE_URL}/api/person/${userID}`, person, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       console.log("Auto-saved");
     } catch (err) {
       console.error("Auto-save failed", err);
@@ -253,7 +253,7 @@ const ApplicantOtherInformationMobile = (props) => {
   useEffect(() => {
     if (!userID) return;
     axios
-      .get(`${API_BASE_URL}/api/verified-exam-applicants`)
+      .get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const verified = res.data.some(
           (a) => a.person_id === parseInt(userID)
@@ -384,7 +384,7 @@ const ApplicantOtherInformationMobile = (props) => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -419,7 +419,7 @@ const ApplicantOtherInformationMobile = (props) => {
 
   const downloadExamPermitPDF = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
@@ -435,7 +435,7 @@ const ApplicantOtherInformationMobile = (props) => {
       const divToPrint = divToPrintRef.current;
       if (!divToPrint) throw new Error("Exam permit content did not render in time.");
 
-      const applicantRes = await axios.get(`${API_BASE_URL}/api/applicant_number/${userID}`);
+      const applicantRes = await axios.get(`${API_BASE_URL}/api/applicant_number/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const applicantNumber = applicantRes.data?.applicant_number || "";
 
       const response = await axios.post(
@@ -446,7 +446,7 @@ const ApplicantOtherInformationMobile = (props) => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });

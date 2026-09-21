@@ -110,7 +110,7 @@ const GradingEvaluationForRegistrar = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/admin/grade-conversion`)
+      .get(`${API_BASE_URL}/api/admin/grade-conversion`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => setGradeConversion(res.data))
       .catch((err) => {
         console.error("Failed to fetch grade conversions:", err);
@@ -396,7 +396,7 @@ const GradingEvaluationForRegistrar = () => {
       setUserID(storedID);
       setEmployeeID(storedEmployeeID);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -409,7 +409,7 @@ const GradingEvaluationForRegistrar = () => {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
@@ -433,7 +433,7 @@ const GradingEvaluationForRegistrar = () => {
     const fetchStudent = async () => {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`
+          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
         );
         const data = await res.json();
 
@@ -442,7 +442,7 @@ const GradingEvaluationForRegistrar = () => {
           setStudentData(data);
 
           const detailsRes = await fetch(
-            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`
+            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
           );
           const detailsData = await detailsRes.json();
           if (Array.isArray(detailsData) && detailsData.length > 0) {
@@ -486,7 +486,7 @@ const GradingEvaluationForRegistrar = () => {
 
     const delayDebounce = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
           params: { query, limit: 10 },
         });
 
@@ -531,9 +531,9 @@ const GradingEvaluationForRegistrar = () => {
           localStorage.getItem("employee_id") ||
           localStorage.getItem("email") ||
           "unknown",
-        audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+        audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
         ...getLoginMacPayload(),
-      });
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
 
       try {
         await postAuditEvent("program_evaluation_grade_submitted");
@@ -940,9 +940,9 @@ const GradingEvaluationForRegistrar = () => {
             localStorage.getItem("employee_id") ||
             localStorage.getItem("email") ||
             "unknown",
-          audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+          audit_actor_role: userRole || localStorage.getItem("role") || "administrator",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blobUrl = window.URL.createObjectURL(

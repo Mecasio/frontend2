@@ -45,7 +45,7 @@ const ChangeYearGradPer = () => {
 
   const fetchYearPeriod = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/get-grading-period`);
+      const response = await axios.get(`${API_BASE_URL}/api/get-grading-period`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setGradingPeriod(response.data);
     } catch (error) {
       console.error("Error fetching grading periods", error);
@@ -71,7 +71,7 @@ const ChangeYearGradPer = () => {
       setUserID(storedID);
       setUserRole(storedRole);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployeeID);
       } else {
         window.location.href = "/login";
@@ -84,7 +84,7 @@ const ChangeYearGradPer = () => {
   const checkAccess = async (employeeID) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
       console.error("Error checking access", error);
@@ -121,7 +121,7 @@ const ChangeYearGradPer = () => {
     const { periodId, periodDescription } = confirmDialog;
     setConfirmDialog({ open: false, periodId: null, periodDescription: "" });
     try {
-      await axios.post(`${API_BASE_URL}/api/grade_period_activate/${periodId}`);
+      await axios.post(`${API_BASE_URL}/api/grade_period_activate/${periodId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       setSnackbar({ open: true, message: "Grading period activated!", severity: "success" });
       fetchYearPeriod();
       await insertAuditLog("grading_period_activated", {

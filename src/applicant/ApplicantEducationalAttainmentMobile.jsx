@@ -362,7 +362,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
   // ── Fetch person (do not alter) ─────────────────────────────────────────
   const fetchPersonData = async (id) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const safePerson = Object.fromEntries(
         Object.entries(res.data).map(([key, val]) => [key, val ?? ""])
       );
@@ -381,7 +381,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
       }
       const response = await axios.put(
         `${API_BASE_URL}/api/person/${userID}`,
-        updatedPerson
+        updatedPerson, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       console.log("✅ Auto-saved successfully:", response.data);
     } catch (error) {
@@ -458,7 +458,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
   useEffect(() => {
     if (!userID) return;
     axios
-      .get(`${API_BASE_URL}/api/verified-exam-applicants`)
+      .get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const verified = res.data.some(
           (a) => a.person_id === parseInt(userID)
@@ -562,7 +562,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -597,7 +597,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
 
   const downloadExamPermitPDF = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
@@ -615,7 +615,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
       const divToPrint = divToPrintRef.current;
       if (!divToPrint) throw new Error("Exam permit content did not render in time.");
 
-      const applicantRes = await axios.get(`${API_BASE_URL}/api/applicant_number/${userID}`);
+      const applicantRes = await axios.get(`${API_BASE_URL}/api/applicant_number/${userID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const applicantNumber = applicantRes.data?.applicant_number || "";
 
       const response = await axios.post(
@@ -626,7 +626,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
         },
-        { responseType: "blob" }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, responseType: "blob" }
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });

@@ -218,7 +218,7 @@ const RegistrarClassList = () => {
       setUser(storedUser);
       setEmployeeID(storedEmployee);
 
-      if (storedRole === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(storedRole)) {
         checkAccess(storedEmployee);
       } else {
         window.location.href = "/login";
@@ -231,7 +231,7 @@ const RegistrarClassList = () => {
   const checkAccess = async (empID) => {
     try {
       // ── 1. Check page-level privilege for this specific page ──────────────────
-      const pageRes = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`);
+      const pageRes = await axios.get(`${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const hasPageAccess = pageRes.data?.page_privilege === 1;
       setHasAccess(hasPageAccess);
 
@@ -249,7 +249,7 @@ const RegistrarClassList = () => {
 
     const fetchAdminData = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+        const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setAdminData(res.data);
         syncRegistrarScopeFromAdminData(res.data);
       } catch (err) {
@@ -333,8 +333,8 @@ const RegistrarClassList = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_BASE_URL}/api/get_school_year/`),
-      axios.get(`${API_BASE_URL}/api/active_school_year`),
+      axios.get(`${API_BASE_URL}/api/get_school_year/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
     ])
       .then(([yearsRes, activeRes]) => {
         const active =
@@ -350,11 +350,11 @@ const RegistrarClassList = () => {
       .catch(console.error)
       .finally(() => setActiveTermReady(true));
 
-    axios.get(`${API_BASE_URL}/api/get_school_semester/`)
+    axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => setSemesters(res.data))
       .catch(console.error);
 
-    axios.get(`${API_BASE_URL}/api/get_year_level`)
+    axios.get(`${API_BASE_URL}/api/get_year_level`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then((res) => {
         const rows = Array.isArray(res.data) ? res.data : [];
         setYearLevels(
@@ -374,7 +374,7 @@ const RegistrarClassList = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const mergedDepartments = restrictDepartmentsToScope(
@@ -402,7 +402,7 @@ const RegistrarClassList = () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
           ),
         );
         const merged = responses.flatMap((response) => response.data || []);
@@ -428,11 +428,11 @@ const RegistrarClassList = () => {
     const departmentIds = getDepartmentIdsFromAdminData(adminData);
     if (departmentIds.length) return;
 
-    axios.get(`${API_BASE_URL}/api/departments`)
+    axios.get(`${API_BASE_URL}/api/departments`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => setDepartment(res.data))
       .catch(console.error);
 
-    axios.get(`${API_BASE_URL}/api/applied_program`)
+    axios.get(`${API_BASE_URL}/api/applied_program`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
       .then(res => {
         // ✅ Same program_code+major dedupe for the fallback ("all
         // departments") path.
@@ -687,7 +687,7 @@ const RegistrarClassList = () => {
         },
         {
           responseType: "blob",
-          headers: {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "x-employee-id": employeeID,
             "x-page-id": pageId,
           },

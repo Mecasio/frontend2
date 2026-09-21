@@ -99,7 +99,7 @@ const SuperAdminFacultyResetPassword = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    audit_actor_role: localStorage.getItem("role") || "registrar",
+    audit_actor_role: localStorage.getItem("role") || "administrator",
     ...getLoginMacPayload(),
   });
 
@@ -108,7 +108,7 @@ const SuperAdminFacultyResetPassword = () => {
     const storedRole = localStorage.getItem("role");
     const storedEmployeeID = localStorage.getItem("employee_id");
 
-    if (!storedRole || storedRole !== "registrar") {
+    if (!storedRole || !["administrator", "superadmin", "technical"].includes(storedRole)) {
       window.location.href = "/login";
       return;
     }
@@ -119,7 +119,7 @@ const SuperAdminFacultyResetPassword = () => {
   const checkAccess = async (empID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -137,7 +137,7 @@ const SuperAdminFacultyResetPassword = () => {
     const fetchFaculty = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/superadmin-get-all-faculty`);
+        const res = await axios.get(`${API_BASE_URL}/api/superadmin-get-all-faculty`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setFaculty(res.data);
       } catch (err) {
         console.error("Failed to fetch faculty list", err);
@@ -159,7 +159,7 @@ const SuperAdminFacultyResetPassword = () => {
       try {
         const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-faculty`, {
           search: searchQuery,
-        });
+        }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
         setUserInfo(res.data);
       } catch (err) {
         setUserInfo(null);

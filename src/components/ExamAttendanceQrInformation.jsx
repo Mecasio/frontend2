@@ -96,7 +96,7 @@ const ExamAttendanceQrInformation = () => {
         // backend instead splits this across /api/person, /api/applicant-schedule,
         // /api/exam-attendance/token, /api/document-verification like the scanner does).
         const res = await axios.get(
-          `${API_BASE_URL}/api/exam-attendance/info/${applicant_number}`,
+          `${API_BASE_URL}/api/exam-attendance/info/${applicant_number}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
         );
         if (!cancelled) setData(res.data);
       } catch (err) {

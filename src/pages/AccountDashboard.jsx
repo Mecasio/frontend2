@@ -57,7 +57,7 @@ const AccountDashboard = () => {
       setUserRole(role);
       setEmployeeID(empID);
 
-      if (role === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(role)) {
         checkAccess(empID);
         fetchUserAccessList(empID);
       } else {
@@ -72,7 +72,7 @@ const AccountDashboard = () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(res.data?.page_privilege === 1);
     } catch (err) {
@@ -85,7 +85,7 @@ const AccountDashboard = () => {
   const fetchUserAccessList = async (employeeID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}`
+        `${API_BASE_URL}/api/page_access/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const accessMap = data.reduce((acc, item) => {
@@ -107,12 +107,6 @@ const AccountDashboard = () => {
         { title: "Add Registrar Account", link: "/register_registrar", icon: AdminPanelSettings, page_id: 71 },
         { title: "Create Student Account", link: "/student_accounts", icon: School, page_id: 143 },
         { title: "Super Admin Application Process", link: "/application_super_admin", icon: School, page_id: 148 },
-      ],
-    },
-    {
-      key: "facultyManagement", label: "Faculty Management", icon: SupervisorAccount,
-      items: [
-        { title: "Professor Education", link: "/superadmin_professor_education", icon: School, page_id: 109 },
       ],
     },
     {
@@ -139,8 +133,8 @@ const AccountDashboard = () => {
     {
       key: "accessControl", label: "Access Control", icon: Security,
       items: [
-        { title: "User Page Access", link: "/user_page_access", icon: Security, page_id: 72 },
-        { title: "Page Table", link: "/page_crud", icon: TableChart, page_id: 72 },
+        { title: "User Page Access", link: "/user_page_access", icon: Security, page_id: 69 },
+        { title: "Page Table", link: "/page_crud", icon: TableChart, page_id: 69 },
       ],
     },
     {
