@@ -2648,12 +2648,12 @@ const ApplicantDashboard = (props) => {
                   onClick={e => { e.stopPropagation(); lightboxPrev(); }}
                   sx={{
                     position: "fixed", left: { xs: 4, sm: 16 }, top: "50%", transform: "translateY(-50%)",
-                    zIndex: 10000, width: { xs: 44, sm: 60 }, height: { xs: 44, sm: 60 },
+                    zIndex: 10000, width: 44, height: 44, p: 0,
                     background: "rgba(255,255,255,0.15)", color: "#fff",
                     "&:hover": { background: "rgba(255,255,255,0.3)" },
                   }}
                 >
-                  <ArrowBackIosNewIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
+                  <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
                 </IconButton>
 
                 {/* Next */}
@@ -2661,12 +2661,12 @@ const ApplicantDashboard = (props) => {
                   onClick={e => { e.stopPropagation(); lightboxNext(); }}
                   sx={{
                     position: "fixed", right: { xs: 4, sm: 16 }, top: "50%", transform: "translateY(-50%)",
-                    zIndex: 10000, width: { xs: 44, sm: 60 }, height: { xs: 44, sm: 60 },
+                    zIndex: 10000, width: 44, height: 44, p: 0,
                     background: "rgba(255,255,255,0.15)", color: "#fff",
                     "&:hover": { background: "rgba(255,255,255,0.3)" },
                   }}
                 >
-                  <ArrowForwardIosIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
+                  <ArrowForwardIosIcon sx={{ fontSize: 18 }} />
                 </IconButton>
 
                 {/* Main card */}
@@ -2737,13 +2737,13 @@ const ApplicantDashboard = (props) => {
                     <IconButton
                       onClick={e => { e.stopPropagation(); closeLightbox(); }}
                       sx={{
-                        position: "fixed", top: 25, left: 50, zIndex: 10001,
-                        width: 75, height: 75,
+                        position: "fixed", top: 25, left: { xs: 4, sm: 16 }, zIndex: 10001,
+                        width: 44, height: 44, p: 0,
                         background: "rgba(255,255,255,0.15)", color: "#fff",
                         "&:hover": { background: "rgba(220,50,50,0.75)" },
                       }}
                     >
-                      <CloseIcon sx={{ fontSize: 28 }} />
+                      <CloseIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* Title */}

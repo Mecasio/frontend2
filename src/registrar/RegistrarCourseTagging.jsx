@@ -184,6 +184,15 @@ const formatSection = (programCode, description) =>
     .filter(Boolean)
     .join("-");
 
+const formatEnrolledSectionLabel = (section) =>
+  [
+    cleanDisplayValue(section?.program_code),
+    cleanDisplayValue(section?.year_level_id),
+    cleanDisplayValue(section?.section_description ?? section?.description),
+  ]
+    .filter(Boolean)
+    .join(" - ");
+
 const formatDepartmentSectionLabel = (section) => {
   if (!section) return "";
   const code = cleanDisplayValue(section.program_code);
@@ -2211,60 +2220,67 @@ const RegistrarCourseTagging = () => {
                         minWidth: 160,
                       }}
                     >
-                      <TextField
-                        select
+                      <Autocomplete
                         size="small"
                         fullWidth
+                        options={sections}
                         disabled={!canEdit || sectionUpdatingId === e.id}
+                        disableClearable={Boolean(e.department_section_id)}
                         value={
-                          e.department_section_id
-                            ? String(e.department_section_id)
-                            : ""
-                        }
-                        onChange={(ev) =>
-                          handleEnrolledSectionChange(e, ev.target.value)
-                        }
-                        sx={{
-                          "& .MuiInputBase-root": {
-                            fontSize: "12px",
-                            backgroundColor: "#fff",
-                          },
-                        }}
-                      >
-                        {!e.department_section_id && (
-                          <MenuItem value="">
-                            <em>No section</em>
-                          </MenuItem>
-                        )}
-                        {e.department_section_id &&
-                          !sections.some(
-                            (s) =>
-                              String(s.department_and_program_section_id) ===
+                          sections.find(
+                            (section) =>
+                              String(section.department_and_program_section_id) ===
                               String(e.department_section_id),
-                          ) && (
-                            <MenuItem value={String(e.department_section_id)}>
-                              {formatSection(e.program_code, e.description) ||
-                                `Section ${e.department_section_id}`}
-                            </MenuItem>
-                          )}
-                        {sections.map((section) => (
-                          <MenuItem
-                            key={section.department_and_program_section_id}
-                            value={String(
-                              section.department_and_program_section_id,
-                            )}
-                          >
-                            {[
-                              section.program_code,
-                              section.description,
-                            ]
-                              .map((v) => cleanDisplayValue(v))
-                              .filter(Boolean)
-                              .join(" - ") ||
-                              `Section ${section.department_and_program_section_id}`}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                          ) ||
+                          (e.department_section_id
+                            ? {
+                                department_and_program_section_id:
+                                  e.department_section_id,
+                                program_code: e.program_code,
+                                year_level_id: e.year_level_id,
+                                section_description: e.section_description,
+                              }
+                            : null)
+                        }
+                        onChange={(event, selected) =>
+                          handleEnrolledSectionChange(
+                            e,
+                            selected
+                              ? String(selected.department_and_program_section_id)
+                              : "",
+                          )
+                        }
+                        getOptionLabel={(option) =>
+                          formatEnrolledSectionLabel(option) ||
+                          (option?.department_and_program_section_id
+                            ? `Section ${option.department_and_program_section_id}`
+                            : "")
+                        }
+                        isOptionEqualToValue={(option, value) =>
+                          String(option.department_and_program_section_id) ===
+                          String(value.department_and_program_section_id)
+                        }
+                        renderOption={(props, option) => (
+                          <li {...props} key={option.department_and_program_section_id}>
+                            <Typography sx={{ fontSize: "11px" }}>
+                              {formatEnrolledSectionLabel(option) ||
+                                `Section ${option.department_and_program_section_id}`}
+                            </Typography>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Search section..."
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                fontSize: "12px",
+                                backgroundColor: "#fff",
+                              },
+                            }}
+                          />
+                        )}
+                      />
                     </StyledTd>
                     <StyledTd
                       sx={{

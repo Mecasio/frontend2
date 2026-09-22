@@ -563,7 +563,7 @@ const StudentBalanceList = () => {
                     <TableRow>
                       <TableCell>Priority</TableCell>
                       <TableCell>Fee</TableCell>
-                      <TableCell>Fund Number</TableCell>
+                      <TableCell>Account Type</TableCell>
                       <TableCell align="right">Remaining Fee</TableCell>
                     </TableRow>
                   </TableHead>

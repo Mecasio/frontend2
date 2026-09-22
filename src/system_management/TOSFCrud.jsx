@@ -28,6 +28,8 @@ import {
   FormControl,
   CircularProgress,
   IconButton,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import EaristLogo from "../assets/EaristLogo.png";
 import Unauthorized from "../components/Unauthorized";
@@ -561,7 +563,7 @@ const TOSF = () => {
   // =====================================================================
   const defaultFeeRateForm = {
     fee_id: "",
-    dprtmnt_curriculum_id: "",
+    dprtmnt_curriculum_id: [],
     branch_id: "",
     amount: "",
     applied_to: 0,
@@ -606,7 +608,7 @@ const TOSF = () => {
   ];
 
   // =====================================================================
-  // FEE GROUPS / FUND NUMBERS (small nested CRUD, opened from Fee Catalog)
+  // FEE GROUPS / ACCOUNT TYPES (small nested CRUD, opened from Fee Catalog)
   // =====================================================================
   const defaultFeeGroupForm = { description: "" };
   const defaultAccountTypeForm = { description: "" };
@@ -758,14 +760,19 @@ const TOSF = () => {
       setFeeGroups(Array.isArray(feeGroupsRes.data) ? feeGroupsRes.data : []);
       setAccountTypes(Array.isArray(accountTypesRes.data) ? accountTypesRes.data : []);
       const nextYearLevels = Array.isArray(optionsRes.data?.yearLevels) ? optionsRes.data.yearLevels : [];
-      setCurriculumOptions(Array.isArray(optionsRes.data?.curricula) ? optionsRes.data.curricula : []);
+      setCurriculumOptions(
+        (Array.isArray(optionsRes.data?.curricula) ? optionsRes.data.curricula : []).filter(
+          (curriculum) => Number(curriculum.lock_status) === 1,
+        ),
+      );
       setYearLevelOptions(nextYearLevels);
       setFeeRateForm((prev) => {
         if (!nextYearLevels.length) return prev;
-        const exists = nextYearLevels.some(
-          (level) => String(level.year_level_id) === String(prev.applied_to),
+        const selectedYearLevel = Number(prev.applied_to ?? 0);
+        const validSelection = selectedYearLevel === 0 || nextYearLevels.some(
+          (level) => String(level.year_level_id) === String(selectedYearLevel),
         );
-        return exists || Number(prev.applied_to) === 0 ? prev : { ...prev, applied_to: 0 };
+        return validSelection ? prev : { ...prev, applied_to: 0 };
       });
     } catch (err) {
       console.error("Error fetching dynamic fees:", err);
@@ -1021,7 +1028,7 @@ const TOSF = () => {
   };
 
   // =====================================================================
-  // FUND NUMBERS (account types) — handlers
+  // ACCOUNT TYPES — handlers
   // =====================================================================
   const handleAccountTypeChange = (e) => setAccountTypeForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleAccountTypeEditChange = (e) => setAccountTypeEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -1048,8 +1055,8 @@ const TOSF = () => {
       resetAccountTypeForm();
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error saving fund number:", error);
-      showSnackbar(error.response?.data?.message || "Error saving fund number", "error");
+      console.error("Error saving account type:", error);
+      showSnackbar(error.response?.data?.message || "Error saving account type", "error");
     }
   };
 
@@ -1068,8 +1075,8 @@ const TOSF = () => {
       closeAccountTypeEditDialog();
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error updating fund number:", error);
-      showSnackbar(error.response?.data?.message || "Error updating fund number", "error");
+      console.error("Error updating account type:", error);
+      showSnackbar(error.response?.data?.message || "Error updating account type", "error");
     }
   };
 
@@ -1109,8 +1116,8 @@ const TOSF = () => {
       showSnackbar("Account type deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error deleting fund number:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting fund number", "error");
+      console.error("Error deleting account type:", error);
+      showSnackbar(error.response?.data?.message || "Error deleting account type", "error");
     } finally {
       setAccountTypeDeleteDialogOpen(false);
       setSelectedAccountType(null);
@@ -1126,6 +1133,18 @@ const TOSF = () => {
   const handleFeeRateChange = (e) => {
     const { name, value } = e.target;
     setFeeRateForm((prev) => {
+      if (name === "dprtmnt_curriculum_id") {
+        const selected = (Array.isArray(value) ? value : [value])
+          .map((item) => String(item))
+          .filter(Boolean);
+        const allCurriculaSelected = selected.length >= curriculumOptions.length;
+        return {
+          ...prev,
+          dprtmnt_curriculum_id: allCurriculaSelected ? [] : selected,
+          applies_to_all: allCurriculaSelected ? 1 : 0,
+        };
+      }
+
       const next = {
         ...prev,
         [name]: ["fee_id", "applied_to", "applies_to_all", "is_active"].includes(name)
@@ -1133,7 +1152,7 @@ const TOSF = () => {
           : name === "amount"
             ? value.replace(/\D/g, "")
             : value,
-        ...(name === "applies_to_all" && Number(value) === 1 ? { dprtmnt_curriculum_id: "" } : {}),
+        ...(name === "applies_to_all" && Number(value) === 1 ? { dprtmnt_curriculum_id: [] } : {}),
       };
       return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
     });
@@ -1141,14 +1160,20 @@ const TOSF = () => {
 
   const normalizeFeeRateParams = (form) => {
     const appliesToAll = Number(form.applies_to_all ?? 1) === 1 ? 1 : 0;
-    const appliedTo = form.applied_to === "" || form.applied_to == null ? 0 : Number(form.applied_to);
+    const appliedTo = form.applied_to === "" || form.applied_to == null
+        ? 0
+        : Number(form.applied_to);
     const branchId = form.branch_id === "" || form.branch_id == null ? null : Number(form.branch_id);
     const dprtmntCurriculumId =
       appliesToAll === 1
         ? null
-        : form.dprtmnt_curriculum_id === "" || form.dprtmnt_curriculum_id == null
-          ? null
-          : Number(form.dprtmnt_curriculum_id);
+        : Array.isArray(form.dprtmnt_curriculum_id)
+          ? form.dprtmnt_curriculum_id.length
+            ? JSON.stringify(form.dprtmnt_curriculum_id.map((value) => Number(value)))
+            : null
+          : form.dprtmnt_curriculum_id === "" || form.dprtmnt_curriculum_id == null
+            ? null
+            : Number(form.dprtmnt_curriculum_id);
     const feeId = form.fee_id === "" || form.fee_id == null ? null : Number(form.fee_id);
 
     return { feeId, dprtmntCurriculumId, branchId, appliedTo, appliesToAll };
@@ -1175,7 +1200,13 @@ const TOSF = () => {
               ? null
               : rate.dprtmnt_curriculum_id == null || rate.dprtmnt_curriculum_id === ""
                 ? null
-                : Number(rate.dprtmnt_curriculum_id),
+                : (() => {
+                    try {
+                      return JSON.stringify(JSON.parse(rate.dprtmnt_curriculum_id));
+                    } catch {
+                      return JSON.stringify([Number(rate.dprtmnt_curriculum_id)]);
+                    }
+                  })(),
           branchId: rate.branch_id == null || rate.branch_id === "" ? null : Number(rate.branch_id),
           appliedTo: rate.applied_to == null ? 0 : Number(rate.applied_to),
           appliesToAll: Number(rate.applies_to_all ?? 1) === 1 ? 1 : 0,
@@ -1207,7 +1238,18 @@ const TOSF = () => {
     }
     setFeeRateForm({
       fee_id: Number(rate.fee_id || ""),
-      dprtmnt_curriculum_id: rate.dprtmnt_curriculum_id || "",
+      dprtmnt_curriculum_id: rate.applies_to_all
+        ? []
+        : (() => {
+            try {
+              const parsed = JSON.parse(rate.dprtmnt_curriculum_id);
+              return Array.isArray(parsed)
+                ? parsed.map((value) => String(value))
+                : [String(rate.dprtmnt_curriculum_id)];
+            } catch {
+              return rate.dprtmnt_curriculum_id ? [String(rate.dprtmnt_curriculum_id)] : [];
+            }
+          })(),
       branch_id: rate.branch_id || "",
       amount: rate.amount || "",
       applied_to:
@@ -1240,7 +1282,9 @@ const TOSF = () => {
       return;
     }
 
-    const duplicate = findDuplicateFeeRate(feeRateForm, feeRateEditMode ? feeRateEditId : null);
+    const duplicate = feeRateEditMode
+      ? findDuplicateFeeRate(feeRateForm, feeRateEditId)
+      : null;
     if (duplicate) {
       showSnackbar(getFeeRateDuplicateMessage(duplicate), "error");
       return;
@@ -1248,11 +1292,12 @@ const TOSF = () => {
 
     try {
       const payload = isFeeRateFormForTuition(feeRateForm) ? { ...feeRateForm, amount: 0 } : feeRateForm;
+      const requestPayload = payload;
       if (feeRateEditMode) {
-        await axios.put(`${API_BASE_URL}/api/tosf/fee-rates/${feeRateEditId}`, payload, permissionHeaders);
+        await axios.put(`${API_BASE_URL}/api/tosf/fee-rates/${feeRateEditId}`, requestPayload, permissionHeaders);
         showSnackbar("Fee rate updated successfully!");
       } else {
-        await axios.post(`${API_BASE_URL}/api/tosf/fee-rates`, payload, permissionHeaders);
+        await axios.post(`${API_BASE_URL}/api/tosf/fee-rates`, requestPayload, permissionHeaders);
         showSnackbar("Fee rate added successfully!");
       }
       closeFeeRateModal();
@@ -1573,6 +1618,21 @@ const TOSF = () => {
       : yearLevelOptions.find((level) => String(level.year_level_id) === String(value))?.year_level_description || "-";
   const getBranchLabel = (value) =>
     branches.find((branch) => String(branch.id) === String(value))?.branch || "All Branches";
+  const getCurriculumScopeLabel = (rate) => {
+    if (Number(rate.applies_to_all) === 1) return "All Curricula";
+    let ids = [];
+    try {
+      const parsed = JSON.parse(rate.dprtmnt_curriculum_id);
+      ids = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      ids = rate.dprtmnt_curriculum_id ? [rate.dprtmnt_curriculum_id] : [];
+    }
+    const labels = ids
+      .map((id) => curriculumOptions.find((item) => String(item.dprtmnt_curriculum_id) === String(id)))
+      .filter(Boolean)
+      .map((item) => `${item.dprtmnt_name} - (${item.program_code}) ${item.program_description} ${item.major || ""} - ${item.year_description}`);
+    return labels.join(", ") || `${rate.dprtmnt_name || ""} - ${rate.program_code || ""} ${rate.year_description || ""}`;
+  };
   const getFeeRateOptionLabel = (rate) => {
     if (!rate) return "-";
     return `${rate.fee_code || ""}${rate.fee_code ? " - " : ""}${rate.fee_name || "Fee"}`;
@@ -1720,7 +1780,7 @@ const TOSF = () => {
                   onClick={() => setAccountTypesModalOpen(true)}
                   sx={{ textTransform: "none", borderRadius: "8px", borderColor: headerColor, color: headerColor }}
                 >
-                  Fund Numbers
+                  Account Types
                 </Button>
               </>
             }
@@ -1740,7 +1800,7 @@ const TOSF = () => {
 
           <Box sx={{ mt: 1, mb: 3 }}>
             <PlainTable
-              headers={["#", "Order", "Code", "Name", "Category", "Fee Group", "Fund Number", "Status", "Rates", "Actions"]}
+              headers={["#", "Order", "Code", "Name", "Category", "Fee Group", "Account Type", "Status", "Rates", "Actions"]}
               showActionColumn={showActionColumn}
               borderColor={borderColor}
               emptyMessage="No dynamic fees found."
@@ -1836,9 +1896,7 @@ const TOSF = () => {
                     {getAppliedToLabel(rate.applied_to)}
                   </TableCell>
                   <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
-                    {Number(rate.applies_to_all) === 1
-                      ? "All Curricula"
-                      : `${rate.dprtmnt_name || ""} - ${rate.program_code || ""} ${rate.year_description || ""}`}
+                    {getCurriculumScopeLabel(rate)}
                   </TableCell>
                   <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                     {getBranchLabel(rate.branch_id)}
@@ -2171,7 +2229,7 @@ const TOSF = () => {
                 </Select>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography fontWeight="bold" mb={1}>Fund Number:</Typography>
+                <Typography fontWeight="bold" mb={1}>Account Type:</Typography>
                 <Select
                   name="account_type"
                   value={feeCatalogForm.account_type}
@@ -2180,7 +2238,7 @@ const TOSF = () => {
                   fullWidth
                 >
                   <MenuItem value="">
-                    <em>Select a fund number</em>
+                    <em>Select an account type</em>
                   </MenuItem>
                   {accountTypes.map((item) => (
                     <MenuItem key={item.id} value={item.id}>
@@ -2260,7 +2318,32 @@ const TOSF = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography fontWeight="bold" mb={1}>Year Level:</Typography>
-                <Select name="applied_to" value={feeRateForm.applied_to} onChange={handleFeeRateChange} fullWidth>
+                <Select
+                  name="applied_to"
+                  value={feeRateForm.applied_to}
+                  onChange={handleFeeRateChange}
+                  fullWidth
+                  sx={{
+                    color: headerColor,
+                    "& .MuiSelect-icon": { color: headerColor },
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: headerColor },
+                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: headerColor },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: headerColor },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        "& .MuiMenuItem-root.Mui-selected": {
+                          backgroundColor: headerColor,
+                          color: "#fff",
+                        },
+                        "& .MuiMenuItem-root.Mui-selected:hover": {
+                          backgroundColor: headerColor,
+                        },
+                      },
+                    },
+                  }}
+                >
                   <MenuItem value={0}>All Year Level</MenuItem>
                   {yearLevelOptions.map((level) => (
                     <MenuItem key={level.year_level_id} value={level.year_level_id}>
@@ -2290,24 +2373,73 @@ const TOSF = () => {
               {Number(feeRateForm.applies_to_all) === 0 && (
                 <Grid item xs={12}>
                   <Typography fontWeight="bold" mb={1}>Department Curriculum:</Typography>
-                  <Select
-                    name="dprtmnt_curriculum_id"
-                    value={feeRateForm.dprtmnt_curriculum_id}
-                    onChange={handleFeeRateChange}
-                    displayEmpty
+                  <Autocomplete
+                    multiple
                     fullWidth
-                    required
-                  >
-                    <MenuItem value="">
-                      <em>Select curriculum</em>
-                    </MenuItem>
-                    {curriculumOptions.map((item) => (
-                      <MenuItem key={item.dprtmnt_curriculum_id} value={item.dprtmnt_curriculum_id}>
-                        {item.dprtmnt_name} - ({item.program_code}) {item.program_description} {item.major || ""} -{" "}
-                        {item.year_description}
-                      </MenuItem>
-                    ))}
-                  </Select>
+                    size="small"
+                    options={curriculumOptions}
+                    value={curriculumOptions.filter((item) =>
+                      (Array.isArray(feeRateForm.dprtmnt_curriculum_id)
+                        ? feeRateForm.dprtmnt_curriculum_id
+                        : []
+                      ).some(
+                        (value) => String(value) === String(item.dprtmnt_curriculum_id),
+                      ),
+                    )}
+                    onChange={(_, selected) =>
+                      handleFeeRateChange({
+                        target: {
+                          name: "dprtmnt_curriculum_id",
+                          value: selected.map((item) => String(item.dprtmnt_curriculum_id)),
+                        },
+                      })
+                    }
+                    getOptionLabel={(item) =>
+                      `${item.dprtmnt_name} - (${item.program_code}) ${item.program_description} ${item.major || ""} - ${item.year_description}`
+                    }
+                    isOptionEqualToValue={(option, value) =>
+                      String(option.dprtmnt_curriculum_id) === String(value.dprtmnt_curriculum_id)
+                    }
+                    renderTags={(value, getTagProps) =>
+                      value.map((item, index) => (
+                        <Chip
+                          {...getTagProps({ index })}
+                          key={item.dprtmnt_curriculum_id}
+                          size="small"
+                          label={`${item.program_code} - ${item.year_description}`}
+                        />
+                      ))
+                    }
+                    renderOption={(props, item) => (
+                      <li {...props} key={item.dprtmnt_curriculum_id}>
+                        <Typography sx={{ fontSize: "13px" }}>
+                          {item.dprtmnt_name} - ({item.program_code}) {item.program_description} {item.major || ""} - {item.year_description}
+                        </Typography>
+                      </li>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder={
+                          Array.isArray(feeRateForm.dprtmnt_curriculum_id) &&
+                          feeRateForm.dprtmnt_curriculum_id.length > 0
+                            ? ""
+                            : "Search and select curriculum..."
+                        }
+                        required={!Array.isArray(feeRateForm.dprtmnt_curriculum_id) || feeRateForm.dprtmnt_curriculum_id.length === 0}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            color: headerColor,
+                            "& fieldset": { borderColor: headerColor },
+                            "&:hover fieldset": { borderColor: headerColor },
+                            "&.Mui-focused fieldset": { borderColor: headerColor },
+                          },
+                          "& .MuiAutocomplete-popupIndicator": { color: headerColor },
+                          "& .MuiAutocomplete-clearIndicator": { color: headerColor },
+                        }}
+                      />
+                    )}
+                  />
                 </Grid>
               )}
               <Grid item xs={12} sm={6}>
@@ -2639,7 +2771,7 @@ const TOSF = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Fund Numbers modal (nested small CRUD) */}
+      {/* Account Types modal (nested small CRUD) */}
       <Dialog
         open={accountTypesModalOpen}
         onClose={() => setAccountTypesModalOpen(false)}
@@ -2659,7 +2791,7 @@ const TOSF = () => {
             alignItems: "center",
           }}
         >
-          Fund Numbers
+          Account Types
           <IconButton onClick={() => setAccountTypesModalOpen(false)} sx={{ color: "white" }}>
             <CloseIcon />
           </IconButton>
@@ -2689,7 +2821,7 @@ const TOSF = () => {
               headers={["#", "Description", "Actions"]}
               showActionColumn={showActionColumn}
               borderColor={borderColor}
-              emptyMessage="No fund numbers found."
+              emptyMessage="No account types found."
             >
               {accountTypes.map((item, index) => (
                 <TableRow key={item.id}>
@@ -2766,7 +2898,7 @@ const TOSF = () => {
         </form>
       </Dialog>
 
-      {/* Fund Number — Edit */}
+      {/* Account Type — Edit */}
       <Dialog
         open={accountTypeEditDialogOpen}
         onClose={closeAccountTypeEditDialog}
@@ -2786,7 +2918,7 @@ const TOSF = () => {
             alignItems: "center",
           }}
         >
-          Edit Fund Number
+          Edit Account Type
           <IconButton onClick={closeAccountTypeEditDialog} sx={{ color: "white" }}>
             <CloseIcon />
           </IconButton>
@@ -2940,11 +3072,11 @@ const TOSF = () => {
         PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
         <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
-          Delete Fund Number
+          Delete Account Type
         </DialogTitle>
         <DialogContent sx={{ p: 3, mt: 2 }}>
           <Typography sx={{ mb: 2 }}>
-            Are you sure you want to delete <b>{selectedAccountType?.description || "this fund number"}</b>?
+            Are you sure you want to delete <b>{selectedAccountType?.description || "this account type"}</b>?
           </Typography>
           <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>This action cannot be undone.</Typography>
         </DialogContent>

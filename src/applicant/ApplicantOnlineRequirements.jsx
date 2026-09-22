@@ -103,6 +103,7 @@ const ApplicantOnlineRequirements = () => {
 
   const [openModal, setOpenModal] = useState(false);
   const [openConfirmModal, setOpenConfirmModal] = useState(false);
+  const [preview, setPreview] = useState({ open: false, url: "", type: "", name: "", loading: false });
 
 
   const [user, setUser] = useState("");
@@ -305,6 +306,40 @@ const ApplicantOnlineRequirements = () => {
     }
   };
 
+  const handlePreview = async (upload) => {
+    if (!upload?.upload_id) return;
+
+    // Release the previous blob URL before loading another document.
+    if (preview.url) URL.revokeObjectURL(preview.url);
+    setPreview({ open: true, url: "", type: "", name: upload.original_name || "Uploaded document", loading: true });
+
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/uploads/preview/${upload.upload_id}`,
+        {
+          responseType: "blob",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+        },
+      );
+      const url = URL.createObjectURL(response.data);
+      setPreview({
+        open: true,
+        url,
+        type: response.headers["content-type"] || upload.mime_type || "",
+        name: upload.original_name || "Uploaded document",
+        loading: false,
+      });
+    } catch {
+      setPreview({ open: false, url: "", type: "", name: "", loading: false });
+      setSnack({ open: true, severity: "error", message: "Unable to preview this document." });
+    }
+  };
+
+  const closePreview = () => {
+    if (preview.url) URL.revokeObjectURL(preview.url);
+    setPreview({ open: false, url: "", type: "", name: "", loading: false });
+  };
+
   const isFormValid = () => {
     const requiredMain = requirements.filter(
       (r) => r.category === "Main" && Number(r.is_required) === 1,
@@ -440,8 +475,7 @@ const ApplicantOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`}
-              target="_blank"
+              onClick={() => handlePreview(uploaded)}
               startIcon={<VisibilityIcon />}
               size="small"
               sx={{ fontWeight: "bold", textTransform: "none", flex: "1 1 auto", minWidth: "100px" }}
@@ -538,8 +572,7 @@ const ApplicantOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`}
-              target="_blank"
+              onClick={() => handlePreview(uploaded)}
               startIcon={<VisibilityIcon />}
               sx={{ color: "white", fontWeight: "bold", height: "40px", textTransform: "none", minWidth: { md: 120, lg: 140 }, fontSize: { md: 12.5, lg: 14 } }}
             >
@@ -578,6 +611,50 @@ const ApplicantOnlineRequirements = () => {
       <Snackbar open={snack.open} autoHideDuration={5000} onClose={handleClose} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert severity={snack.severity} onClose={handleClose} sx={{ width: "100%" }}>{snack.message}</Alert>
       </Snackbar>
+
+      {/* Protected document preview. The file is fetched with Axios, so the JWT is
+          never put in the URL or exposed in a new browser tab. */}
+      <Dialog
+        open={preview.open}
+        onClose={closePreview}
+        maxWidth="lg"
+        fullWidth
+        fullScreen={isMobile}
+        PaperProps={{ sx: { height: isMobile ? "100%" : "90vh", borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
+      >
+        <DialogTitle sx={{ bgcolor: headerColor || "#1976d2", color: "white", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, px: { xs: 2, sm: 3 }, py: 1.75 }}>
+          <Box display="flex" alignItems="center" gap={1.5} minWidth={0}>
+            <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <VisibilityIcon sx={{ color: "white" }} />
+            </Box>
+            <Box minWidth={0}>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>Document Preview</Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2} sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {preview.name || "Uploaded requirement"}
+              </Typography>
+            </Box>
+          </Box>
+          <Button onClick={closePreview} sx={{ minWidth: 40, width: 40, height: 40, borderRadius: "50%", color: "white", fontSize: 24, lineHeight: 1, p: 0, backgroundColor: "rgba(255,255,255,0.12)", "&:hover": { backgroundColor: "rgba(255,255,255,0.25)" } }}>
+            ×
+          </Button>
+        </DialogTitle>
+        <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 }, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f5" }}>
+          {preview.loading ? (
+            <Typography sx={{ color: subtitleColor, fontSize: 14 }}>Loading preview…</Typography>
+          ) : preview.type.startsWith("image/") ? (
+            <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", p: { xs: 1, sm: 2 }, borderRadius: "10px", backgroundColor: "white", border: "1px solid #e0e0e0" }}>
+              <Box component="img" src={preview.url} alt={preview.name} sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            </Box>
+          ) : preview.type === "application/pdf" || preview.name.toLowerCase().endsWith(".pdf") ? (
+            <Box component="iframe" src={preview.url} title={preview.name} sx={{ width: "100%", height: "100%", border: "1px solid #e0e0e0", borderRadius: "10px", backgroundColor: "white" }} />
+          ) : (
+            <Typography>This file type cannot be previewed in the browser.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, borderTop: "1px solid #e0e0e0", backgroundColor: "white" }}>
+          <Button onClick={closePreview} variant="contained" sx={{ minWidth: 110, backgroundColor: headerColor || "#1976d2", color: "white", fontWeight: "bold", textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: headerColor || "#1976d2", opacity: 0.9, boxShadow: "none" } }}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Success Dialog */}
       <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth fullScreen={isMobile}
@@ -801,7 +878,7 @@ const ApplicantOnlineRequirements = () => {
                     <Typography sx={{ fontSize: 11.5, color: uploaded ? "#2e7d32" : "#999", mt: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uploaded?.original_name || "No file uploaded"}</Typography>
                   </Box>
                   {uploaded ? (
-                    <Button variant="contained" color="primary" href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`} target="_blank" startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
+                    <Button variant="contained" color="primary" onClick={() => handlePreview(uploaded)} startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
                       {isMobile ? "View" : "Preview"}
                     </Button>
                   ) : (

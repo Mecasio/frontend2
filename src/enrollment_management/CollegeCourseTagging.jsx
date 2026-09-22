@@ -187,10 +187,14 @@ const formatStudentCurriculum = (yearDesc, courseCode, courseDescription) => {
   return [year, program].filter(Boolean).join(" - ");
 };
 
-const formatSection = (programCode, description) =>
-  [cleanDisplayValue(programCode), cleanDisplayValue(description)]
+const formatEnrolledSectionLabel = (section) =>
+  [
+    cleanDisplayValue(section?.program_code),
+    cleanDisplayValue(section?.year_level_id),
+    cleanDisplayValue(section?.section_description ?? section?.description),
+  ]
     .filter(Boolean)
-    .join("-");
+    .join(" - ");
 
 const formatDepartmentSectionLabel = (section, extraSuffix = "") => {
   if (!section) return "";
@@ -2430,17 +2434,7 @@ const CollegeCourseTagging = () => {
                     },
                   });
                 }}
-                getOptionLabel={(section) => {
-                  const isOtherDeptSection = otherDeptSectionIds.has(
-                    String(section.department_and_program_section_id),
-                  );
-                  return formatDepartmentSectionLabel(
-                    section,
-                    isOtherDeptSection
-                      ? `[${cleanDisplayValue(section.dprtmnt_code) || "Other Dept"}]`
-                      : "",
-                  );
-                }}
+                getOptionLabel={formatEnrolledSectionLabel}
                 isOptionEqualToValue={(option, value) =>
                   String(option.department_and_program_section_id) ===
                   String(value.department_and_program_section_id)
@@ -2460,7 +2454,7 @@ const CollegeCourseTagging = () => {
                           : {}),
                       }}
                     >
-                      <Typography component="span" sx={{ fontSize: "13px" }}>
+                      <Typography component="span" sx={{ fontSize: "11px" }}>
                         <strong>
                           {cleanDisplayValue(section.program_code)
                             ? `(${cleanDisplayValue(section.program_code)})`
@@ -2645,60 +2639,68 @@ const CollegeCourseTagging = () => {
                           minWidth: 160,
                         }}
                       >
-                        <TextField
-                          select
-                          size="small"
+                        <Autocomplete
                           fullWidth
+                          size="small"
+                          options={availableSections}
                           disabled={!canEdit || sectionUpdatingId === e.id}
                           value={
-                            e.department_section_id
-                              ? String(e.department_section_id)
-                              : ""
-                          }
-                          onChange={(ev) =>
-                            handleEnrolledSectionChange(e, ev.target.value)
-                          }
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              fontSize: "12px",
-                              backgroundColor: "#fff",
-                            },
-                          }}
-                        >
-                          {!e.department_section_id && (
-                            <MenuItem value="">
-                              <em>No section</em>
-                            </MenuItem>
-                          )}
-                          {e.department_section_id &&
-                            !availableSections.some(
-                              (s) =>
-                                String(s.department_and_program_section_id) ===
+                            availableSections.find(
+                              (section) =>
+                                String(section.department_and_program_section_id) ===
                                 String(e.department_section_id),
-                            ) && (
-                              <MenuItem value={String(e.department_section_id)}>
-                                {formatSection(e.program_code, e.description) ||
-                                  `Section ${e.department_section_id}`}
-                              </MenuItem>
-                            )}
-                          {availableSections.map((section) => (
-                            <MenuItem
+                            ) ||
+                            (e.department_section_id
+                              ? {
+                                  department_and_program_section_id:
+                                    e.department_section_id,
+                                  program_code: e.program_code,
+                                  year_level_id: e.year_level_id,
+                                  section_description: e.section_description,
+                                  description: e.description,
+                                }
+                              : null)
+                          }
+                          onChange={(event, selected) =>
+                            handleEnrolledSectionChange(
+                              e,
+                              selected
+                                ? String(selected.department_and_program_section_id)
+                                : "",
+                            )
+                          }
+                          getOptionLabel={(section) =>
+                            formatEnrolledSectionLabel(section) ||
+                            `Section ${section.department_and_program_section_id}`
+                          }
+                          isOptionEqualToValue={(option, value) =>
+                            String(option.department_and_program_section_id) ===
+                            String(value.department_and_program_section_id)
+                          }
+                          renderOption={(props, section) => (
+                            <li
+                              {...props}
                               key={section.department_and_program_section_id}
-                              value={String(
-                                section.department_and_program_section_id,
-                              )}
                             >
-                              {[
-                                section.program_code,
-                                section.description,
-                              ]
-                                .map((v) => cleanDisplayValue(v))
-                                .filter(Boolean)
-                                .join(" - ") ||
-                                `Section ${section.department_and_program_section_id}`}
-                            </MenuItem>
-                          ))}
-                        </TextField>
+                              <Typography sx={{ fontSize: "11px" }}>
+                                {formatEnrolledSectionLabel(section) ||
+                                  `Section ${section.department_and_program_section_id}`}
+                              </Typography>
+                            </li>
+                          )}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              placeholder="Search section..."
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  fontSize: "12px",
+                                  backgroundColor: "#fff",
+                                },
+                              }}
+                            />
+                          )}
+                        />
                       </StyledTd>
                       <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
                         {cleanDisplayValue(e.day_description, "—")}
@@ -2857,8 +2859,8 @@ const CollegeCourseTagging = () => {
             getOptionLabel={(section) =>
               [
                 section.program_code,
-                section.major,
-                section.description,
+                section.year_level_id,
+                section.section_description ?? section.description,
               ]
                 .map((v) => cleanDisplayValue(v))
                 .filter(Boolean)
@@ -2873,8 +2875,8 @@ const CollegeCourseTagging = () => {
               <li {...props} key={section.department_and_program_section_id}>
                 {[
                   section.program_code,
-                  section.major,
-                  section.description,
+                  section.year_level_id,
+                  section.section_description ?? section.description,
                 ]
                   .map((v) => cleanDisplayValue(v))
                   .filter(Boolean)

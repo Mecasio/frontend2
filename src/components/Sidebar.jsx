@@ -909,7 +909,7 @@ const SideBar = ({
         },
         {
           title: "Verify Document Room Assignment",
-          link: "/verify_document_room_assignment ",
+          link: "/verify_document_room_assignment",
           icon: AccessTimeIcon,
           page_id: 118,
         },
@@ -1813,56 +1813,48 @@ const SideBar = ({
       title: "Admission Management",
       path: "/admission_dashboard",
       icon: Business,
-      page_id: 92,
     },
     {
       key: "enrollment",
       title: "Enrollment Management",
       path: "/admission_dashboard",
       icon: Business,
-      page_id: 92,
     },
     {
       key: "medical",
       title: "Medical Management",
       path: "/admission_dashboard",
       icon: Business,
-      page_id: 92,
     },
     {
       key: "registrar",
       title: "Registrar Management",
       path: "/admission_dashboard",
       icon: Business,
-      page_id: 92,
     },
     {
       key: "course",
       title: "Course Management",
       path: "/course_management",
       icon: LibraryBooks,
-      page_id: 93,
     },
     {
       key: "department",
       title: "Department Management",
       path: "/department_dashboard",
       icon: Apartment,
-      page_id: 94,
     },
     {
       key: "system",
       title: "System Management",
       path: "/system_dashboard",
       icon: Settings,
-      page_id: 95,
     },
     {
       key: "account",
       title: "Account Management",
       path: "/account_dashboard",
       icon: People,
-      page_id: 96,
     },
   ];
 
@@ -1870,7 +1862,6 @@ const SideBar = ({
   const registrarDashboard = getRegistrarDashboard(accessSet);
 
   const renderSection = (item) => {
-    if (!userAccessList[item.page_id]) return null;
     const groups = sectionMenus[item.key];
     const hasVisible = groups
       ? groups.some((g) =>

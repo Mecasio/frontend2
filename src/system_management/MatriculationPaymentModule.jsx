@@ -464,7 +464,7 @@ const MatriculationPaymentModule = () => {
                 );
                 setCashierAccountTypeId(assignment?.account_type_id ?? null);
             } catch (error) {
-                console.error("Failed to load cashier fund number:", error);
+                console.error("Failed to load cashier account type:", error);
                 setCashierAccountTypeId(null);
             }
         };
@@ -1522,7 +1522,7 @@ const MatriculationPaymentModule = () => {
                                             <TableRow>
                                                 <TableCell>Priority</TableCell>
                                                 <TableCell>Fee</TableCell>
-                                                <TableCell>Fund Number</TableCell>
+                                                <TableCell>Account Type</TableCell>
                                                 <TableCell align="right">Fee Amount</TableCell>
                                             </TableRow>
                                         </TableHead>

@@ -36,6 +36,7 @@ import {
   computeTuitionAmount,
   fetchResolvedFees,
   filterAssessedFeeLines,
+  formatAmount,
   toNumber as toFeeNumber,
 } from "../utils/corDynamicFees";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
@@ -757,9 +758,7 @@ const CertificateOfRegistration = forwardRef(
     const savedNetAssessment = savedUnifast
       ? 0
       : Number(selectedPaymentData?.total_tosf || 0);
-    const displayTotalAssessment = selectedPaymentData
-      ? savedNetAssessment
-      : baseTotalAssessment;
+    const displayTotalAssessment = baseTotalAssessment;
     const displayFinancialAidAmount = selectedPaymentData
       ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
       : "";
@@ -2685,7 +2684,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayTuitionAmount}
+                              value={formatAmount(displayTuitionAmount)}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2742,7 +2741,7 @@ const CertificateOfRegistration = forwardRef(
                             >
                               <input
                                 type="text"
-                                value={toFeeNumber(fee.amount)}
+                                value={formatAmount(fee.amount)}
                                 readOnly
                                 style={{
                                   textAlign: "center",
@@ -2865,7 +2864,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayTotalAssessment}
+                              value={formatAmount(displayTotalAssessment)}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2923,7 +2922,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayFinancialAidAmount}
+                              value={
+                                displayFinancialAidAmount === ""
+                                  ? ""
+                                  : formatAmount(displayFinancialAidAmount)
+                              }
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2981,7 +2984,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayNetAssessment}
+                              value={
+                                displayNetAssessment === ""
+                                  ? ""
+                                  : formatAmount(displayNetAssessment)
+                              }
                               readOnly
                               style={{
                                 textAlign: "center",

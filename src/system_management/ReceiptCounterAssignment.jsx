@@ -444,7 +444,7 @@ const ReceiptCounterAssignment = () => {
     ) {
       setSnackbar({
         open: true,
-        message: "Please complete all required fields including fund number.",
+        message: "Please complete all required fields including account type.",
         severity: "error",
       });
       return;
@@ -978,7 +978,7 @@ const ReceiptCounterAssignment = () => {
                   backgroundColor: "#f5f5f5",
                 }}
               >
-                <strong>Fund Number</strong>
+                <strong>Account Type</strong>
               </TableCell>
               <TableCell
                 sx={{
@@ -1189,11 +1189,11 @@ const ReceiptCounterAssignment = () => {
             </FormControl>
             <FormControl fullWidth required>
               <InputLabel id="account-type-select-label">
-                Fund Number
+                Account Type
               </InputLabel>
               <Select
                 labelId="account-type-select-label"
-                label="Fund Number"
+                label="Account Type"
                 value={assignForm.account_type_id}
                 onChange={(e) =>
                   setAssignForm((prev) => ({

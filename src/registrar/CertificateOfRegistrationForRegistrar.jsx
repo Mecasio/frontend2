@@ -39,6 +39,7 @@ import {
   computeTuitionAmount,
   fetchResolvedFees,
   filterAssessedFeeLines,
+  formatAmount,
   toNumber as toFeeNumber,
 } from "../utils/corDynamicFees";
 
@@ -987,9 +988,7 @@ const CertificateOfRegistration = forwardRef(
     const savedNetAssessment = savedUnifast
       ? 0
       : toFeeNumber(selectedPaymentData?.total_tosf);
-    const displayTotalAssessment = hasSavedAssessment
-      ? savedNetAssessment
-      : baseTotalAssessment;
+    const displayTotalAssessment = baseTotalAssessment;
     const displayFinancialAidAmount = hasSavedAssessment
       ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
       : "";
@@ -2502,10 +2501,16 @@ const CertificateOfRegistration = forwardRef(
                             const program = String(item.program_code || "")
                               .trim()
                               .replace(/^TBA$/i, "");
-                            const section = String(
-                              item.section || item.description || "",
-                            )
-                              .trim()
+                            const section = [
+                              item.program_code,
+                              item.year_level_id,
+                              item.section_description ??
+                                item.section ??
+                                item.description,
+                            ]
+                              .map((value) => String(value ?? "").trim())
+                              .filter(Boolean)
+                              .join(" - ")
                               .replace(/^TBA$/i, "");
                             const sectionOnly =
                               program &&
@@ -2863,7 +2868,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayTuitionAmount}
+                              value={formatAmount(displayTuitionAmount)}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2920,7 +2925,7 @@ const CertificateOfRegistration = forwardRef(
                             >
                               <input
                                 type="text"
-                                value={toFeeNumber(fee.amount)}
+                                value={formatAmount(fee.amount)}
                                 readOnly
                                 style={{
                                   textAlign: "center",
@@ -3045,7 +3050,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayTotalAssessment}
+                              value={formatAmount(displayTotalAssessment)}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3103,7 +3108,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayFinancialAidAmount}
+                              value={
+                                displayFinancialAidAmount === ""
+                                  ? ""
+                                  : formatAmount(displayFinancialAidAmount)
+                              }
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3161,7 +3170,11 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={displayNetAssessment}
+                              value={
+                                displayNetAssessment === ""
+                                  ? ""
+                                  : formatAmount(displayNetAssessment)
+                              }
                               readOnly
                               style={{
                                 textAlign: "center",

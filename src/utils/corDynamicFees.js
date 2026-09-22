@@ -16,6 +16,8 @@ export const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+export const formatAmount = (value) => toNumber(value).toFixed(2);
+
 export const toDecimalPercent = (value) => {
   const numeric = toNumber(value);
   if (numeric <= 0) return 0;
