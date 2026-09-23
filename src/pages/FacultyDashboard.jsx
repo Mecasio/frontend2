@@ -904,7 +904,7 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
             <Box sx={{ px: 2, py: 1, borderTop: `2px solid ${borderColor}`, textAlign: "right" }}>
               <Button
                 size="small"
-                onClick={() => navigate("/faculty_masterlist")}
+                onClick={() => navigate("/faculty_classlist")}
                 sx={{ textTransform: "none", fontSize: 12, color: headerColor }}
               >
                 View All Classes →
@@ -1079,8 +1079,8 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
             </Typography>
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
               <QuickAction icon={WorkIcon} label="View Workload" color="#E65100" onClick={() => navigate("/faculty_workload")} />
-              <QuickAction icon={ListAltIcon} label="View Class List" color="#1565C0" onClick={() => navigate("/faculty_masterlist")} />
-              <QuickAction icon={GradingIcon} label="Encode Grades" color="#43A047" onClick={() => navigate("/grading_sheet")} />
+              <QuickAction icon={ListAltIcon} label="View Class List" color="#1565C0" onClick={() => navigate("/faculty_classlist")} />
+              <QuickAction icon={GradingIcon} label="Encode Grades" color="#43A047" onClick={() => navigate("/faculty_grading_sheet")} />
               <QuickAction icon={SchoolIcon} label="My Evaluation" color="#6A1B9A" onClick={() => navigate("/faculty_evaluation")} />
             </Box>
           </Box>

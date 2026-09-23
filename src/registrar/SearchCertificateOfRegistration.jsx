@@ -171,13 +171,9 @@ const SearchCertificateOfRegistration = () => {
   const location = useLocation();
   const REGISTRAR_COR_SEARCH_KEY = "registrar_cor_search_student_number";
 
-  const [studentNumber, setStudentNumber] = useState(() => {
-    return (
-      sessionStorage.getItem(REGISTRAR_COR_SEARCH_KEY) ||
-      localStorage.getItem("studentNumberForCOR") ||
-      ""
-    );
-  });
+  // Do not restore a previous student's COR automatically on page load.
+  // The current student is supplied through the URL or entered by the user.
+  const [studentNumber, setStudentNumber] = useState("");
   const [debouncedStudentNumber, setDebouncedStudentNumber] = useState("");
   const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -187,6 +183,7 @@ const SearchCertificateOfRegistration = () => {
   const [studentDetails, setStudentDetails] = useState([]);
   const [corPreload, setCorPreload] = useState(null);
   const [corPreloadLoading, setCorPreloadLoading] = useState(false);
+  const corSearchRequestRef = useRef(0);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [schoolYears, setSchoolYears] = useState([]);
   const [schoolSemesters, setSchoolSemesters] = useState([]);
@@ -273,6 +270,12 @@ const SearchCertificateOfRegistration = () => {
     const personIdFromUrl = params.get("person_id")?.trim();
 
     if (studentNumberFromUrl) {
+      corSearchRequestRef.current += 1;
+      setSelectedStudent(null);
+      setStudentData([]);
+      setStudentDetails([]);
+      setCorPreload(null);
+      setQrCodeUrl("");
       setStudentNumber(studentNumberFromUrl);
       sessionStorage.setItem(REGISTRAR_COR_SEARCH_KEY, studentNumberFromUrl);
       sessionStorage.setItem("edit_student_number", studentNumberFromUrl);
@@ -281,12 +284,14 @@ const SearchCertificateOfRegistration = () => {
 
     if (!personIdFromUrl) return;
 
+    corSearchRequestRef.current += 1;
     setStudentNumber("");
     setDebouncedStudentNumber("");
     setSelectedStudent(null);
     setStudentData([]);
     setStudentDetails([]);
     setCorPreload(null);
+    setQrCodeUrl("");
 
     axios
       .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
@@ -317,22 +322,35 @@ const SearchCertificateOfRegistration = () => {
   }, [location.search]);
 
   useEffect(() => {
+    const requestId = ++corSearchRequestRef.current;
+    const isCurrentRequest = () =>
+      corSearchRequestRef.current === requestId;
+
     if (!debouncedStudentNumber || debouncedStudentNumber.length < 5) {
       setSelectedStudent(null);
       setStudentData([]);
+      setStudentDetails([]);
       setCorPreload(null);
       setCorPreloadLoading(false);
+      setQrCodeUrl("");
       return;
     }
 
     if (!selectedActiveSchoolYear) {
+      setSelectedStudent(null);
+      setStudentData([]);
+      setStudentDetails([]);
       setCorPreload(null);
+      setQrCodeUrl("");
       return;
     }
 
     const fetchStudent = async () => {
       try {
         setCorPreload(null);
+        setSelectedStudent(null);
+        setStudentData([]);
+        setStudentDetails([]);
         setCorPreloadLoading(true);
         setQrCodeUrl("");
 
@@ -350,6 +368,7 @@ const SearchCertificateOfRegistration = () => {
               { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
             )
             .catch((err) => {
+              if (!isCurrentRequest()) return null;
               console.error("COR preload failed:", err);
               showSnackbar(
                 err.response?.data?.message ||
@@ -360,12 +379,15 @@ const SearchCertificateOfRegistration = () => {
             }),
         ]);
 
+        if (!isCurrentRequest()) return;
         setCorPreload(preloadRes?.data || null);
 
         if (preloadRes?.data) {
           try {
             setQrCodeUrl(await ensureStudentQr(debouncedStudentNumber));
+            if (!isCurrentRequest()) return;
           } catch (qrError) {
+            if (!isCurrentRequest()) return;
             console.error("Student QR generation failed:", qrError);
             showSnackbar("Student found, but the QR code could not be prepared.", "warning");
           }
@@ -373,6 +395,7 @@ const SearchCertificateOfRegistration = () => {
 
         // Match the first function's response handling
         if (!res.ok) {
+          if (!isCurrentRequest()) return;
           const errorBody = await res.json().catch(() => null);
 
           setSelectedStudent(null);
@@ -389,13 +412,17 @@ const SearchCertificateOfRegistration = () => {
 
         const data = await res.json();
 
+        if (!isCurrentRequest()) return;
+
         console.log("Fetched student data:", data);
 
         if (data) {
           if (!preloadRes?.data) {
             try {
               setQrCodeUrl(await ensureStudentQr(data.student_number || debouncedStudentNumber));
+              if (!isCurrentRequest()) return;
             } catch (qrError) {
+              if (!isCurrentRequest()) return;
               console.error("Student QR generation failed:", qrError);
               showSnackbar("Student found, but the QR code could not be prepared.", "warning");
             }
@@ -412,6 +439,8 @@ const SearchCertificateOfRegistration = () => {
             `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
           );
           const detailsData = await detailsRes.json();
+
+          if (!isCurrentRequest()) return;
 
           if (Array.isArray(detailsData) && detailsData.length > 0) {
             setStudentDetails(detailsData);
@@ -431,12 +460,13 @@ const SearchCertificateOfRegistration = () => {
           showSnackbar("No student data found.", "info");
         }
       } catch (err) {
+        if (!isCurrentRequest()) return;
         console.error("Error fetching student", err);
         setCorPreload(null);
 
         showSnackbar("Server error. Please try again.", "error");
       } finally {
-        setCorPreloadLoading(false);
+        if (isCurrentRequest()) setCorPreloadLoading(false);
       }
     };
 

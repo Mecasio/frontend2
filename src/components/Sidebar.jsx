@@ -72,6 +72,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import API_BASE_URL from "../apiConfig";
 import { syncRegistrarScopeFromEmployeeResponse } from "../utils/registrarCurriculumRestriction";
+import { logout as logoutUser } from "../utils/authSession";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import {
   AccountTree,
@@ -496,6 +497,7 @@ const SideBar = ({
   onCollapseChange,
   mobileOpen,
   onMobileClose,
+  onLogout,
 }) => {
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
@@ -749,13 +751,8 @@ const SideBar = ({
   };
 
   const Logout = () => {
-    ["token", "email", "role", "person_id", "prof_id", "employee_id"].forEach(
-      (k) => localStorage.removeItem(k),
-    );
-    // Also clear the force flag on logout so it doesn't bleed into the next session
-    localStorage.removeItem("force_password_change");
+    (onLogout || logoutUser)();
     setIsAuthenticated(false);
-    navigate("/");
     onMobileClose?.();
   };
 
@@ -2298,18 +2295,18 @@ const SideBar = ({
                     onNavClick={handleNavClick}
                   />
                   <NavItem
-                    to="/faculty_masterlist"
+                    to="/faculty_classlist"
                     icon={ListAltIcon}
                     label="Class List"
-                    active={isActive("/faculty_masterlist")}
+                    active={isActive("/faculty_classlist")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
                   <NavItem
-                    to="/grading_sheet"
+                    to="/faculty_grading_sheet"
                     icon={AssignmentTurnedInIcon}
                     label="Grading Management"
-                    active={isActive("/grading_sheet")}
+                    active={isActive("/faculty_grading_sheet")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />

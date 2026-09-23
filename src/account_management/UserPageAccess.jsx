@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -16,7 +16,6 @@ import {
   TableCell,
   TextField,
   MenuItem,
-  InputLabel,
   Checkbox,
   Stack,
   TableBody,
@@ -328,6 +327,7 @@ const UserPageAccess = () => {
   const [openModal, setOpenModal] = useState(false);
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [accessDescription, setAccessDescription] = useState("");
+  const createDescriptionInputRef = useRef(null);
   const [createPageAccess, setCreatePageAccess] = useState({});
   const [createPages, setCreatePages] = useState([]);
   const [accessLevels, setAccessLevels] = useState([]);
@@ -368,6 +368,9 @@ const UserPageAccess = () => {
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "administrator",
     });
+
+  const getCreateAccessDescription = () =>
+    createDescriptionInputRef.current?.value ?? accessDescription;
 
   const handleCloseSnack = (event, reason) => {
     if (reason === "clickaway") return;
@@ -573,6 +576,7 @@ const UserPageAccess = () => {
     onToggle,
     disabled = false,
     requireManagePermission = true,
+    toggleWidth = 42,
   }) => (
     <Stack spacing={1.75} sx={{ width: "100%" }}>
       {Object.entries(permissionLabels).map(([permissionKey, label]) => {
@@ -621,7 +625,17 @@ const UserPageAccess = () => {
                 disabled={toggleDisabled}
                 disableRipple
                 onChange={(e) => onToggle(permissionKey, e.target.checked)}
-                sx={bulkPermissionToggleSx}
+                sx={{
+                  ...bulkPermissionToggleSx,
+                  width: toggleWidth,
+                  "& .MuiSwitch-switchBase": {
+                    ...bulkPermissionToggleSx["& .MuiSwitch-switchBase"],
+                    "&.Mui-checked": {
+                      ...bulkPermissionToggleSx["& .MuiSwitch-switchBase"]["&.Mui-checked"],
+                      transform: `translateX(${toggleWidth - 22}px)`,
+                    },
+                  },
+                }}
               />
               <Typography
                 sx={{
@@ -803,15 +817,6 @@ const UserPageAccess = () => {
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const filteredCreatePages = filterPagesForAccessModal(
-    createPages,
-    createAccessSearch,
-  );
-  const filteredEditPages = filterPagesForAccessModal(
-    editPages,
-    editAccessSearch,
-  );
-
   // Split the selected user's pages into "has access" / "no access" buckets
   const pagesWithAccess = pages.filter((p) => pageAccess[p.id]?.access);
   const pagesWithoutAccess = pages.filter((p) => !pageAccess[p.id]?.access);
@@ -829,6 +834,41 @@ const UserPageAccess = () => {
   const filteredPagesWithoutAccess = pagesWithoutAccess.filter(matchesGroupFilter);
   const bulkActionPages =
     accessTab === 0 ? filteredPagesWithAccess : filteredPagesWithoutAccess;
+
+  const createPagesWithAccess = createPages.filter((p) => createPageAccess[p.id]?.access);
+  const createPagesWithoutAccess = createPages.filter((p) => !createPageAccess[p.id]?.access);
+  const availableCreatePageGroups = ACCESS_GROUP_ORDER.filter((label) =>
+    createPages.some((p) => (PAGE_ID_TO_GROUP[p.id] || p.page_group) === label),
+  );
+  const matchesCreateGroupFilter = (p) =>
+    !pageGroupFilter || (PAGE_ID_TO_GROUP[p.id] || p.page_group) === pageGroupFilter;
+  const filteredCreatePagesWithAccess = filterPagesForAccessModal(
+    createPagesWithAccess.filter(matchesCreateGroupFilter),
+    createAccessSearch,
+  );
+  const filteredCreatePagesWithoutAccess = filterPagesForAccessModal(
+    createPagesWithoutAccess.filter(matchesCreateGroupFilter),
+    createAccessSearch,
+  );
+  const createBulkActionPages =
+    accessTab === 0 ? filteredCreatePagesWithAccess : filteredCreatePagesWithoutAccess;
+  const editPagesWithAccess = editPages.filter((p) => editPageAccess[p.id]?.access);
+  const editPagesWithoutAccess = editPages.filter((p) => !editPageAccess[p.id]?.access);
+  const availableEditPageGroups = ACCESS_GROUP_ORDER.filter((label) =>
+    editPages.some((p) => (PAGE_ID_TO_GROUP[p.id] || p.page_group) === label),
+  );
+  const matchesEditGroupFilter = (p) =>
+    !pageGroupFilter || (PAGE_ID_TO_GROUP[p.id] || p.page_group) === pageGroupFilter;
+  const filteredEditPagesWithAccess = filterPagesForAccessModal(
+    editPagesWithAccess.filter(matchesEditGroupFilter),
+    editAccessSearch,
+  );
+  const filteredEditPagesWithoutAccess = filterPagesForAccessModal(
+    editPagesWithoutAccess.filter(matchesEditGroupFilter),
+    editAccessSearch,
+  );
+  const editBulkActionPages =
+    accessTab === 0 ? filteredEditPagesWithAccess : filteredEditPagesWithoutAccess;
   const bulkActionScopeLabel = pageGroupFilter
     ? ` in ${pageGroupFilter}`
     : "";
@@ -1085,16 +1125,25 @@ const UserPageAccess = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+      const [pagesRes, accessRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+        axios.get(`${API_BASE_URL}/api/access_table`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      ]);
 
-      const pagesData = (res.data || []).sort((a, b) => a.id - b.id);
+      const pagesData = (pagesRes.data || []).sort((a, b) => a.id - b.id);
+      setAccessLevels(accessRes.data || []);
 
       const defaultAccess = buildAccessLevelPermissionState(pagesData);
 
       setCreatePages(pagesData);
       setCreatePageAccess(defaultAccess);
       setAccessDescription("");
+      if (createDescriptionInputRef.current) {
+        createDescriptionInputRef.current.value = "";
+      }
       setCreateAccessSearch("");
+      setAccessTab(1);
+      setPageGroupFilter("");
       setOpenCreateModal(true);
     } catch (err) {
       console.error(err);
@@ -1128,6 +1177,8 @@ const UserPageAccess = () => {
       setEditAccessId("");
       setEditAccessDescription("");
       setEditAccessSearch("");
+      setAccessTab(1);
+      setPageGroupFilter("");
       setOpenEditAccessModal(true);
     } catch (err) {
       console.error(err);
@@ -1175,12 +1226,13 @@ const UserPageAccess = () => {
   };
 
   const handleCreateBulkPermission = async (permissionKey, enabled) => {
-    const affectedCount = createPages.filter(
-      (p) => createPageAccess[p.id]?.access,
-    ).length;
+    const targetPages = pageGroupFilter
+      ? createBulkActionPages
+      : createPages.filter((p) => createPageAccess[p.id]?.access);
+    const affectedCount = targetPages.length;
 
     setCreatePageAccess((prev) =>
-      setBulkPermissionState(createPages, prev, permissionKey, enabled),
+      setBulkPermissionState(targetPages, prev, permissionKey, enabled),
     );
 
     try {
@@ -1190,7 +1242,7 @@ const UserPageAccess = () => {
           modal_context: "create_access",
           permission: permissionKey,
           enabled: enabled ? 1 : 0,
-          access_description: accessDescription,
+          access_description: getCreateAccessDescription(),
           affected_count: affectedCount,
         },
         getAuditConfigForPage(),
@@ -1272,12 +1324,13 @@ const UserPageAccess = () => {
   };
 
   const handleEditBulkPermission = async (permissionKey, enabled) => {
-    const affectedCount = editPages.filter(
-      (p) => editPageAccess[p.id]?.access,
-    ).length;
+    const targetPages = pageGroupFilter
+      ? editBulkActionPages
+      : editPages.filter((p) => editPageAccess[p.id]?.access);
+    const affectedCount = targetPages.length;
 
     setEditPageAccess((prev) =>
-      setBulkPermissionState(editPages, prev, permissionKey, enabled),
+      setBulkPermissionState(targetPages, prev, permissionKey, enabled),
     );
 
     try {
@@ -1376,7 +1429,8 @@ const UserPageAccess = () => {
     try {
       const selectedPages = buildAccessLevelPayload(createPageAccess);
 
-      if (!accessDescription.trim()) {
+      const description = getCreateAccessDescription();
+      if (!description.trim()) {
         setSnack({
           open: true,
           severity: "warning",
@@ -1386,7 +1440,7 @@ const UserPageAccess = () => {
       }
 
       await axios.post(`${API_BASE_URL}/api/access`, {
-        access_description: accessDescription,
+        access_description: description,
         access_page: selectedPages,
       }, getAuditConfigForPage());
 
@@ -2745,8 +2799,16 @@ const UserPageAccess = () => {
       <Dialog
         open={openCreateModal}
         onClose={() => { setOpenCreateModal(false); setCreateAccessSearch(""); }}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
+        PaperProps={{
+          sx: {
+            height: "80vh",
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
       >
         <DialogTitle
           sx={{
@@ -2756,6 +2818,7 @@ const UserPageAccess = () => {
             justifyContent: "space-between",
             alignItems: "center",
             fontWeight: "bold",
+            flexShrink: 0,
           }}
         >
           <Box display="flex" alignItems="center" gap={1}>
@@ -2780,102 +2843,237 @@ const UserPageAccess = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers>
-          <Box display="flex" gap={2} mb={2}>
-            <TextField
-              label="Description"
-              fullWidth
-              value={accessDescription}
-              onChange={(e) => setAccessDescription(e.target.value)}
-            />
-            <Button
-              variant="contained"
-              startIcon={<CheckCircleIcon />}
-              sx={{ px: 3, fontWeight: 600, textTransform: "none", borderRadius: 2, whiteSpace: "nowrap" }}
-              onClick={handleCreateAssignAll}
+        <DialogContent
+          dividers
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "250px minmax(0, 1fr) 230px" },
+              gap: 2,
+              alignItems: "stretch",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            {/* LEFT: group filter */}
+            <Paper variant="outlined" sx={{ p: 1, height: "100%", minHeight: 0, overflowY: "auto" }}>
+              <Typography fontWeight={700} sx={{ px: 1, py: 1 }}>Filter by Group</Typography>
+              <Button
+                fullWidth
+                size="small"
+                onClick={() => setPageGroupFilter("")}
+                variant={!pageGroupFilter ? "contained" : "text"}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  mb: 0.5,
+                  ...(!pageGroupFilter
+                    ? { backgroundColor: mainButtonColor, color: "#fff", "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 } }
+                    : { color: mainButtonColor, "&:hover": { backgroundColor: `${mainButtonColor}14` } }),
+                }}
+              >
+                All Groups
+              </Button>
+              {availableCreatePageGroups.map((group) => (
+                <Button
+                  key={group}
+                  fullWidth
+                  size="small"
+                  onClick={() => setPageGroupFilter(group)}
+                  variant={pageGroupFilter === group ? "contained" : "text"}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    textTransform: "none",
+                    mb: 0.5,
+                    ...(pageGroupFilter === group
+                      ? { backgroundColor: mainButtonColor, color: "#fff", "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 } }
+                      : { color: mainButtonColor, "&:hover": { backgroundColor: `${mainButtonColor}14` } }),
+                  }}
+                >
+                  {group}
+                </Button>
+              ))}
+            </Paper>
+
+            {/* CENTER: description, search, tabs, and page table */}
+            <Box sx={{ minWidth: 0, minHeight: 0, height: "100%", boxSizing: "border-box", pt: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <TextField
+                label="Description"
+                fullWidth
+                defaultValue={accessDescription}
+                inputRef={createDescriptionInputRef}
+                sx={{ mb: 1.5, flexShrink: 0 }}
+              />
+
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search Page Description / Group / ID"
+                value={createAccessSearch}
+                onChange={(e) => setCreateAccessSearch(e.target.value)}
+                sx={{ mb: 1.5, flexShrink: 0 }}
+                InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
+              />
+
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  mb: 1.5,
+                  flexShrink: 0,
+                  backgroundColor: "background.paper",
+                }}
+              >
+                <Tabs
+                  value={accessTab}
+                  onChange={(e, newValue) => setAccessTab(newValue)}
+                  sx={{
+                    minHeight: 40,
+                    "& .MuiTab-root": { minHeight: 40, fontWeight: 600, textTransform: "none" },
+                    "& .Mui-selected": { color: `${mainButtonColor} !important` },
+                    "& .MuiTabs-indicator": { backgroundColor: mainButtonColor },
+                  }}
+                >
+                  <Tab icon={<LockOpenIcon fontSize="small" />} iconPosition="start" label={`Pages With Access (${createPagesWithAccess.length})`} />
+                  <Tab icon={<LockIcon fontSize="small" />} iconPosition="start" label={`Pages Without Access (${createPagesWithoutAccess.length})`} />
+                </Tabs>
+              </Box>
+
+              <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <Paper sx={{ border: `1px solid ${borderColor}`, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <TableContainer sx={{ flex: 1, overflow: "auto" }}>
+                    <Table size="small" stickyHeader sx={{ "& .MuiTableCell-root": { py: "7px", px: 1, lineHeight: 1.2 }, "& .MuiTableCell-head": { py: 0.75 }, "& .MuiSwitch-root": { my: -0.75 } }}>
+                      <TableHead>
+                        <TableRow>
+                          {(accessTab === 0
+                            ? ["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"]
+                            : ["#", "Page Description", "Page Group", "Access"]
+                          ).map((header) => (
+                            <TableCell
+                              key={header}
+                              sx={{ color: "white", textAlign: "center", fontWeight: "bold", border: `1px solid ${borderColor}`, backgroundColor: accessTab === 0 ? headerColor || "#1976d2" : "#9e9e9e" }}
+                            >
+                              {header}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(accessTab === 0 ? filteredCreatePagesWithAccess : filteredCreatePagesWithoutAccess).map((p) => (
+                          <TableRow key={p.id} sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                              <Switch checked={createPageAccess[p.id]?.access || false} onChange={() => handleCreateToggle(p.id)} />
+                            </TableCell>
+                            {accessTab === 0 && ["can_create", "can_edit", "can_delete"].map((permissionKey) => (
+                              <TableCell key={permissionKey} sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                                <Switch checked={createPageAccess[p.id]?.[permissionKey] || false} onChange={() => handleCreatePermissionToggle(p.id, permissionKey)} />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                        {createBulkActionPages.length === 0 && (
+                          <TableRow>
+                            <TableCell align="center" colSpan={accessTab === 0 ? 7 : 4}>No pages found.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Box>
+            </Box>
+
+            {/* RIGHT: bulk access actions */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%", minHeight: 0 }}>
+            <Paper variant="outlined" sx={{ p: 2, flexShrink: 0 }}>
+              <Typography fontWeight={700} sx={{ mb: pageGroupFilter ? 0.25 : 1.5, fontSize: 15 }}>Access Actions</Typography>
+              {pageGroupFilter && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                  Applies to {pageGroupFilter} only
+                </Typography>
+              )}
+              <Stack spacing={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="small"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={handleCreateAssignAll}
+                  disabled={createPages.length === 0}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    width: "200px",
+                    backgroundColor: mainButtonColor,
+                    "&:hover": {
+                      backgroundColor: mainButtonColor,
+                      opacity: 0.92,
+                    },
+                  }}
+                >
+                  Assign All Access
+                </Button>
+                {accessTab === 0 && renderBulkPermissionToggles({
+                  pagesList: createBulkActionPages,
+                  accessMap: createPageAccess,
+                  onToggle: handleCreateBulkPermission,
+                  requireManagePermission: false,
+                  toggleWidth: 102,
+                })}
+              </Stack>
+            </Paper>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+              }}
             >
-              Assign All
-            </Button>
-          </Box>
-
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search Page Description / Group / ID"
-            value={createAccessSearch}
-            onChange={(e) => setCreateAccessSearch(e.target.value)}
-            sx={{ mb: 2 }}
-            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
-          />
-
-          <Box mb={2}>
-            {renderBulkPermissionToggles({
-              pagesList: createPages.filter((p) => createPageAccess[p.id]?.access),
-              accessMap: createPageAccess,
-              onToggle: handleCreateBulkPermission,
-              requireManagePermission: false,
-            })}
-          </Box>
-
-          <Paper sx={{ border: `1px solid ${borderColor}` }}>
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
-                  <TableRow>
-                    {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
-                      <TableCell
-                        key={header}
-                        sx={{ color: "white", textAlign: "center", fontWeight: "bold", border: `1px solid ${borderColor}` }}
-                      >
-                        {header}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredCreatePages.map((p) => (
-                    <TableRow
-                      key={p.id}
-                      sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}
+              <Typography fontWeight={700} sx={{ mb: 1.25, fontSize: 15 }}>
+                Existing Access Levels ({accessLevels.length})
+              </Typography>
+              <Stack spacing={0.75}>
+                {accessLevels.length > 0 ? (
+                  accessLevels.map((access) => (
+                    <Box
+                      key={access.access_id}
+                      sx={{
+                        px: 1,
+                        py: 0.9,
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: 1,
+                        backgroundColor: "background.paper",
+                      }}
                     >
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch checked={createPageAccess[p.id]?.access || false} onChange={() => handleCreateToggle(p.id)} />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={createPageAccess[p.id]?.can_create || false}
-                          onChange={() => handleCreatePermissionToggle(p.id, "can_create")}
-                          disabled={!createPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={createPageAccess[p.id]?.can_edit || false}
-                          onChange={() => handleCreatePermissionToggle(p.id, "can_edit")}
-                          disabled={!createPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={createPageAccess[p.id]?.can_delete || false}
-                          onChange={() => handleCreatePermissionToggle(p.id, "can_delete")}
-                          disabled={!createPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredCreatePages.length === 0 && (
-                    <TableRow>
-                      <TableCell align="center" colSpan={7}>No pages found.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                      <Typography variant="body2" sx={{ lineHeight: 1.35 }}>
+                        {access.access_description || `Access Level ${access.access_id}`}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No existing access levels found.
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+            </Box>
+          </Box>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2 }}>
@@ -2904,8 +3102,16 @@ const UserPageAccess = () => {
       <Dialog
         open={openEditAccessModal}
         onClose={() => { setOpenEditAccessModal(false); setEditAccessSearch(""); }}
-        maxWidth="lg"
+        maxWidth="xl"
         fullWidth
+        PaperProps={{
+          sx: {
+            height: "80vh",
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
       >
         <DialogTitle
           sx={{
@@ -2915,6 +3121,7 @@ const UserPageAccess = () => {
             justifyContent: "space-between",
             alignItems: "center",
             fontWeight: "bold",
+            flexShrink: 0,
           }}
         >
           <Box display="flex" alignItems="center" gap={1}>
@@ -2939,144 +3146,79 @@ const UserPageAccess = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel id="edit-access-level-select-label">Access Level</InputLabel>
-            <Select
-              labelId="edit-access-level-select-label"
-              value={editAccessId}
-              label="Access Level"
-              onChange={(e) => handleSelectAccessLevel(e.target.value)}
-            >
-              <MenuItem value="">Select Access Level</MenuItem>
-              {accessLevels.map((access) => (
-                <MenuItem key={access.access_id} value={access.access_id}>
-                  {access.access_description}
-                </MenuItem>
+        <DialogContent dividers sx={{ flex: 1, minHeight: 0, p: 2, display: "flex", overflow: "hidden" }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "250px minmax(0, 1fr) 230px" }, gap: 2, width: "100%", minHeight: 0 }}>
+            <Paper variant="outlined" sx={{ p: 1, height: "100%", minHeight: 0, overflowY: "auto" }}>
+              <Typography fontWeight={700} sx={{ px: 1, py: 1 }}>Filter by Group</Typography>
+              <Button fullWidth size="small" onClick={() => setPageGroupFilter("")} variant={!pageGroupFilter ? "contained" : "text"} sx={{ justifyContent: "flex-start", textTransform: "none", mb: 0.5, ...(!pageGroupFilter ? { backgroundColor: mainButtonColor, color: "#fff" } : { color: mainButtonColor }) }}>
+                All Groups
+              </Button>
+              {availableEditPageGroups.map((group) => (
+                <Button key={group} fullWidth size="small" onClick={() => setPageGroupFilter(group)} variant={pageGroupFilter === group ? "contained" : "text"} sx={{ justifyContent: "flex-start", textAlign: "left", textTransform: "none", mb: 0.5, ...(pageGroupFilter === group ? { backgroundColor: mainButtonColor, color: "#fff" } : { color: mainButtonColor }) }}>
+                  {group}
+                </Button>
               ))}
-            </Select>
-          </FormControl>
+            </Paper>
 
-          <TextField
-            label="Description"
-            fullWidth
-            value={editAccessDescription}
-            onChange={(e) => setEditAccessDescription(e.target.value)}
-            sx={{ mb: 2 }}
-            disabled={!editAccessId}
-          />
-
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search Page Description / Group / ID"
-            value={editAccessSearch}
-            onChange={(e) => setEditAccessSearch(e.target.value)}
-            disabled={!editAccessId}
-            sx={{ mb: 2 }}
-            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
-          />
-
-          <Box display="flex" justifyContent="space-between" alignItems="center" gap={2} mb={2}>
-            {/* Left: Select All / Clear All */}
-            <Box display="flex" gap={1.5}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<LockOpenIcon />}
-                onClick={handleEditSelectAll}
-                disabled={!editAccessId}
-                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-              >
-                Select All
-              </Button>
-              <Button
-                variant="contained"
-                color="warning"
-                startIcon={<LockIcon />}
-                onClick={handleEditClearAll}
-                disabled={!editAccessId}
-                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-              >
-                Clear All
-              </Button>
+            <Box sx={{ minWidth: 0, minHeight: 0, height: "100%", boxSizing: "border-box", pt: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <TextField label="Description" fullWidth value={editAccessDescription} onChange={(e) => setEditAccessDescription(e.target.value)} disabled={!editAccessId} sx={{ mb: 1.5, flexShrink: 0 }} />
+              <TextField fullWidth size="small" placeholder="Search Page Description / Group / ID" value={editAccessSearch} onChange={(e) => setEditAccessSearch(e.target.value)} disabled={!editAccessId} sx={{ mb: 1.5, flexShrink: 0 }} InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }} />
+              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 1.5, flexShrink: 0 }}>
+                <Tabs value={accessTab} onChange={(e, newValue) => setAccessTab(newValue)} sx={{ minHeight: 40, "& .MuiTab-root": { minHeight: 40, fontWeight: 600, textTransform: "none" }, "& .Mui-selected": { color: `${mainButtonColor} !important` }, "& .MuiTabs-indicator": { backgroundColor: mainButtonColor } }}>
+                  <Tab icon={<LockOpenIcon fontSize="small" />} iconPosition="start" label={`Pages With Access (${editPagesWithAccess.length})`} />
+                  <Tab icon={<LockIcon fontSize="small" />} iconPosition="start" label={`Pages Without Access (${editPagesWithoutAccess.length})`} />
+                </Tabs>
+              </Box>
+              <Paper sx={{ border: `1px solid ${borderColor}`, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <TableContainer sx={{ flex: 1, overflow: "auto" }}>
+                  <Table size="small" stickyHeader sx={{ "& .MuiTableCell-root": { py: "7px", px: 1, lineHeight: 1.2 }, "& .MuiTableCell-head": { py: 0.75 }, "& .MuiSwitch-root": { my: -0.75 } }}>
+                    <TableHead>
+                      <TableRow>
+                        {(accessTab === 0 ? ["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"] : ["#", "Page Description", "Page Group", "Access"]).map((header) => (
+                          <TableCell key={header} sx={{ color: "white", textAlign: "center", fontWeight: "bold", border: `1px solid ${borderColor}`, backgroundColor: accessTab === 0 ? headerColor || "#1976d2" : "#9e9e9e" }}>{header}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(accessTab === 0 ? filteredEditPagesWithAccess : filteredEditPagesWithoutAccess).map((p) => (
+                        <TableRow key={p.id} sx={{ "&:hover": { backgroundColor: "#f5f5f5" } }}>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}><Switch checked={editPageAccess[p.id]?.access || false} onChange={() => handleEditToggle(p.id)} disabled={!editAccessId} /></TableCell>
+                          {accessTab === 0 && ["can_create", "can_edit", "can_delete"].map((permissionKey) => (
+                            <TableCell key={permissionKey} sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}><Switch checked={editPageAccess[p.id]?.[permissionKey] || false} onChange={() => handleEditPermissionToggle(p.id, permissionKey)} disabled={!editAccessId || !editPageAccess[p.id]?.access} /></TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      {editBulkActionPages.length === 0 && <TableRow><TableCell align="center" colSpan={accessTab === 0 ? 7 : 4}>No pages found.</TableCell></TableRow>}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
             </Box>
 
-            {/* Right: Per-permission bulk toggles */}
-            <Box>
-              {renderBulkPermissionToggles({
-                pagesList: editPages.filter((p) => editPageAccess[p.id]?.access),
-                accessMap: editPageAccess,
-                onToggle: handleEditBulkPermission,
-                disabled: !editAccessId,
-                requireManagePermission: false,
-              })}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%", minHeight: 0 }}>
+              <Paper variant="outlined" sx={{ p: 2, flexShrink: 0 }}>
+                <Typography fontWeight={700} sx={{ mb: 1.25, fontSize: 15 }}>Access Actions</Typography>
+                <Stack spacing={1}>
+                  <Button fullWidth variant="contained" color="success" size="small" startIcon={<LockOpenIcon />} onClick={handleEditSelectAll} disabled={!editAccessId} sx={{ textTransform: "none", fontWeight: 600 }}>Select All</Button>
+                  <Button fullWidth variant="contained" color="warning" size="small" startIcon={<LockIcon />} onClick={handleEditClearAll} disabled={!editAccessId} sx={{ textTransform: "none", fontWeight: 600 }}>Clear All</Button>
+                  {accessTab === 0 && renderBulkPermissionToggles({ pagesList: editBulkActionPages, accessMap: editPageAccess, onToggle: handleEditBulkPermission, disabled: !editAccessId, requireManagePermission: false })}
+                </Stack>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2, flex: 1, minHeight: 0, overflowY: "auto" }}>
+                <Typography fontWeight={700} sx={{ mb: 1.25, fontSize: 15 }}>Existing Access Levels ({accessLevels.length})</Typography>
+                <Stack spacing={0.75}>
+                  {accessLevels.length > 0 ? accessLevels.map((access) => (
+                    <Button key={access.access_id} fullWidth onClick={() => handleSelectAccessLevel(access.access_id)} sx={{ justifyContent: "flex-start", textAlign: "left", textTransform: "none", px: 1, py: 0.9, border: `1px solid ${borderColor}`, borderRadius: 1, color: titleColor || "#111", backgroundColor: Number(editAccessId) === Number(access.access_id) ? `${mainButtonColor}18` : "background.paper", borderColor: Number(editAccessId) === Number(access.access_id) ? mainButtonColor : borderColor }}>
+                      {access.access_description || `Access Level ${access.access_id}`}
+                    </Button>
+                  )) : <Typography variant="body2" color="text.secondary">No existing access levels found.</Typography>}
+                </Stack>
+              </Paper>
             </Box>
           </Box>
-
-          <Paper sx={{ border: `1px solid ${borderColor}` }}>
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
-                  <TableRow>
-                    {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
-                      <TableCell
-                        key={header}
-                        sx={{ color: "white", textAlign: "center", fontWeight: "bold", border: `1px solid ${borderColor}` }}
-                      >
-                        {header}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredEditPages.map((p) => (
-                    <TableRow
-                      key={p.id}
-                      sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}
-                    >
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={editPageAccess[p.id]?.access || false}
-                          onChange={() => handleEditToggle(p.id)}
-                          disabled={!editAccessId}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={editPageAccess[p.id]?.can_create || false}
-                          onChange={() => handleEditPermissionToggle(p.id, "can_create")}
-                          disabled={!editAccessId || !editPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={editPageAccess[p.id]?.can_edit || false}
-                          onChange={() => handleEditPermissionToggle(p.id, "can_edit")}
-                          disabled={!editAccessId || !editPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={editPageAccess[p.id]?.can_delete || false}
-                          onChange={() => handleEditPermissionToggle(p.id, "can_delete")}
-                          disabled={!editAccessId || !editPageAccess[p.id]?.access}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredEditPages.length === 0 && (
-                    <TableRow>
-                      <TableCell align="center" colSpan={7}>No pages found.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2 }}>

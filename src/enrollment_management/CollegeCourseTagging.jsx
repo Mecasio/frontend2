@@ -40,6 +40,7 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -377,6 +378,7 @@ const CollegeCourseTagging = () => {
   const [courses, setCourses] = useState([]);
   const [enrolled, setEnrolled] = useState([]);
   const [studentNumber, setStudentNumber] = useState("");
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [first_name, setUserFirstName] = useState(null);
   const [middle_name, setUserMiddleName] = useState(null);
@@ -1304,7 +1306,10 @@ const CollegeCourseTagging = () => {
   };
 
   const handleSearchStudent = async () => {
-    if (!studentNumber.trim()) {
+    if (studentSearchLoading) return;
+
+    const searchStudentNumber = studentNumber.trim();
+    if (!searchStudentNumber) {
       setSnack({
         open: true,
         message: "Please fill in the student number",
@@ -1320,9 +1325,10 @@ const CollegeCourseTagging = () => {
       });
       return;
     }
+    setStudentSearchLoading(true);
     try {
       const scopeResult = await resolveStudentRegistrarScope(
-        studentNumber.trim(),
+        searchStudentNumber,
       );
       if (scopeResult.error) {
         setApplyingAs("");
@@ -1436,6 +1442,8 @@ const CollegeCourseTagging = () => {
         message: getStudentSearchErrorMessage(error),
         severity: "error",
       });
+    } finally {
+      setStudentSearchLoading(false);
     }
   };
 
@@ -1821,15 +1829,6 @@ const CollegeCourseTagging = () => {
   };
 
   useEffect(() => {
-    if (!studentNumber?.trim()) return;
-    if (departmentLoading) return;
-    const delayDebounce = setTimeout(() => {
-      handleSearchStudent();
-    }, 500);
-    return () => clearTimeout(delayDebounce);
-  }, [studentNumber, departmentLoading]);
-
-  useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
     const handleKeyDown = (e) => {
       const isBlockedKey =
@@ -2139,10 +2138,29 @@ const CollegeCourseTagging = () => {
                 value={studentNumber}
                 onChange={(e) => setStudentNumber(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearchStudent();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearchStudent();
+                  }
                 }}
                 sx={{ "& .MuiOutlinedInput-root": { fontSize: "13px" } }}
               />
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={handleSearchStudent}
+                disabled={studentSearchLoading || departmentLoading}
+                sx={{
+                  mt: 1,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  backgroundColor: mainButtonColor,
+                  "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
+                }}
+              >
+                {studentSearchLoading ? "Searching..." : "Search Student"}
+              </Button>
               <Typography
                 sx={{
                   fontSize: "11px",

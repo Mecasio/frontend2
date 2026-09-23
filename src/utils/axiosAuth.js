@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logout } from "./authSession";
 
 let interceptorInstalled = false;
 
@@ -33,6 +34,27 @@ export function ensureAxiosAuthInterceptor() {
 
     return config;
   });
+
+  axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      const status = error.response?.status;
+      const serverError = error.response?.data?.error;
+      const requestUrl = String(error.config?.url || "");
+      const isAuthRequest = /\/api\/(login|login_applicant|login-totp-setup|verify-login-totp)(?:$|[/?])/.test(requestUrl);
+      const hasToken = Boolean(localStorage.getItem("token"));
+      const isExpiredTokenResponse =
+        status === 401 ||
+        serverError === "TOKEN_EXPIRED" ||
+        (status === 403 && serverError === "Invalid token");
+
+      if (hasToken && !isAuthRequest && isExpiredTokenResponse) {
+        logout();
+      }
+
+      return Promise.reject(error);
+    },
+  );
 }
 
 ensureAxiosAuthInterceptor();

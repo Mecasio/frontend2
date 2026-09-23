@@ -379,6 +379,7 @@ const RegistrarCourseTaggingSummer = () => {
   const [courses, setCourses] = useState([]);
   const [enrolled, setEnrolled] = useState([]);
   const [studentNumber, setStudentNumber] = useState("");
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [first_name, setUserFirstName] = useState(null);
   const [middle_name, setUserMiddleName] = useState(null);
@@ -946,7 +947,10 @@ const RegistrarCourseTaggingSummer = () => {
   };
 
   const handleSearchStudent = async () => {
-    if (!studentNumber.trim()) {
+    if (studentSearchLoading) return;
+
+    const searchStudentNumber = studentNumber.trim();
+    if (!searchStudentNumber) {
       setSnack({
         open: true,
         message: "Please fill in the student number",
@@ -954,13 +958,14 @@ const RegistrarCourseTaggingSummer = () => {
       });
       return;
     }
+    setStudentSearchLoading(true);
     try {
       // Search by student number only (any semester). Still pass a truthy
       // active_school_year_id so the API skips the active-semester filter.
       const response = await axios.post(
         `${API_BASE_URL}/api/student-tagging`,
         {
-          studentNumber,
+          studentNumber: searchStudentNumber,
           active_school_year_id: activeSchoolYearId || true,
         },
         { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" } },
@@ -1059,6 +1064,8 @@ const RegistrarCourseTaggingSummer = () => {
         message: "Student not found or error processing request.",
         severity: "error",
       });
+    } finally {
+      setStudentSearchLoading(false);
     }
   };
 
@@ -1347,14 +1354,6 @@ const RegistrarCourseTaggingSummer = () => {
 
     return false;
   };
-
-  useEffect(() => {
-    if (!studentNumber) return;
-    const delayDebounce = setTimeout(() => {
-      handleSearchStudent();
-    }, 500);
-    return () => clearTimeout(delayDebounce);
-  }, [studentNumber]);
 
   useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
@@ -1671,10 +1670,29 @@ const RegistrarCourseTaggingSummer = () => {
                 value={studentNumber}
                 onChange={(e) => setStudentNumber(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearchStudent();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearchStudent();
+                  }
                 }}
                 sx={{ "& .MuiOutlinedInput-root": { fontSize: "13px" } }}
               />
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={handleSearchStudent}
+                disabled={studentSearchLoading}
+                sx={{
+                  mt: 1,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  backgroundColor: mainButtonColor,
+                  "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
+                }}
+              >
+                {studentSearchLoading ? "Searching..." : "Search Student"}
+              </Button>
               <Typography
                 sx={{
                   fontSize: "11px",
@@ -1893,8 +1911,12 @@ const RegistrarCourseTaggingSummer = () => {
               size="small"
               onClick={() => {
                 if (studentNumber) {
-                  localStorage.setItem("studentNumberForCOR", studentNumber);
-                  window.open("/registrar_search_certificate_of_registration", "_blank");
+                  window.open(
+                    `/registrar_search_certificate_of_registration?student_number=${encodeURIComponent(
+                      studentNumber,
+                    )}`,
+                    "_blank",
+                  );
                 } else {
                   setSnack({
                     open: true,

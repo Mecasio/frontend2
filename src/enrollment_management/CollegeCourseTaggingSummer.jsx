@@ -32,6 +32,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
 import ScoreIcon from "@mui/icons-material/Score";
 import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
@@ -378,6 +379,7 @@ const CollegeCourseTaggingSummer = () => {
   const [courses, setCourses] = useState([]);
   const [enrolled, setEnrolled] = useState([]);
   const [studentNumber, setStudentNumber] = useState("");
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [first_name, setUserFirstName] = useState(null);
   const [middle_name, setUserMiddleName] = useState(null);
@@ -909,7 +911,10 @@ const CollegeCourseTaggingSummer = () => {
   };
 
   const handleSearchStudent = async () => {
-    if (!studentNumber.trim()) {
+    if (studentSearchLoading) return;
+
+    const searchStudentNumber = studentNumber.trim();
+    if (!searchStudentNumber) {
       setSnack({
         open: true,
         message: "Please fill in the student number",
@@ -925,11 +930,12 @@ const CollegeCourseTaggingSummer = () => {
       });
       return;
     }
+    setStudentSearchLoading(true);
     try {
       // Pass a school-year hint so student-tagging/dprtmnt skips semester filters.
       // Enrollment still uses the real summer activeSchoolYearId when available.
       const scopeResult = await resolveStudentRegistrarScope(
-        studentNumber.trim(),
+        searchStudentNumber,
         {
           activeSchoolYearId: activeSchoolYearId || true,
         },
@@ -1056,6 +1062,8 @@ const CollegeCourseTaggingSummer = () => {
         message: "Student not found or error processing request.",
         severity: "error",
       });
+    } finally {
+      setStudentSearchLoading(false);
     }
   };
 
@@ -1390,15 +1398,6 @@ const CollegeCourseTaggingSummer = () => {
   };
 
   useEffect(() => {
-    if (!studentNumber?.trim()) return;
-    if (departmentLoading) return;
-    const delayDebounce = setTimeout(() => {
-      handleSearchStudent();
-    }, 500);
-    return () => clearTimeout(delayDebounce);
-  }, [studentNumber, departmentLoading]);
-
-  useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
     const handleKeyDown = (e) => {
       const isBlockedKey =
@@ -1651,10 +1650,29 @@ const CollegeCourseTaggingSummer = () => {
                 value={studentNumber}
                 onChange={(e) => setStudentNumber(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearchStudent();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearchStudent();
+                  }
                 }}
                 sx={{ "& .MuiOutlinedInput-root": { fontSize: "13px" } }}
               />
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={handleSearchStudent}
+                disabled={studentSearchLoading || departmentLoading}
+                sx={{
+                  mt: 1,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  backgroundColor: mainButtonColor,
+                  "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
+                }}
+              >
+                {studentSearchLoading ? "Searching..." : "Search Student"}
+              </Button>
               <Typography
                 sx={{
                   fontSize: "11px",

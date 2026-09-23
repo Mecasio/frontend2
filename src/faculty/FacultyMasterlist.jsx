@@ -641,7 +641,7 @@ const FacultyMasterList = () => {
   }, [currentPage, totalPages]);
 
   const handleNavigateToGradingSheet = useCallback(() => {
-    navigate("/grading_sheet", {
+    navigate("/faculty_grading_sheet", {
       state: {
         course_id: selectedCourse,
         section_id: selectedSection,

@@ -1306,7 +1306,7 @@ const FacultyWorkload = () => {
         <div
           className="schedule-block relative w-full h-full cursor-pointer text-center"
           onClick={() =>
-            navigate("/faculty_masterlist", {
+            navigate("/faculty_classlist", {
               state: {
                 course_id: entry.course_id,
                 section_id: entry.section_id,

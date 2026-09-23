@@ -12,6 +12,7 @@ import ProtectedRoute, { isTokenValid } from "./components/ProtectedRoute";
 
 import API_BASE_URL from "./apiConfig";
 import { refreshRegistrarCurriculumId } from "./utils/registrarCurriculumRestriction";
+import { getTokenExpiryMs, logout, registerLogoutHandler } from "./utils/authSession";
 
 // ============================================================
 // STATIC (NON-LAZY) IMPORTS
@@ -406,6 +407,36 @@ function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => registerLogoutHandler(() => setIsAuthenticated(false)), []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    const expiryMs = getTokenExpiryMs();
+    if (!expiryMs) {
+      logout();
+      return undefined;
+    }
+
+    const delay = expiryMs - Date.now();
+    if (delay <= 0) {
+      logout();
+      return undefined;
+    }
+
+    const timer = window.setTimeout(logout, delay);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === "token" && !event.newValue) logout();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
   const ApplicantPersonalInformationResponsive = () => { const isMobile = window.innerWidth < 768; return isMobile ? <ApplicantPersonalInformationMobile /> : <ApplicantPersonalInformation />; };
   const ApplicantFamilyBackgroundResponsive = () => { const isMobile = window.innerWidth < 768; return isMobile ? <ApplicantFamilyBackgroundMobile /> : <ApplicantFamilyBackground />; };
   const ApplicantEducationalAttainmentResponsive = () => { const isMobile = window.innerWidth < 768; return isMobile ? <ApplicantEducationalAttainmentMobile /> : <ApplicantEducationalAttainment />; };
@@ -601,7 +632,7 @@ function App() {
                     {/* Desktop spacer — pushes content right */}
                     {!isMobile && <aside className="shrink-0" style={{ width: isSidebarCollapsed ? 75 : 290, transition: "width .34s cubic-bezier(.22,1,.36,1)", willChange: "width" }} />}
 
-                    <SideBar setIsAuthenticated={setIsAuthenticated} profileImage={profileImage} setProfileImage={setProfileImage} onCollapseChange={setIsSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
+                    <SideBar setIsAuthenticated={setIsAuthenticated} profileImage={profileImage} setProfileImage={setProfileImage} onCollapseChange={setIsSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} onLogout={logout} />
                   </>
                 )}
 
@@ -837,10 +868,10 @@ function App() {
                       {/* FACULTY                                                    */}
                       {/* ---------------------------------------------------------- */}
                       <Route path="/faculty_reset_password" element={<ProtectedRoute><FacultyResetPassword /></ProtectedRoute>} />
-                      <Route path="/grading_sheet" element={<ProtectedRoute><GradingSheet /></ProtectedRoute>} />
+                      <Route path="/faculty_grading_sheet" element={<ProtectedRoute><GradingSheet /></ProtectedRoute>} />
                       <Route path="/faculty_workload" element={<ProtectedRoute><FacultyWorkload /></ProtectedRoute>} />
                       <Route path="/faculty_evaluation" element={<ProtectedRoute><FacultyEvaluation /></ProtectedRoute>} />
-                      <Route path="/faculty_masterlist" element={<ProtectedRoute><FacultyMasterList /></ProtectedRoute>} />
+                      <Route path="/faculty_classlist" element={<ProtectedRoute><FacultyMasterList /></ProtectedRoute>} />
 
                       {/* ---------------------------------------------------------- */}
                       {/* MEDICAL MANAGEMENT                                         */}
@@ -951,7 +982,7 @@ function App() {
                 isAuthenticatedPage={isAuthenticated}
                 accentColor={settings?.colors?.header}
                 mainButtonColor={settings?.colors?.mainButton}
-                onLogout={() => { clearAuthStorage(); setIsAuthenticated(false); window.location.href = "/"; }}
+                onLogout={logout}
               />
 
               {/* Footer */}
