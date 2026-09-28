@@ -401,9 +401,11 @@ const CourseManagement = () => {
         [name]: value,
       };
 
-      const lec = parseFloat(updated.lec_unit) || 0;
-      const lab = parseFloat(updated.lab_unit) || 0;
-      updated.course_unit = (lec + lab).toFixed(2);
+      if (name === "lec_unit" || name === "lab_unit") {
+        const lec = parseFloat(updated.lec_unit) || 0;
+        const lab = parseFloat(updated.lab_unit) || 0;
+        updated.course_unit = (lec + lab).toFixed(2);
+      }
 
       return updated;
     });
@@ -1720,7 +1722,7 @@ const CourseManagement = () => {
                 name="course_unit"
                 type="number"
                 value={course.course_unit}
-                InputProps={{ readOnly: true }}
+                onChange={handleChangesForEverything}
               />
             </Grid>
 

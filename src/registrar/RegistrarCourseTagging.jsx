@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -445,6 +445,7 @@ const RegistrarCourseTagging = () => {
   const [enrolled, setEnrolled] = useState([]);
   const [studentNumber, setStudentNumber] = useState("");
   const [studentSearchLoading, setStudentSearchLoading] = useState(false);
+  const studentSearchLockRef = useRef(false);
   const [userId, setUserId] = useState(null);
   const [first_name, setUserFirstName] = useState(null);
   const [middle_name, setUserMiddleName] = useState(null);
@@ -1007,7 +1008,7 @@ const RegistrarCourseTagging = () => {
   };
 
   const handleSearchStudent = async () => {
-    if (studentSearchLoading) return;
+    if (studentSearchLockRef.current || studentSearchLoading) return;
 
     const searchStudentNumber = studentNumber.trim();
     if (!searchStudentNumber) {
@@ -1018,10 +1019,17 @@ const RegistrarCourseTagging = () => {
       });
       return;
     }
+
+    if (
+      userId != null &&
+      String(userId).trim() === searchStudentNumber
+    ) {
+      return;
+    }
+
+    studentSearchLockRef.current = true;
     setStudentSearchLoading(true);
-    // Clear the previous student's section immediately while the new record loads.
-    setSelectedSection("");
-    setPendingSectionId("");
+
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/student-tagging`,
@@ -1047,6 +1055,21 @@ const RegistrarCourseTagging = () => {
         lastName: last_name,
         applyingAs: applyingAsValue,
       } = response.data;
+
+      const nextSectionId =
+        departmentSectionId != null && String(departmentSectionId).trim() !== ""
+          ? String(departmentSectionId)
+          : "";
+
+      await logStudentBasicInfoSearch({
+        studentNumber: studentNum,
+        firstName: first_name,
+        middleName: middle_name,
+        lastName: last_name,
+      });
+
+      // Commit the new student only after the complete search succeeds. The
+      // currently displayed student remains intact if the request fails.
       setStorageValue("token2", token2);
       setStorageValue("person_id2", person_id2);
       setStorageValue("studentNumber", studentNum);
@@ -1071,14 +1094,11 @@ const RegistrarCourseTagging = () => {
       setStudentYearLevel(cleanDisplayValue(yearLevelDescription));
       setPersonID(cleanDisplayValue(person_id2));
       setSectionDescription(cleanDisplayValue(section));
-      // Clear previous student's enrollment UI so bulk-enroll buttons unlock
-      // until this student's enrolled subjects are loaded.
+      setCourses([]);
       setEnrolled([]);
       setDisableYearButtons(false);
-      const nextSectionId =
-        departmentSectionId != null && String(departmentSectionId).trim() !== ""
-          ? String(departmentSectionId)
-          : "";
+      setIsEnrolled(isEnrolled);
+
       if (resolvedDepartmentId != null && String(resolvedDepartmentId).trim() !== "") {
         setPendingSectionId(nextSectionId);
         setSelectedDepartment(String(resolvedDepartmentId));
@@ -1090,41 +1110,22 @@ const RegistrarCourseTagging = () => {
         }
       } else {
         setSelectedSection(nextSectionId);
+        setPendingSectionId("");
       }
-      setIsEnrolled(isEnrolled);
-      await logStudentBasicInfoSearch({
-        studentNumber: studentNum,
-        firstName: first_name,
-        middleName: middle_name,
-        lastName: last_name,
-      });
+
       setSnack({
         open: true,
         message: "Student found and authenticated!",
         severity: "success",
       });
     } catch (error) {
-      setApplyingAs("");
-      setUserId(null);
-      setCurr(null);
-      setCourses([]);
-      setEnrolled([]);
-      setIsEnrolled(false);
-      setDisableYearButtons(false);
-      setCurriculumYear("");
-      setStudentYearLevel("");
-      setSectionDescription("");
-      setUserFirstName(null);
-      setUserMiddleName(null);
-      setUserLastName(null);
-      setSelectedSection("");
-      setPendingSectionId("");
       setSnack({
         open: true,
         message: getStudentSearchErrorMessage(error),
         severity: "error",
       });
     } finally {
+      studentSearchLockRef.current = false;
       setStudentSearchLoading(false);
     }
   };

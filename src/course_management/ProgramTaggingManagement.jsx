@@ -17,6 +17,7 @@ import {
   TableCell,
   Paper,
   Grid,
+  Chip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -159,6 +160,7 @@ const ProgramTagging = () => {
     semester_id: "",
     course_id: "",
   });
+  const [selectedCourses, setSelectedCourses] = useState([]);
 
   const [courseList, setCourseList] = useState([]);
   const [yearLevelList, setYearlevelList] = useState([]);
@@ -343,6 +345,12 @@ const ProgramTagging = () => {
         }
       });
 
+      // Show the most recently added program tags first.
+      unique.sort(
+        (a, b) =>
+          Number(b.program_tagging_id) - Number(a.program_tagging_id),
+      );
+
       setTaggedPrograms(unique);
       setFilteredPrograms(unique);
     } catch (err) {
@@ -378,21 +386,32 @@ const ProgramTagging = () => {
       return false;
     }
 
-    const {
-      curriculum_id,
-      year_level_id,
-      semester_id,
-      course_id,
-    } = progTag;
+    const { curriculum_id, year_level_id, semester_id, course_id } = progTag;
+    const courseIds = editingId
+      ? [course_id]
+      : selectedCourses.map((course) => course.course_id);
 
     // ✅ Required fields
-    if (!curriculum_id || !year_level_id || !semester_id || !course_id) {
-      showSnackbar("Please fill all fields", "error");
+    if (!curriculum_id || !year_level_id || !semester_id || !courseIds.length) {
+      showSnackbar("Please fill all fields and select at least one course.", "error");
       return false;
     }
 
+    const coursesToInsert = editingId
+      ? courseIds
+      : [...new Set(courseIds)].filter(
+        (selectedCourseId) =>
+          !taggedPrograms.some(
+            (p) =>
+              Number(p.curriculum_id) === Number(curriculum_id) &&
+              Number(p.year_level_id) === Number(year_level_id) &&
+              Number(p.semester_id) === Number(semester_id) &&
+              Number(p.course_id) === Number(selectedCourseId),
+          ),
+      );
+
     // 🔍 Prevent duplicate (ignore self when editing)
-    const isDuplicate = taggedPrograms.some(
+    const isDuplicate = editingId && taggedPrograms.some(
       (p) =>
         Number(p.curriculum_id) === Number(curriculum_id) &&
         Number(p.year_level_id) === Number(year_level_id) &&
@@ -403,6 +422,11 @@ const ProgramTagging = () => {
 
     if (isDuplicate) {
       showSnackbar("This program tag already exists!", "error");
+      return false;
+    }
+
+    if (!editingId && !coursesToInsert.length) {
+      showSnackbar("All selected courses are already tagged.", "error");
       return false;
     }
 
@@ -437,31 +461,28 @@ const ProgramTagging = () => {
         showSnackbar("Program tag updated successfully!", "success");
       } else {
         // ✅ Insert new program tag
-        const { data } = await axios.post(
-          `${API_BASE_URL}/api/program_tagging`,
-          {
-            curriculum_id,
-            year_level_id,
-            semester_id,
-            course_id,
-          },
-          getPermissionHeaders(),
+        await Promise.all(
+          coursesToInsert.map((selectedCourseId) =>
+            axios.post(
+              `${API_BASE_URL}/api/program_tagging`,
+              {
+                curriculum_id,
+                year_level_id,
+                semester_id,
+                course_id: selectedCourseId,
+              },
+              getPermissionHeaders(),
+            ),
+          ),
         );
 
         // 🔥 Add new tag to state immediately
-        setTaggedPrograms((prev) => [
-          ...prev,
-          {
-            program_tagging_id: data.insertId, // Use returned insertId
-            curriculum_id,
-            year_level_id,
-            semester_id,
-            course_id,
-          },
-        ]);
-
         fetchTaggedPrograms();
-        showSnackbar("Program tag inserted successfully!", "success");
+        const skippedCount = courseIds.length - coursesToInsert.length;
+        showSnackbar(
+          `${coursesToInsert.length} program tag${coursesToInsert.length === 1 ? "" : "s"} inserted${skippedCount ? `; ${skippedCount} duplicate${skippedCount === 1 ? "" : "s"} skipped` : ""}.`,
+          "success",
+        );
       }
 
       // ✅ Reset form
@@ -472,6 +493,7 @@ const ProgramTagging = () => {
         course_id: "",
       });
 
+      setSelectedCourses([]);
       setEditingId(null);
       return true;
     } catch (err) {
@@ -483,6 +505,7 @@ const ProgramTagging = () => {
 
   const handleEdit = (program) => {
     setEditingId(program.program_tagging_id);
+    setSelectedCourses([]);
 
     setProgTag({
       curriculum_id: program.curriculum_id,
@@ -931,6 +954,7 @@ const ProgramTagging = () => {
                           variant="contained"
                           onClick={() => {
                             setEditingId(null);
+                            setSelectedCourses([]);
 
                             setProgTag({
                               curriculum_id: "",
@@ -984,11 +1008,6 @@ const ProgramTagging = () => {
             setSelectedSemester={setSelectedSemester}
             setFilteredPrograms={setFilteredPrograms}
           />
-
-
-      <br />
-
-
 
         <div>
           <TableContainer component={Paper} sx={{ width: "100%", }}>
@@ -1835,17 +1854,25 @@ const ProgramTagging = () => {
               <Autocomplete
                 fullWidth
                 options={courseList}
+                multiple={!editingId}
                 value={
-                  courseList.find(
-                    (course) => course.course_id === progTag.course_id,
-                  ) || null
+                  editingId
+                    ? courseList.find(
+                      (course) => course.course_id === progTag.course_id,
+                    ) || null
+                    : selectedCourses
                 }
                 onChange={(event, newValue) => {
-                  setProgTag((prev) => ({
-                    ...prev,
-                    course_id: newValue?.course_id || "",
-                  }));
+                  if (editingId) {
+                    setProgTag((prev) => ({
+                      ...prev,
+                      course_id: newValue?.course_id || "",
+                    }));
+                  } else {
+                    setSelectedCourses(newValue);
+                  }
                 }}
+                renderTags={() => null}
                 getOptionLabel={(option) =>
                   `${option.course_code} - ${option.course_description} (${option.prereq || "No prereq"})`
                 }
@@ -1871,6 +1898,21 @@ const ProgramTagging = () => {
                   <TextField {...params} label="Choose Course" />
                 )}
               />
+              {!editingId && selectedCourses.length > 0 && (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 }}>
+                  {selectedCourses.map((course) => (
+                    <Chip
+                      key={course.course_id}
+                      label={`${course.course_code} - ${course.course_description}`}
+                      onDelete={() =>
+                        setSelectedCourses((prev) =>
+                          prev.filter((item) => item.course_id !== course.course_id),
+                        )
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
             </Grid>
 
             {/* YEAR */}
