@@ -779,6 +779,21 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   const [lockoutTimer, setLockoutTimer] = useState(0);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     fetchAndStoreUserMacAddress().catch((err) => {
       console.error("Unable to preload MAC address for audit logs:", err);
     });
@@ -1013,14 +1028,20 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
           backgroundPosition: "center, center",
           backgroundRepeat: "no-repeat, no-repeat",
           width: "100%",
-          height: isDesktop ? "calc(100vh - 100px)" : undefined,
-          minHeight: isDesktop ? 0 : "100dvh",
+          height: isDesktop
+            ? "calc(100vh - 100px)"
+            : isMobile
+              ? "calc(100dvh - 96px)"
+              : "calc(100dvh - 104px)",
+          minHeight: 0,
           display: "flex",
-          alignItems: isDesktop ? "center" : "flex-start",
+          alignItems: "center",
           justifyContent: "center",
           position: "relative",
-          overflowY: isDesktop ? "hidden" : "auto",
+          overflowY: "hidden",
           overflowX: "hidden",
+          overscrollBehavior: "none",
+          touchAction: isMobile ? "none" : "auto",
           py: isDesktop ? 0 : isTablet ? 4 : 2,
           px: 2,
           pb: isMobile ? "calc(16px + env(safe-area-inset-bottom))" : undefined,
@@ -1041,8 +1062,8 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
               border: `1px solid ${borderColor}`,
               width: "100%",
               margin: 0,
-              transform: isMobile ? "scale(0.9)" : "none",
-              transformOrigin: "top center",
+              transform: "scale(0.9)",
+              transformOrigin: "center center",
               boxSizing: "border-box",
             }}
             className="Container login-card uniform-card"

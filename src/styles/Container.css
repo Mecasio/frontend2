@@ -400,6 +400,24 @@
 
 /* ─── Mobile (≤ 600px) ───────────────────────────────────── */
 @media (max-width: 600px) {
+  .compact-register-card,
+  .compact-register-card input,
+  .compact-register-card select,
+  .compact-register-card textarea,
+  .compact-register-card button,
+  .compact-register-card label,
+  .compact-register-card p,
+  .compact-register-card span,
+  .compact-register-card a {
+    font-size: 12px !important;
+  }
+
+  .compact-register-card input,
+  .compact-register-card select,
+  .compact-register-card textarea {
+    font-size: 13px !important;
+  }
+
   .Container {
     max-width: 100%;
     width: calc(100% - 32px);

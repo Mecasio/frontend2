@@ -147,7 +147,7 @@ const EntranceExamScheduleManagement = lazy(() => import("./admission/EntranceEx
 const EvaluatorApplicantList = lazy(() => import("./admission/EvaluatorApplicantList"));
 const EvaluatorScheduleTile = lazy(() => import("./admission/EvaluatorScheduleTile"));
 const ProctorApplicantList = lazy(() => import("./admission/ProctorApplicantList"));
-const ExaminationPermitChangeCourse = lazy(() => import("./admission/ExaminationPermitChangeCourse"));
+const AdmissionPrintableForms = lazy(() => import("./admission/AdmissionPrintableForms"));
 const AdmissionOnlineRequirements = lazy(() => import("./admission/AdmissionOnlineRequirements"));
 const AdmissionContactManagement = lazy(() => import("./admission/AdmissionContactManagement"));
 const VerifyDocumentScheduleManagement = lazy(() => import("./admission/VerifyDocumentScheduleManagement"));
@@ -787,7 +787,7 @@ function App() {
                       <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
                       <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
                       <Route path="/admission_announcement" element={<ProtectedRoute><AdmissionAnnouncement /></ProtectedRoute>} />
-                      <Route path="/examination_permit_change_course" element={<ProtectedRoute><ExaminationPermitChangeCourse /></ProtectedRoute>} />
+                      <Route path="/admission_printable_forms" element={<ProtectedRoute><AdmissionPrintableForms /></ProtectedRoute>} />
 
                       {/* ---------------------------------------------------------- */}
                       {/* APPLICANT                                                  */}
@@ -988,7 +988,7 @@ function App() {
               {/* Footer */}
               {!isCorExportRenderRoute && (
                 <Box component="footer" sx={{ width: "100%", position: "fixed", bottom: 0, left: 0, zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: appColors.footer || "#ffffff", color: "white", textAlign: "center", padding: "12px 5px" }}>
-                  <Typography style={{ fontSize: "14px" }}>{appBranding.footerText || ""}</Typography>
+                  <Typography style={{ fontSize: "11px" }}>{appBranding.footerText || ""}</Typography>
                 </Box>
               )}
             </div>

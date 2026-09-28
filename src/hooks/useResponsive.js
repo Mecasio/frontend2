@@ -49,6 +49,7 @@ export function useResponsive() {
 
   return {
     width: state.width,
+    height: state.height,
     device: state.device,
     isMobile: state.device === "mobile",
     isTablet: state.device === "tablet",

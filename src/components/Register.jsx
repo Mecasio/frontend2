@@ -1059,11 +1059,35 @@ const parseDateValue = (value) => {
   return parsed.isValid() ? parsed : null;
 };
 
-const formatDateInput = (value) => {
-  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+const formatBirthDateInput = (value) => {
+  const rawValue = String(value ?? "").trim();
+  const rawDigits = rawValue.replace(/\D/g, "").slice(0, 8);
+  const digits = rawValue.startsWith("-")
+    ? `01${rawDigits.slice(1)}`.slice(0, 8)
+    : rawDigits;
+  if (!digits) return "";
+
+  if (digits.length <= 2) {
+    if (digits.length === 2) {
+      const month = Math.min(12, Math.max(1, Number(digits)));
+      return String(month).padStart(2, "0");
+    }
+    return digits;
+  }
+
+  const month = String(Math.min(12, Math.max(1, Number(digits.slice(0, 2))))).padStart(2, "0");
+  if (digits.length <= 4) return `${month}/${digits.slice(2)}`;
+
+  const monthNumber = Number(month);
+  const yearDigits = digits.slice(4, 8);
+  const yearNumber = yearDigits.length === 4 ? Number(yearDigits) : 2000;
+  const lastDayOfMonth = new Date(yearNumber, monthNumber, 0).getDate();
+  const dayNumber = Math.min(
+    lastDayOfMonth,
+    Math.max(1, Number(digits.slice(2, 4))),
+  );
+
+  return `${month}/${String(dayNumber).padStart(2, "0")}/${yearDigits}`;
 };
 
 const BIRTH_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -1129,12 +1153,20 @@ const DateField = React.forwardRef(function DateField(props, ref) {
   };
 
   const handleTextChange = (e) => {
-    const formatted = formatDateInput(e.target.value);
+    const formatted = formatBirthDateInput(e.target.value);
+
+    let parsed = dayjs(formatted, format, true);
+
     setText(formatted);
-    const parsed = dayjs(formatted, format, true);
-    if (parsed.isValid()) {
+    if (
+      parsed.isValid() &&
+      !parsed.isBefore(minDate, "day") &&
+      !parsed.isAfter(maxDate, "day")
+    ) {
       onChange?.({ target: { name, value: parsed.format("YYYY-MM-DD") } });
-    } else if (formatted === "") {
+    } else {
+      // Clear the parent value while the user is still typing or correcting
+      // the date so stale birthday/age values are not retained.
       onChange?.({ target: { name, value: "" } });
     }
   };
@@ -1161,7 +1193,6 @@ const DateField = React.forwardRef(function DateField(props, ref) {
         disabled={disabled}
         maxLength={10}
         onChange={handleTextChange}
-        onClick={openCalendar}
         style={{
           width: "100%",
           height: style.height ?? "100%",
@@ -4037,14 +4068,19 @@ const Register = () => {
           backgroundPosition: "center, center",
           backgroundRepeat: "no-repeat, no-repeat",
           width: "100%",
-          height: "calc(100vh - 100px)",
+          height: isCompact
+            ? isMobile
+              ? "calc(100dvh - 96px)"
+              : "calc(100dvh - 104px)"
+            : "calc(100vh - 100px)",
           minHeight: 0,
           display: "flex",
-          alignItems: "center",
+          alignItems: isCompact ? "flex-start" : "center",
           justifyContent: "center",
-          overflowY: "hidden",
+          overflowY: isCompact ? "auto" : "hidden",
           overflowX: "hidden",
-          py: 0,
+          pt: isCompact ? (isMobile ? 1 : 2) : 0,
+          pb: isCompact ? 1 : 0,
           px: isCompact ? 0 : 2,
           boxSizing: "border-box",
         }}
@@ -4087,16 +4123,22 @@ const Register = () => {
           <div
             style={{
               border: `1px solid ${borderColor}`,
-              marginLeft: 0,
-              marginTop: 0,
+              marginLeft: "auto",
+              marginRight: "auto",
+              marginTop: isCompact ? 8 : 0,
               width: isCompact ? "100%" : 460,
               maxWidth: isCompact ? 640 : 460,
               minWidth: 0,
               flex: isCompact ? "none" : "0 0 460px",
-              transform: "none",
+              transform: isMobile
+                ? "scale(0.9)"
+                : isTablet
+                  ? "scale(0.95)"
+                  : "none",
+              transformOrigin: isCompact ? "top center" : "center center",
               boxSizing: "border-box",
             }}
-            className="Container registration-card uniform-card"
+            className="Container registration-card uniform-card compact-register-card"
           >
             {/* Header */}
             {isCompact ? (
@@ -4658,6 +4700,9 @@ const Register = () => {
                   slotProps={{
                     paper: {
                       sx: {
+                        width: isMobile ? "calc(100% + 48px)" : undefined,
+                        maxWidth: isMobile ? "calc(100vw - 24px)" : undefined,
+                        ml: isMobile ? "-24px" : undefined,
                         mt: 0.5,
                         border: `1px solid ${headerColor}`,
                         borderRadius: "8px",
@@ -5354,14 +5399,14 @@ const Register = () => {
               <Box>
                 <Typography
                   fontWeight="bold"
-                  fontSize={16}
+                  fontSize={isMobile ? 14 : 16}
                   color="white"
                   lineHeight={1.2}
                 >
                   Important Reminder for Applicants
                 </Typography>
                 <Typography
-                  fontSize={12}
+                  fontSize={isMobile ? 10 : 12}
                   color="rgba(255,255,255,0.8)"
                   lineHeight={1.2}
                 >

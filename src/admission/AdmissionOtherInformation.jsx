@@ -83,7 +83,7 @@ const AdmissionOtherInformation = () => {
 
     {
       label: "Examination Permit",
-      to: "/examination_permit_change_course",
+      to: "/admission_printable_forms",
       icon: <PersonSearchIcon fontSize="large" />,
     },
 

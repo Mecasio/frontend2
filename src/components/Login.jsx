@@ -471,7 +471,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
 };
 
 /* ─── Inline compact-device announcement banner (mobile + tablet) ─── */
-const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false }) => {
+const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false, narrow = false, onVisibilityChange }) => {
   const [openViewer, setOpenViewer] = useState(false);
   const [viewerStartIndex, setViewerStartIndex] = useState(0);
   const [index, setIndex] = useState(0);
@@ -518,7 +518,10 @@ const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false }) 
 
       {!bannerVisible && (
         <button
-          onClick={() => setBannerVisible(true)}
+          onClick={() => {
+            setBannerVisible(true);
+            onVisibilityChange?.(true);
+          }}
           style={{
             width: flush ? "calc(100% - 32px)" : "100%",
             margin: flush ? "12px 16px 0" : "0 0 14px",
@@ -560,9 +563,12 @@ const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false }) 
           }}
         >
           {hasImage && (
-            <div style={{ position: "relative", aspectRatio: "16 / 9", background: "#000" }}>
+            <div style={{ position: "relative", aspectRatio: narrow ? "16 / 7" : "16 / 9", background: "#000" }}>
               <button
-                onClick={() => setBannerVisible(false)}
+                onClick={() => {
+                  setBannerVisible(false);
+                  onVisibilityChange?.(false);
+                }}
                 style={{
                   position: "absolute",
                   top: 8,
@@ -792,7 +798,7 @@ const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false }) 
 ══════════════════════════════════════════════════════════════ */
 const Login = ({ setIsAuthenticated }) => {
   const settings = useContext(SettingsContext);
-  const { isMobile, isTablet, isCompact } = useResponsive();
+  const { isMobile, isTablet, isCompact, width: viewportWidth, height: viewportHeight } = useResponsive();
   const colors = settings?.colors || {};
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
@@ -808,6 +814,7 @@ const Login = ({ setIsAuthenticated }) => {
   const [currentYear, setCurrentYear] = useState("");
   const [loginType, setLoginType] = useState("applicant");
   const [compactSlides, setCompactSlides] = useState([]);
+  const [compactAnnouncementVisible, setCompactAnnouncementVisible] = useState(true);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [tempLoginData, setTempLoginData] = useState(null);
@@ -1079,6 +1086,9 @@ const Login = ({ setIsAuthenticated }) => {
 
   // ── Layout tokens per device tier ──
   const fieldHeight = isMobile ? "48px" : "46px";
+  const compactAnnouncementOpen = isCompact && compactSlides.length > 0 && compactAnnouncementVisible;
+  const shortAnnouncementOpen = isMobile && compactAnnouncementOpen && viewportHeight < 760;
+  const narrowAnnouncementOpen = isMobile && compactAnnouncementOpen && viewportWidth < 380;
 
   return (
     <Box
@@ -1088,16 +1098,23 @@ const Login = ({ setIsAuthenticated }) => {
         backgroundPosition: "center, center",
         backgroundRepeat: "no-repeat, no-repeat",
         width: "100%",
-        height: isCompact ? undefined : "calc(100vh - 100px)",
-        minHeight: isCompact ? "100dvh" : 0,
+        // The app header and fixed footer are outside this content area. Keep
+        // the login canvas inside the space between them on compact screens.
+        height: isCompact
+          ? isMobile
+            ? "calc(100dvh - 96px)"
+            : "calc(100dvh - 104px)"
+          : "calc(100vh - 100px)",
+        minHeight: 0,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         overflowY: isCompact ? "auto" : "hidden",
         overflowX: "hidden",
         py: isCompact ? (isTablet ? 4 : 0) : 0,
+        pt: 0,
         px: isCompact ? (isMobile ? 0 : 2) : 2,
-        pb: isMobile ? "calc(16px + env(safe-area-inset-bottom))" : undefined,
+        pb: 0,
         boxSizing: "border-box",
       }}
     >
@@ -1136,8 +1153,9 @@ const Login = ({ setIsAuthenticated }) => {
         <div
           style={{
             border: `1px solid ${borderColor}`,
-            marginLeft: 0,
-            marginTop: 0,
+            marginLeft: "auto",
+            marginRight: "auto",
+            marginTop: narrowAnnouncementOpen ? 50 : 0,
             width: isCompact
               ? isMobile
                 ? "calc(100% - 32px)"
@@ -1146,8 +1164,11 @@ const Login = ({ setIsAuthenticated }) => {
             maxWidth: isCompact ? (isMobile ? 480 : 520) : 460,
             minWidth: 0,
             flex: isCompact ? "none" : "0 0 460px",
-            transform: isMobile ? "scale(0.9)" : "none",
-            transformOrigin: isMobile ? "top center" : undefined,
+            // The compact login also contains the announcement and registration
+            // prompt, so use a slightly smaller scale to keep the complete card
+            // between the fixed header and footer on phone-sized screens.
+            transform: `scale(${narrowAnnouncementOpen ? (shortAnnouncementOpen ? 0.72 : 0.82) : 0.9})`,
+            transformOrigin: "center center",
             boxSizing: "border-box",
           }}
           className="Container login-card uniform-card"
@@ -1194,6 +1215,8 @@ const Login = ({ setIsAuthenticated }) => {
                 slides={compactSlides}
                 flush
                 roundTop={isMobile}
+                narrow={isMobile && viewportWidth < 380}
+                onVisibilityChange={setCompactAnnouncementVisible}
               />
             )}
 

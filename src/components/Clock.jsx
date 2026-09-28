@@ -43,7 +43,7 @@ const Clock = () => {
           gap: 1,
         }}
       >
-        <Typography sx={{ fontSize: "16px" }}>{formattedDate}</Typography>
+        <Typography sx={{ fontSize: "13px" }}>{formattedDate}</Typography>
       </Box>
 
       {/* TIME */}
@@ -55,7 +55,7 @@ const Clock = () => {
           gap: 1,
         }}
       >
-        <Typography sx={{ fontSize: "16px" }}>{formattedTime}</Typography>
+        <Typography sx={{ fontSize: "13px" }}>{formattedTime}</Typography>
       </Box>
     </Box>
   );

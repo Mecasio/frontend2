@@ -893,8 +893,8 @@ const SideBar = ({
           page_id: 11,
         },
         {
-          title: "Examination Permit / Change Course / Form Process",
-          link: "/examination_permit_change_course",
+          title: "Admission Printable Forms",
+          link: "/admission_printable_forms",
           icon: Badge,
           page_id: 48,
         },

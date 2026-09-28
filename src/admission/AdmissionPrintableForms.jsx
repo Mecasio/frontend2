@@ -148,7 +148,7 @@ const FORM_ENDPOINTS = {
   },
 };
 
-const ExaminationPermitChangeCourse = () => {
+const AdmissionPrintableForms = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
@@ -2758,7 +2758,7 @@ const ExaminationPermitChangeCourse = () => {
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
         >
-          EXAMINATION PERMIT CHANGE COURSE
+          ADMISSION PRINTABLE FORMS
         </Typography>
         <Box display="flex" alignItems="center" gap={2}>
           <Autocomplete
@@ -3583,4 +3583,4 @@ const ExaminationPermitChangeCourse = () => {
   );
 };
 
-export default ExaminationPermitChangeCourse;
+export default AdmissionPrintableForms;

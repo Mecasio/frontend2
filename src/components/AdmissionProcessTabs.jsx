@@ -36,8 +36,8 @@ export const ADMISSION_PROCESS_TABS = [
     iconKey: "schedule",
   },
   {
-    label: "Examination Permit",
-    to: "/examination_permit_change_course",
+    label: "Admission Printable Forms",
+    to: "/admission_printable_forms",
     iconKey: "personSearch",
   },
   {
