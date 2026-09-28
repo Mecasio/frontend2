@@ -44,6 +44,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import AnnouncementSlider from "../components/AnnouncementSlider";
+import { AnnouncementViewerModal } from "./Login";
 import RedirectLoading from "../components/RedirectLoading";
 import {
   fetchAndStoreUserMacAddress,
@@ -56,6 +57,7 @@ import {
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Autocomplete from "@mui/material/Autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
+import { useResponsive } from "../hooks/useResponsive";
 import MuiLink from "@mui/material/Link";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -217,7 +219,7 @@ const FormattedContent = ({ text, style = {} }) => {
 };
 
 /* ─── Fullscreen Announcement Viewer Modal (mobile) ─── */
-const AnnouncementViewerModal = ({ slides, startIndex, onClose, detailThemes = {} }) => {
+const RegisterAnnouncementViewerModal = ({ slides, startIndex, onClose, detailThemes = {} }) => {
   const [index, setIndex] = useState(startIndex || 0);
   const [scale, setScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
@@ -678,7 +680,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
   return (
     <>
       {openViewer && (
-        <AnnouncementViewerModal
+        <RegisterAnnouncementViewerModal
           slides={slides}
           startIndex={viewerStartIndex}
           onClose={() => setOpenViewer(false)}
@@ -3163,6 +3165,7 @@ const Register = () => {
   const companyName = branding.companyName || "Company Name";
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+  const { height: viewportHeight } = useResponsive();
   // isCompact = "not enough width for the two-column desktop layout" —
   // covers both phones and tablets so neither breaks the container.
   const isCompact = isMobile || isTablet;
@@ -4070,9 +4073,9 @@ const Register = () => {
           width: "100%",
           height: isCompact
             ? isMobile
-              ? "calc(100dvh - 96px)"
-              : "calc(100dvh - 104px)"
-            : "calc(100vh - 100px)",
+              ? "calc(100dvh - 56px - 40px)"
+              : "calc(100dvh - 64px - 40px)"
+            : "calc(100vh - 64px - 40px)",
           minHeight: 0,
           display: "flex",
           alignItems: isCompact ? "flex-start" : "center",
@@ -4106,7 +4109,7 @@ const Register = () => {
               flex: "1 1 auto",
               minWidth: 0,
               position: "relative",
-              height: isCompact ? "auto" : "min(690px, calc(100vh - 100px))",
+              height: isCompact ? "auto" : "min(690px, calc(100vh - 64px - 40px))",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -4117,6 +4120,7 @@ const Register = () => {
               targetRole="applicant"
               alignCenter={!isCompact}
               stack={isCompact}
+              viewerComponent={AnnouncementViewerModal}
             />
           </Box>}
 
@@ -4125,24 +4129,28 @@ const Register = () => {
               border: `1px solid ${borderColor}`,
               marginLeft: "auto",
               marginRight: "auto",
-              marginTop: isCompact ? 8 : 0,
+                marginTop: isMobile ? 30 : isCompact ? 8 : 0,
+               marginBottom: isMobile && viewportHeight < 666 ? 30 : 0,
               width: isCompact ? "100%" : 460,
               maxWidth: isCompact ? 640 : 460,
               minWidth: 0,
               flex: isCompact ? "none" : "0 0 460px",
-              transform: isMobile
-                ? "scale(0.9)"
-                : isTablet
-                  ? "scale(0.95)"
-                  : "none",
-              transformOrigin: isCompact ? "top center" : "center center",
+              // Keep the compact form reduced while allowing the scaled
+              // height to participate in layout before the fixed footer.
+              zoom: isMobile ? 0.9 : isTablet ? 0.95 : 1,
               boxSizing: "border-box",
             }}
             className="Container registration-card uniform-card compact-register-card"
           >
             {/* Header */}
             {isCompact ? (
-              <AnnouncementSlider campusId={branchId} targetRole="applicant" stack embedded />
+              <AnnouncementSlider
+                campusId={branchId}
+                targetRole="applicant"
+                stack
+                embedded
+                viewerComponent={AnnouncementViewerModal}
+              />
             ) : <div
               className="Header"
               style={{

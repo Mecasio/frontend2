@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import API_BASE_URL from "../apiConfig";
@@ -137,7 +138,12 @@ const DetailToggleTab = ({
     </div>
 );
 
-const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = false }) => {
+const AnnouncementSlider = ({
+    alignCenter = false,
+    stack = false,
+    embedded = false,
+    viewerComponent: ViewerComponent = null,
+}) => {
     const desktopOffset = { margin: 0 };
     const desktopSize = alignCenter
         ? { width: "100%", height: "100%", position: "absolute", inset: 0 }
@@ -249,9 +255,12 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
        LIGHTBOX — shared between mobile & desktop
        Image LEFT  |  Details RIGHT
     ───────────────────────────────────────── */
-    const LightboxModal = () => (
-        <AnimatePresence>
-            {lightboxOpen && lightboxCurrent && (
+    const LightboxModal = () => {
+        if (typeof document === "undefined") return null;
+
+        return createPortal(
+            <AnimatePresence>
+                {lightboxOpen && lightboxCurrent && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -410,9 +419,23 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                         </div>
                     </motion.div>
                 </motion.div>
-            )}
-        </AnimatePresence>
-    );
+                )}
+            </AnimatePresence>,
+            document.body
+        );
+    };
+
+    const ReviewModal = () => {
+        if (!lightboxOpen || !ViewerComponent || typeof document === "undefined") return null;
+        return createPortal(
+            <ViewerComponent
+                slides={slides}
+                startIndex={lightboxIndex}
+                onClose={closeLightbox}
+            />,
+            document.body
+        );
+    };
 
     /* ─────────────────────────────────────────
        STACKED LAYOUT (tablet / phone)
@@ -514,7 +537,7 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                     )}
                 </div>
 
-                <LightboxModal />
+                {ViewerComponent ? <ReviewModal /> : <LightboxModal />}
             </>
         );
     }
@@ -659,7 +682,7 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                 </div>
             </div>
 
-            <LightboxModal />
+            {ViewerComponent ? <ReviewModal /> : <LightboxModal />}
         </>
     );
 };
