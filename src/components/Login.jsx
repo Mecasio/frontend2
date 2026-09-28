@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { Container, Box, Snackbar, Alert, Typography, Button } from "@mui/material";
@@ -108,7 +109,7 @@ const FormattedContent = ({ text }) => {
 };
 
 /* ─── Fullscreen Announcement Viewer Modal ─── */
-const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
+export const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
   const [index, setIndex] = useState(startIndex || 0);
   const [scale, setScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
@@ -512,9 +513,16 @@ const CompactAnnouncementBanner = ({ slides, flush = false, roundTop = false, na
 
   return (
     <>
-      {openViewer && (
-        <AnnouncementViewerModal slides={slides} startIndex={viewerStartIndex} onClose={() => setOpenViewer(false)} />
-      )}
+      {openViewer && typeof document !== "undefined"
+        ? createPortal(
+            <AnnouncementViewerModal
+              slides={slides}
+              startIndex={viewerStartIndex}
+              onClose={() => setOpenViewer(false)}
+            />,
+            document.body
+          )
+        : null}
 
       {!bannerVisible && (
         <button
@@ -1087,7 +1095,6 @@ const Login = ({ setIsAuthenticated }) => {
   // ── Layout tokens per device tier ──
   const fieldHeight = isMobile ? "48px" : "46px";
   const compactAnnouncementOpen = isCompact && compactSlides.length > 0 && compactAnnouncementVisible;
-  const shortAnnouncementOpen = isMobile && compactAnnouncementOpen && viewportHeight < 760;
   const narrowAnnouncementOpen = isMobile && compactAnnouncementOpen && viewportWidth < 380;
 
   return (
@@ -1098,16 +1105,22 @@ const Login = ({ setIsAuthenticated }) => {
         backgroundPosition: "center, center",
         backgroundRepeat: "no-repeat, no-repeat",
         width: "100%",
-        // The app header and fixed footer are outside this content area. Keep
-        // the login canvas inside the space between them on compact screens.
+        // The app header and fixed footer are outside this content area.
+        // Keep the login canvas inside the space between them.
         height: isCompact
           ? isMobile
-            ? "calc(100dvh - 96px)"
-            : "calc(100dvh - 104px)"
-          : "calc(100vh - 100px)",
+            ? "calc(100dvh - 56px - 40px)"
+            : "calc(100dvh - 64px - 40px)"
+          : "calc(100vh - 64px - 40px)",
         minHeight: 0,
         display: "flex",
-        alignItems: "center",
+        // An open announcement makes the compact card taller than the
+        // available mobile area. Start it at the safe content boundary so
+        // centering cannot move its top behind the fixed app header.
+        alignItems:
+          isCompact && isMobile && compactAnnouncementOpen
+            ? "flex-start"
+            : "center",
         justifyContent: "center",
         overflowY: isCompact ? "auto" : "hidden",
         overflowX: "hidden",
@@ -1140,7 +1153,7 @@ const Login = ({ setIsAuthenticated }) => {
               flex: "1 1 auto",
               minWidth: 0,
               position: "relative",
-              height: "min(690px, calc(100vh - 100px))",
+              height: "min(690px, calc(100vh - 64px - 40px))",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -1155,7 +1168,14 @@ const Login = ({ setIsAuthenticated }) => {
             border: `1px solid ${borderColor}`,
             marginLeft: "auto",
             marginRight: "auto",
-            marginTop: narrowAnnouncementOpen ? 50 : 0,
+            marginTop:
+              isCompact && isMobile && compactAnnouncementOpen
+                ? 30
+                : 0,
+            marginBottom:
+              isMobile && viewportHeight < 666
+                ? 30
+                : 0,
             width: isCompact
               ? isMobile
                 ? "calc(100% - 32px)"
@@ -1167,8 +1187,13 @@ const Login = ({ setIsAuthenticated }) => {
             // The compact login also contains the announcement and registration
             // prompt, so use a slightly smaller scale to keep the complete card
             // between the fixed header and footer on phone-sized screens.
-            transform: `scale(${narrowAnnouncementOpen ? (shortAnnouncementOpen ? 0.72 : 0.82) : 0.9})`,
-            transformOrigin: "center center",
+            // Keep the compact form reduced while allowing its scaled height
+            // to participate in layout, avoiding unused space before footer.
+            zoom: narrowAnnouncementOpen
+              ? isMobile && viewportHeight < 760
+                ? 0.72
+                : 0.82
+              : 0.9,
             boxSizing: "border-box",
           }}
           className="Container login-card uniform-card"
@@ -1219,7 +1244,6 @@ const Login = ({ setIsAuthenticated }) => {
                 onVisibilityChange={setCompactAnnouncementVisible}
               />
             )}
-
             <div
               style={
                 isCompact && compactSlides.length > 0

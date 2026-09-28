@@ -752,7 +752,7 @@ const TotpLoginModal = ({
 ══════════════════════════════════════════════════════════════════════════ */
 const LoginEnrollment = ({ setIsAuthenticated }) => {
   const settings = useContext(SettingsContext);
-  const { device, isMobile, isTablet, isDesktop } = useResponsive();
+  const { device, isMobile, isTablet, isDesktop, height: viewportHeight } = useResponsive();
   const colors = settings?.colors || {};
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
@@ -1018,6 +1018,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
 
   // ── Layout tokens per device tier ──
   const fieldHeight = isMobile ? "52px" : "54px";
+  const isShortViewport = isMobile && viewportHeight <= 634;
 
   return (
     <>
@@ -1029,22 +1030,26 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
           backgroundRepeat: "no-repeat, no-repeat",
           width: "100%",
           height: isDesktop
-            ? "calc(100vh - 100px)"
+            ? "calc(100vh - 64px - 40px)"
             : isMobile
-              ? "calc(100dvh - 96px)"
-              : "calc(100dvh - 104px)",
+              ? "calc(100dvh - 56px - 40px)"
+              : "calc(100dvh - 64px - 40px)",
           minHeight: 0,
           display: "flex",
-          alignItems: "center",
+          alignItems: isShortViewport ? "flex-start" : "center",
           justifyContent: "center",
           position: "relative",
-          overflowY: "hidden",
+           overflowY: isShortViewport ? "auto" : "hidden",
           overflowX: "hidden",
           overscrollBehavior: "none",
-          touchAction: isMobile ? "none" : "auto",
-          py: isDesktop ? 0 : isTablet ? 4 : 2,
+           touchAction: isShortViewport ? "pan-y" : isMobile ? "none" : "auto",
+          py: isShortViewport ? 0 : isDesktop ? 0 : isTablet ? 4 : 2,
           px: 2,
-          pb: isMobile ? "calc(16px + env(safe-area-inset-bottom))" : undefined,
+          pb: isShortViewport
+            ? 0
+            : isMobile
+              ? "calc(16px + env(safe-area-inset-bottom))"
+              : undefined,
           boxSizing: "border-box",
         }}
       >
@@ -1062,8 +1067,12 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
               border: `1px solid ${borderColor}`,
               width: "100%",
               margin: 0,
-              transform: "scale(0.9)",
-              transformOrigin: "center center",
+               // `zoom` keeps the reduced visual size while also shrinking
+               // the element's layout height, preventing empty space before
+               // the fixed footer on short mobile screens.
+               zoom: isShortViewport ? 0.82 : 0.9,
+               marginTop: isShortViewport ? 30 : 0,
+               marginBottom: isMobile && viewportHeight < 666 ? 30 : 0,
               boxSizing: "border-box",
             }}
             className="Container login-card uniform-card"

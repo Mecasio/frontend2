@@ -19,12 +19,13 @@ function computeDevice(width) {
 
 function getSnapshot() {
   if (typeof window === "undefined") {
-    return { width: 1280, device: "desktop", isTouch: false, orientation: "landscape" };
+    return { width: 1280, height: 800, device: "desktop", isTouch: false, orientation: "landscape" };
   }
   const width = window.innerWidth;
-  const height = window.innerHeight;
+  const height = Math.round(window.visualViewport?.height || window.innerHeight);
   return {
     width,
+    height,
     device: computeDevice(width),
     isTouch: window.matchMedia?.("(pointer: coarse)").matches ?? false,
     orientation: width >= height ? "landscape" : "portrait",
@@ -41,9 +42,11 @@ export function useResponsive() {
   useEffect(() => {
     window.addEventListener("resize", handleChange);
     window.addEventListener("orientationchange", handleChange);
+    window.visualViewport?.addEventListener("resize", handleChange);
     return () => {
       window.removeEventListener("resize", handleChange);
       window.removeEventListener("orientationchange", handleChange);
+      window.visualViewport?.removeEventListener("resize", handleChange);
     };
   }, [handleChange]);
 
