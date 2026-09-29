@@ -77,6 +77,7 @@ const AuditLogs = () => {
   const [totalLogs, setTotalLogs] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -234,6 +235,7 @@ const AuditLogs = () => {
   useEffect(() => {
     requestRef.current?.abort();
     requestRef.current = null;
+    setIsRefreshing(false);
     setLogs([]);
     setCurrentPage(1);
     setTotalPages(1);
@@ -259,6 +261,19 @@ const AuditLogs = () => {
 
     fetchLogs(loadedPageRef.current + 1, true);
   }, [fetchLogs, hasMore, totalPages]);
+
+  const handleRefresh = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setIsRefreshing(true);
+    setLogs([]);
+    setCurrentPage(1);
+    setTotalPages(1);
+    setHasMore(false);
+    loadedPageRef.current = 0;
+    resetList();
+    fetchLogs(1).finally(() => setIsRefreshing(false));
+  }, [fetchLogs, resetList]);
 
   if (hasAccess === null) {
     return <LoadingOverlay open message="Loading..." />;
@@ -337,8 +352,8 @@ const AuditLogs = () => {
                   flexWrap="wrap"
                   gap={1}
                   sx={{ height: "50px" }}
-                >
-                  {/* LEFT SIDE */}
+                  >
+                    {/* LEFT SIDE */}
                   <Typography
                     fontSize="16px"
                     fontWeight="bold"
@@ -354,6 +369,31 @@ const AuditLogs = () => {
                     gap={1}
                     flexWrap="wrap"
                   >
+                    <Button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 90,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 0.7,
+                        },
+                      }}
+                    >
+                      {isRefreshing ? "Refreshing..." : "Refresh"}
+                    </Button>
+
                     <Button
                       onClick={() => goToPage(1)}
                       disabled={currentPage === 1}
