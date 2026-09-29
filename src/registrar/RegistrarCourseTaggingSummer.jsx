@@ -482,7 +482,7 @@ const RegistrarCourseTaggingSummer = () => {
         .then((res) => setCourses(res.data))
         .catch((err) => console.error(err));
     }
-  }, [currId]);
+  }, [currId, userId]);
 
   useEffect(() => {
     if (userId && currId && activeSchoolYearId) {

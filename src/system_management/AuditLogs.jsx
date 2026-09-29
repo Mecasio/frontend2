@@ -25,6 +25,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import { Virtuoso } from "react-virtuoso";
 
 const PAGE_SIZE = 100;
 
@@ -59,8 +60,9 @@ const AuditLogs = () => {
   const titleColor = colors.title || "#000000";
   const borderColor = colors.border || "#d1d5db";
 
-  const scrollRef = useRef(null);
-  const requestRef = useRef(false);
+  const requestRef = useRef(null);
+  const virtuosoRef = useRef(null);
+  const loadedPageRef = useRef(0);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +76,7 @@ const AuditLogs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -85,7 +88,7 @@ const AuditLogs = () => {
 
   const resetList = useCallback(() => {
     setError("");
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    virtuosoRef.current?.scrollToIndex({ index: 0, behavior: "auto" });
   }, []);
 
 
@@ -164,10 +167,11 @@ const AuditLogs = () => {
   };
 
 
-  const fetchLogs = useCallback(async (pageToLoad = 1) => {
+  const fetchLogs = useCallback(async (pageToLoad = 1, append = false) => {
     if (requestRef.current) return;
 
-    requestRef.current = true;
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError("");
 
@@ -182,17 +186,32 @@ const AuditLogs = () => {
           start_date: startDate,
           end_date: endDate,
         },
+        signal: controller.signal,
       });
 
-      setLogs(data.data || []);
+      const nextLogs = Array.isArray(data.data) ? data.data : [];
+      setLogs((previousLogs) =>
+        append ? [...previousLogs, ...nextLogs] : nextLogs,
+      );
       setTotalLogs(Number(data.total || 0));
-      setTotalPages(Math.max(1, Number(data.totalPages || 1)));
+      const nextTotalPages = Math.max(1, Number(data.totalPages || 1));
+      setTotalPages(nextTotalPages);
+      setCurrentPage(pageToLoad);
+      loadedPageRef.current = pageToLoad;
+      setHasMore(
+        typeof data.hasMore === "boolean"
+          ? data.hasMore
+          : pageToLoad < nextTotalPages,
+      );
     } catch (err) {
+      if (axios.isCancel(err) || err.name === "CanceledError") return;
       console.error("Audit logs fetch failed:", err);
       setError(err.response?.data?.message || "Failed to fetch audit logs.");
     } finally {
-      requestRef.current = false;
-      setLoading(false);
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   }, [search, severity, action, startDate, endDate]);
 
@@ -213,21 +232,33 @@ const AuditLogs = () => {
   }, []);
 
   useEffect(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setLogs([]);
     setCurrentPage(1);
-  }, [severity, search, action, startDate, endDate]);
-
-  useEffect(() => {
+    setTotalPages(1);
+    setHasMore(false);
+    loadedPageRef.current = 0;
     resetList();
-    fetchLogs(currentPage);
-  }, [currentPage, severity, search, action, startDate, endDate, fetchLogs, resetList]);
+    fetchLogs(1);
+  }, [severity, search, action, startDate, endDate, fetchLogs, resetList]);
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+  const goToPage = useCallback(
+    (page) => {
+      const nextPage = Math.min(Math.max(page, 1), totalPages);
+      resetList();
+      fetchLogs(nextPage);
+    },
+    [fetchLogs, resetList, totalPages],
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (!hasMore || requestRef.current || loadedPageRef.current >= totalPages) {
+      return;
     }
-  }, [currentPage, totalPages]);
 
-  const paginatedLogs = logs;
+    fetchLogs(loadedPageRef.current + 1, true);
+  }, [fetchLogs, hasMore, totalPages]);
 
   if (hasAccess === null) {
     return <LoadingOverlay open message="Loading..." />;
@@ -324,7 +355,7 @@ const AuditLogs = () => {
                     flexWrap="wrap"
                   >
                     <Button
-                      onClick={() => setCurrentPage(1)}
+                      onClick={() => goToPage(1)}
                       disabled={currentPage === 1}
                       variant="outlined"
                       size="small"
@@ -350,7 +381,7 @@ const AuditLogs = () => {
 
                     <Button
                       onClick={() =>
-                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                        goToPage(currentPage - 1)
                       }
                       disabled={currentPage === 1}
                       variant="outlined"
@@ -378,9 +409,7 @@ const AuditLogs = () => {
                     <FormControl size="small" sx={{ minWidth: 90 }}>
                       <Select
                         value={currentPage}
-                        onChange={(e) =>
-                          setCurrentPage(Number(e.target.value))
-                        }
+                        onChange={(e) => goToPage(Number(e.target.value))}
                         sx={{
                           fontSize: "12px",
                           height: 36,
@@ -431,9 +460,7 @@ const AuditLogs = () => {
 
                     <Button
                       onClick={() =>
-                        setCurrentPage((prev) =>
-                          Math.min(prev + 1, totalPages)
-                        )
+                        goToPage(currentPage + 1)
                       }
                       disabled={
                         currentPage === totalPages ||
@@ -462,7 +489,7 @@ const AuditLogs = () => {
                     </Button>
 
                     <Button
-                      onClick={() => setCurrentPage(totalPages)}
+                      onClick={() => goToPage(totalPages)}
                       disabled={
                         currentPage === totalPages ||
                         totalPages === 0
@@ -575,129 +602,138 @@ const AuditLogs = () => {
         )}
 
         <Box
-          ref={scrollRef}
           sx={{
             flex: 1,
             minHeight: 0,
-            overflowY: "auto",
+            overflow: "hidden",
             border: `1px solid ${borderColor}`,
             backgroundColor: "#f8fafc",
             p: 2,
           }}
         >
-          <Box sx={{}} />
+          {logs.length > 0 && (
+            <Virtuoso
+              ref={virtuosoRef}
+              data={logs}
+              computeItemKey={(_, log) => log.log_key}
+              endReached={handleEndReached}
+              style={{ height: "100%" }}
+              itemContent={(index, log) => {
+                const severityValue = String(log.severity || "INFO").toUpperCase();
+                const severityStyle = severityColors[severityValue] || severityColors.INFO;
 
-          {paginatedLogs.map((log, index) => {
-            const severityValue = String(log.severity || "INFO").toUpperCase();
-            const severityStyle = severityColors[severityValue] || severityColors.INFO;
-
-            return (
-              <Box
-                key={log.log_key}
-                sx={{
-                  minHeight: "auto",
-                  mb: "12px",
-                  display: "grid",
-                  gridTemplateColumns: "16px 1fr",
-                  columnGap: 1.5,
-                }}
-              >
-                <Box
-                  sx={{
-                    position: "relative",
-                    display: "flex",
-                    justifyContent: "center",
-                  }}
-                >
+                return (
                   <Box
                     sx={{
-                      width: 10,
-                      height: 10,
-                      mt: 1.2,
-                      borderRadius: "50%",
-                      backgroundColor: severityStyle.border,
-                      border: "2px solid #fff",
-                      boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.16)",
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      top: 26,
-                      bottom: -12,
-                      width: 2,
-                      backgroundColor: "#dbe3ea",
-                    }}
-                  />
-                </Box>
-
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 1.5,
-                    border: `1px solid ${borderColor}`,
-                    borderLeft: `4px solid ${severityStyle.border}`,
-                    borderRadius: 1,
-                    backgroundColor: index % 2 === 0 ? "white" : "lightgray",
-                  }}
-                >
-                  <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={0.75}>
-                    <Chip
-                      label={severityValue}
-                      size="small"
-                      sx={{
-                        backgroundColor: severityStyle.bg,
-                        color: severityStyle.color,
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                      {formatDate(log.timestamp)}
-                    </Typography>
-                  </Box>
-
-                  <Typography
-                    sx={{
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: "#1f2937",
-
+                      minHeight: "auto",
+                      pb: "12px",
+                      display: "grid",
+                      gridTemplateColumns: "16px 1fr",
+                      columnGap: 1.5,
                     }}
                   >
-                    {log.actor_display || log.email || "unknown"}
-                  </Typography>
-
-                  {log.user_mac_address && (
-                    <Typography
+                    <Box
                       sx={{
-                        mt: 0.5,
-                        fontSize: 12,
-                        color: "#6b7280",
-                        fontFamily: "monospace",
+                        position: "relative",
+                        display: "flex",
+                        justifyContent: "center",
                       }}
                     >
-                      MAC: {log.user_mac_address}
-                    </Typography>
-                  )}
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          mt: 1.2,
+                          borderRadius: "50%",
+                          backgroundColor: severityStyle.border,
+                          border: "2px solid #fff",
+                          boxShadow: "0 0 0 1px rgba(15, 23, 42, 0.16)",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 26,
+                          bottom: -12,
+                          width: 2,
+                          backgroundColor: "#dbe3ea",
+                        }}
+                      />
+                    </Box>
 
-                  <Typography
-                    sx={{
-                      mt: 0.5,
-                      fontSize: 14,
-                      color: "#374151",
-                      lineHeight: 1.45,
-                      whiteSpace: "pre-line",
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1.5,
+                        border: `1px solid ${borderColor}`,
+                        borderLeft: `4px solid ${severityStyle.border}`,
+                        borderRadius: 1,
+                        backgroundColor: index % 2 === 0 ? "white" : "lightgray",
+                      }}
+                    >
+                      <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={0.75}>
+                        <Chip
+                          label={severityValue}
+                          size="small"
+                          sx={{
+                            backgroundColor: severityStyle.bg,
+                            color: severityStyle.color,
+                            fontWeight: 700,
+                          }}
+                        />
+                        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                          {formatDate(log.timestamp)}
+                        </Typography>
+                      </Box>
 
-                    }}
-                  >
-                    {log.message}
-                  </Typography>
-                </Paper>
-              </Box>
-            );
-          })}
+                      <Typography
+                        sx={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: "#1f2937",
+                        }}
+                      >
+                        {log.actor_display || log.email || "unknown"}
+                      </Typography>
 
-          <Box sx={{}} />
+                      {log.user_mac_address && (
+                        <Typography
+                          sx={{
+                            mt: 0.5,
+                            fontSize: 12,
+                            color: "#6b7280",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          MAC: {log.user_mac_address}
+                        </Typography>
+                      )}
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontSize: 14,
+                          color: "#374151",
+                          lineHeight: 1.45,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
+                        {log.message}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                );
+              }}
+              components={{
+                Footer: () =>
+                  loading ? (
+                    <Box sx={{ textAlign: "center", py: 2, color: "text.secondary" }}>
+                      Loading more audit logs...
+                    </Box>
+                  ) : null,
+              }}
+            />
+          )}
 
           {logs.length === 0 && !loading && (
             <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>

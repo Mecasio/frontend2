@@ -575,7 +575,7 @@ const RegistrarCourseTagging = () => {
         .get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
         .then((res) => setCourses(res.data))
         .catch((err) => console.error(err));
-  }, [currId]);
+  }, [currId, userId]);
 
   useEffect(() => {
     if (userId && currId)
