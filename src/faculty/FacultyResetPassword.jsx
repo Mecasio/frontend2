@@ -201,7 +201,7 @@ const FacultyResetPassword = () => {
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
       localStorage.removeItem("force_password_change");
       window.dispatchEvent(new Event("password_changed"));
-      setTimeout(() => navigate("/faculty_dashboard"), 1500);
+      setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
       setSnack({ open: true, message: err.response?.data?.message || "Error updating password.", severity: "error" });
     }

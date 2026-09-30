@@ -981,7 +981,7 @@ const StudentNumbering = () => {
         onClose={(_, reason) => {
           if (reason === "backdropClick" || isLocked) return;
           setAuthOpen(false);
-          navigate("/registrar_dashboard");
+          navigate("/dashboard");
         }}
         PaperProps={{
           sx: {
@@ -1044,7 +1044,7 @@ const StudentNumbering = () => {
             <IconButton
               onClick={() => {
                 setAuthOpen(false);
-                navigate("/registrar_dashboard");
+                navigate("/dashboard");
               }}
               sx={{
                 color: "white",
@@ -1299,7 +1299,7 @@ const StudentNumbering = () => {
               <Button
                 onClick={() => {
                   setAuthOpen(false);
-                  navigate("/registrar_dashboard");
+                  navigate("/dashboard");
                 }}
                 color="error"
                 variant="outlined"

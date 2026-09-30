@@ -164,7 +164,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       setUserID(storedID);
 
       if (storedRole !== "student") {
-        window.location.href = "/faculty_dashboard";
+        window.location.href = "/dashboard";
       } else {
         fetchPersonData(storedID);
         fetchStudentDetails(storedID);

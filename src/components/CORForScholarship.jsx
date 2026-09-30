@@ -32,6 +32,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
+import { formatYearSection } from "../utils/sectionDisplay";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import {
@@ -2409,22 +2410,12 @@ const CertificateOfRegistration = forwardRef(
                             const program = String(item.program_code || "")
                               .trim()
                               .replace(/^TBA$/i, "");
-                            const section = [
-                              item.program_code,
+                            const sectionOnly = formatYearSection(
                               item.year_level_id,
                               item.section_description ??
                                 item.section ??
                                 item.description,
-                            ]
-                              .map((value) => String(value ?? "").trim())
-                              .filter(Boolean)
-                              .join(" - ")
-                              .replace(/^TBA$/i, "");
-                            const sectionOnly =
-                              program &&
-                              section.toUpperCase().startsWith(program.toUpperCase())
-                                ? section.slice(program.length).replace(/^[\s\-–]+/, "")
-                                : section;
+                            ).replace(/^TBA$/i, "");
                             const line1 = program || sectionOnly || "TBA";
                             const line2 =
                               program && sectionOnly && sectionOnly !== program

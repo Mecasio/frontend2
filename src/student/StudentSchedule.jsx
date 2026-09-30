@@ -161,7 +161,7 @@ const StudentSchedule = () => {
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
     if (!storedID) { window.location.href = "/login"; return; }
-    if (storedRole !== "student") { window.location.href = "/faculty_dashboard"; return; }
+    if (storedRole !== "student") { window.location.href = "/dashboard"; return; }
     fetchStudentSchedule(storedID);
     fetchStudentInfo(storedID);
     fetchStudentAcademicDetails(storedID);

@@ -110,7 +110,7 @@ const StudentFacultyEvaluation = () => {
       setUserID(storedID);
 
       if (storedRole !== "student") {
-        window.location.href = "/faculty_dashboard";
+        window.location.href = "/dashboard";
       } else {
         fetchEvaluationPeriodStatus().then((open) => {
           if (open) fetchCourseData(storedID, open);

@@ -233,18 +233,7 @@ const RegistrarResetPassword = () => {
       localStorage.removeItem("force_password_change");
       window.dispatchEvent(new Event("password_changed"));
       const role = String(localStorage.getItem("role") || "").trim().toLowerCase();
-      let dashboard = "/registrar_dashboard";
-      if (role === "administrator") {
-        try {
-          const accessList = JSON.parse(localStorage.getItem("accessList") || "[]");
-          const accessSet = new Set((Array.isArray(accessList) ? accessList : []).map(Number));
-          if (accessSet.has(101)) dashboard = "/registrar_dashboard";
-          else if (accessSet.has(102)) dashboard = "/enrollment_officer_dashboard";
-          else if (accessSet.has(103)) dashboard = "/admission_officer_dashboard";
-        } catch {
-          dashboard = "/registrar_dashboard";
-        }
-      }
+      const dashboard = "/dashboard";
       setTimeout(() => navigate(dashboard), 1500);
     } catch (err) {
       setSnack({

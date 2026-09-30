@@ -31,6 +31,7 @@ import { FaFileExcel } from "react-icons/fa";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { formatYearSection } from "../utils/sectionDisplay";
 import { useLocation } from "react-router-dom";
 import {
   getDepartmentIdsFromAdminData,
@@ -191,8 +192,10 @@ const formatStudentCurriculum = (yearDesc, courseCode, courseDescription) => {
 const formatEnrolledSectionLabel = (section) =>
   [
     cleanDisplayValue(section?.program_code),
-    cleanDisplayValue(section?.year_level_id),
-    cleanDisplayValue(section?.section_description ?? section?.description),
+    formatYearSection(
+      section?.year_level_id,
+      section?.section_description ?? section?.description,
+    ),
   ]
     .filter(Boolean)
     .join(" - ");
@@ -201,7 +204,7 @@ const formatDepartmentSectionLabel = (section, extraSuffix = "") => {
   if (!section) return "";
   const code = cleanDisplayValue(section.program_code);
   const name = joinDisplayValues(section.program_description, section.major);
-  const desc = cleanDisplayValue(section.description);
+  const desc = formatYearSection(section.year_level_id, section.description);
   return [code ? `(${code})` : "", name, desc ? `— ${desc}` : "", extraSuffix]
     .filter(Boolean)
     .join(" ");
@@ -2483,8 +2486,11 @@ const CollegeCourseTagging = () => {
                             section.program_description,
                             section.major,
                           )}
-                        {cleanDisplayValue(section.description)
-                          ? ` — ${cleanDisplayValue(section.description)}`
+                        {formatYearSection(section.year_level_id, section.description)
+                          ? ` — ${formatYearSection(
+                              section.year_level_id,
+                              section.description,
+                            )}`
                           : ""}
                         {isOtherDeptSection
                           ? ` [${cleanDisplayValue(section.dprtmnt_code) || "Other Dept"}]`
@@ -2877,8 +2883,10 @@ const CollegeCourseTagging = () => {
             getOptionLabel={(section) =>
               [
                 section.program_code,
-                section.year_level_id,
-                section.section_description ?? section.description,
+                formatYearSection(
+                  section.year_level_id,
+                  section.section_description ?? section.description,
+                ),
               ]
                 .map((v) => cleanDisplayValue(v))
                 .filter(Boolean)
@@ -2893,8 +2901,10 @@ const CollegeCourseTagging = () => {
               <li {...props} key={section.department_and_program_section_id}>
                 {[
                   section.program_code,
-                  section.year_level_id,
-                  section.section_description ?? section.description,
+                  formatYearSection(
+                    section.year_level_id,
+                    section.section_description ?? section.description,
+                  ),
                 ]
                   .map((v) => cleanDisplayValue(v))
                   .filter(Boolean)

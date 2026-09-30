@@ -806,20 +806,6 @@ const SideBar = ({
     student: makeUploadHandler("/api/update_student", "Student1by1"),
   };
 
-  function accessObjToSet(list) {
-    const s = new Set();
-    for (const k in list) {
-      if (list[k]) s.add(Number(k));
-    }
-    return s;
-  }
-  function getRegistrarDashboard(aSet) {
-    if (aSet.has(101)) return "/registrar_dashboard";
-    if (aSet.has(102)) return "/enrollment_officer_dashboard";
-    if (aSet.has(103)) return "/admission_officer_dashboard";
-    return "/registrar_dashboard";
-  }
-
   const loc = typeof window !== "undefined" ? window.location.pathname : "";
   const isActive = (p) => loc === p;
   const isActivePrefix = (px) => loc.startsWith(px);
@@ -1855,9 +1841,6 @@ const SideBar = ({
     },
   ];
 
-  const accessSet = accessObjToSet(userAccessList);
-  const registrarDashboard = getRegistrarDashboard(accessSet);
-
   const renderSection = (item) => {
     const groups = sectionMenus[item.key];
     const hasVisible = groups
@@ -2201,10 +2184,10 @@ const SideBar = ({
                 <>
                   <div className="sb-section-label">Navigation</div>
                   <NavItem
-                    to={registrarDashboard}
+                    to="/dashboard"
                     icon={DashboardIcon}
                     label="Dashboard"
-                    active={isActive(registrarDashboard)}
+                    active={isActive("/dashboard")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
@@ -2219,10 +2202,10 @@ const SideBar = ({
                 <>
                   <div className="sb-section-label">Navigation</div>
                   <NavItem
-                    to="/applicant_dashboard"
+                    to="/dashboard"
                     icon={DashboardIcon}
                     label="Dashboard"
-                    active={isActivePrefix("/applicant_dashboard")}
+                    active={isActive("/dashboard")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
@@ -2279,10 +2262,10 @@ const SideBar = ({
                 <>
                   <div className="sb-section-label">Navigation</div>
                   <NavItem
-                    to="/faculty_dashboard"
+                    to="/dashboard"
                     icon={DashboardIcon}
                     label="Dashboard"
-                    active={isActive("/faculty_dashboard")}
+                    active={isActive("/dashboard")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
@@ -2335,10 +2318,10 @@ const SideBar = ({
                 <>
                   <div className="sb-section-label">Navigation</div>
                   <NavItem
-                    to="/student_dashboard"
+                    to="/dashboard"
                     icon={DashboardIcon}
                     label="Dashboard"
-                    active={isActive("/student_dashboard")}
+                    active={isActive("/dashboard")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
@@ -2379,7 +2362,7 @@ const SideBar = ({
                     to="/student_personal_information"
                     icon={PersonIcon}
                     label="Student Profile"
-                    active={/^\/student_dashboard[1-5]$/.test(loc)}
+                    active={isActive("/student_personal_information")}
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />

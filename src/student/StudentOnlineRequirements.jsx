@@ -548,7 +548,7 @@ const StudentOnlineRequirements = () => {
                 setAllRequirementsCompleted(true);
                 setOpenConfirmModal(false);
                 setSnack({ open: true, severity: "success", message: "Requirements submitted successfully." });
-                setTimeout(() => { window.location.href = "/student_dashboard"; }, 1500);
+                setTimeout(() => { window.location.href = "/dashboard"; }, 1500);
               } catch (err) {
                 setSnack({ open: true, severity: "error", message: "Failed to submit. Please try again." });
               }

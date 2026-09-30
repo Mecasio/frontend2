@@ -833,7 +833,7 @@ const ApplicantOnlineRequirements = () => {
             fullWidth
             variant="contained"
             endIcon={<ArrowForwardIcon />}
-            onClick={() => { setOpenModal(false); window.location.href = "/applicant_dashboard"; }}
+              onClick={() => { setOpenModal(false); window.location.href = "/dashboard"; }}
             sx={{ height: 44, borderRadius: "10px", backgroundColor: headerColor || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: headerColor || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
           >
             Go to Applicant Dashboard

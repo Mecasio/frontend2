@@ -975,7 +975,7 @@ const Login = ({ setIsAuthenticated }) => {
         localStorage.setItem("employee_id", "");
         localStorage.setItem("curriculum_id", "");
         setIsAuthenticated(true);
-        navigate(shouldForceChange ? "/applicant_reset_password" : "/applicant_dashboard");
+          navigate(shouldForceChange ? "/applicant_reset_password" : "/dashboard");
         return;
       }
 
@@ -1042,28 +1042,8 @@ const Login = ({ setIsAuthenticated }) => {
     setSnack((prev) => ({ ...prev, open: false }));
   };
 
-  function accessToSet(list = []) {
-    return new Set(list.map(Number));
-  }
-  function getRegistrarDashboard(accessSet) {
-    if (accessSet.has(101)) return "/registrar_dashboard";
-    if (accessSet.has(102)) return "/enrollment_officer_dashboard";
-    if (accessSet.has(103)) return "/admission_officer_dashboard";
-    return "/registrar_dashboard";
-  }
-  function getUserDashboard(role, accessList = []) {
-    const accessSet = accessToSet(accessList);
-    const normalizedRole = String(role || "").trim().toLowerCase();
-    // Superadmin / technical always open on Registrar Dashboard.
-    if (["superadmin", "technical"].includes(normalizedRole)) {
-      return "/registrar_dashboard";
-    }
-    // Administrator: registrar by default; admission/enrollment officers by page access.
-    if (normalizedRole === "administrator") {
-      return getRegistrarDashboard(accessSet);
-    }
-    if (normalizedRole === "faculty") return "/faculty_dashboard";
-    return "/student_dashboard";
+  function getUserDashboard() {
+    return "/dashboard";
   }
 
   const backgroundBase =

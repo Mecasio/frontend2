@@ -30,6 +30,7 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import { formatYearSection } from "../utils/sectionDisplay";
 import {
   buildFeeLinesPayload,
   computeTotalAssessment,
@@ -2323,16 +2324,10 @@ const CertificateOfRegistration = forwardRef(
                             const program = String(item.program_code || "")
                               .trim()
                               .replace(/^TBA$/i, "");
-                            const section = String(
+                            const sectionOnly = formatYearSection(
+                              item.year_level_id,
                               item.section || item.description || "",
-                            )
-                              .trim()
-                              .replace(/^TBA$/i, "");
-                            const sectionOnly =
-                              program &&
-                              section.toUpperCase().startsWith(program.toUpperCase())
-                                ? section.slice(program.length).replace(/^[\s\-–]+/, "")
-                                : section;
+                            ).replace(/^TBA$/i, "");
                             const line1 = program || sectionOnly || "TBA";
                             const line2 =
                               program && sectionOnly && sectionOnly !== program

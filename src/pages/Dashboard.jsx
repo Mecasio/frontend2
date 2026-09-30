@@ -124,7 +124,7 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
       setUserRole(storedRole);
       setUserID(storedID);
       if (!["administrator", "superadmin", "technical"].includes(storedRole)) {
-        window.location.href = "/applicant_dashboard";
+        window.location.href = "/dashboard";
       }
     } else {
       window.location.href = "/login";

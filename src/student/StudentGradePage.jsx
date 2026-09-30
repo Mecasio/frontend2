@@ -303,7 +303,7 @@ const StudentGradePage = () => {
       setUserRole(storedRole);
       setUserID(storedID);
       if (storedRole !== "student") {
-        window.location.href = "/faculty_dashboard";
+        window.location.href = "/dashboard";
       } else {
         fetchStudentGrade(storedID);
       }

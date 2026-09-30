@@ -31,6 +31,7 @@ import { FaFileExcel } from "react-icons/fa";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { formatYearSection } from "../utils/sectionDisplay";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
@@ -188,8 +189,10 @@ const formatSection = (programCode, description) =>
 const formatEnrolledSectionLabel = (section) =>
   [
     cleanDisplayValue(section?.program_code),
-    cleanDisplayValue(section?.year_level_id),
-    cleanDisplayValue(section?.section_description ?? section?.description),
+    formatYearSection(
+      section?.year_level_id,
+      section?.section_description ?? section?.description,
+    ),
   ]
     .filter(Boolean)
     .join(" - ");
@@ -198,7 +201,7 @@ const formatDepartmentSectionLabel = (section) => {
   if (!section) return "";
   const code = cleanDisplayValue(section.program_code);
   const name = joinDisplayValues(section.program_description, section.major);
-  const desc = cleanDisplayValue(section.description);
+  const desc = formatYearSection(section.year_level_id, section.description);
   return [code ? `(${code})` : "", name, desc ? `— ${desc}` : ""]
     .filter(Boolean)
     .join(" ");
@@ -900,7 +903,11 @@ const RegistrarCourseTagging = () => {
         String(selectedSection),
     );
     if (!section) return sectionDescription || "Unknown Section";
-    return [section.program_description, section.major, section.description]
+    return [
+      section.program_description,
+      section.major,
+      formatYearSection(section.year_level_id, section.description),
+    ]
       .map((value) => cleanDisplayValue(value))
       .filter(Boolean)
       .join(" ");
@@ -2075,8 +2082,11 @@ const RegistrarCourseTagging = () => {
                           section.program_description,
                           section.major,
                         )}
-                      {cleanDisplayValue(section.description)
-                        ? ` — ${cleanDisplayValue(section.description)}`
+                      {formatYearSection(section.year_level_id, section.description)
+                        ? ` — ${formatYearSection(
+                            section.year_level_id,
+                            section.description,
+                          )}`
                         : ""}
                     </Typography>
                   </li>
@@ -2499,7 +2509,7 @@ const RegistrarCourseTagging = () => {
               [
                 section.program_code,
                 section.major,
-                section.description,
+                formatYearSection(section.year_level_id, section.description),
               ]
                 .map((v) => cleanDisplayValue(v))
                 .filter(Boolean)
@@ -2515,7 +2525,7 @@ const RegistrarCourseTagging = () => {
                 {[
                   section.program_code,
                   section.major,
-                  section.description,
+                  formatYearSection(section.year_level_id, section.description),
                 ]
                   .map((v) => cleanDisplayValue(v))
                   .filter(Boolean)

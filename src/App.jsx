@@ -279,9 +279,65 @@ const AdmissionOfficerDashboard = lazy(() => import("./pages/AdmissionOfficerDas
 const ApplicantDashboard = lazy(() => import("./pages/ApplicantDashboard"));
 const EnrollmentOfficerDashboard = lazy(() => import("./pages/EnrollmentOfficerDashboard"));
 const FacultyDashboard = lazy(() => import("./pages/FacultyDashboard"));
-const RegistrarDashboard = lazy(() => import("./pages/RegistrarDashboard"));
+const RegistrarDashboard = lazy(() => import("./pages/Dashboard"));
 const ScheduleFilterer = lazy(() => import("./pages/SchedulePlottingFilter"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+
+const DASHBOARD_ACCESS_IDS = {
+  registrar: 101,
+  enrollment: 102,
+  admission: 103,
+};
+
+const getStoredDashboardAccess = () => {
+  try {
+    const raw = localStorage.getItem("accessList");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map(Number) : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const DashboardEntry = ({ profileImage, setProfileImage }) => {
+  const role = String(localStorage.getItem("role") || "")
+    .trim()
+    .toLowerCase();
+
+  if (role === "faculty") {
+    return <FacultyDashboard profileImage={profileImage} setProfileImage={setProfileImage} />;
+  }
+  if (role === "applicant") {
+    return <ApplicantDashboard profileImage={profileImage} setProfileImage={setProfileImage} />;
+  }
+  if (role === "student") {
+    return <StudentDashboard profileImage={profileImage} setProfileImage={setProfileImage} />;
+  }
+
+  if (["administrator", "superadmin", "technical"].includes(role)) {
+    const access = getStoredDashboardAccess();
+    const assignedDashboards = Object.entries(DASHBOARD_ACCESS_IDS).filter(([, pageId]) =>
+      access.has(pageId),
+    );
+
+    if (assignedDashboards.length !== 1) {
+      return <Unauthorized />;
+    }
+
+    const [dashboard] = assignedDashboards[0];
+    if (dashboard === "registrar") {
+      return <RegistrarDashboard profileImage={profileImage} setProfileImage={setProfileImage} />;
+    }
+    if (dashboard === "enrollment") {
+      return <EnrollmentOfficerDashboard />;
+    }
+    if (dashboard === "admission") {
+      return <AdmissionOfficerDashboard />;
+    }
+  }
+
+  return <Unauthorized />;
+};
 
 // ------------------------------------------------------------
 // REGISTRAR
@@ -474,48 +530,27 @@ function App() {
     localStorage.removeItem("accessList");
   };
 
-  const getStoredAccessList = () => {
-    try {
-      const raw = localStorage.getItem("accessList");
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.map(Number) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const getRegistrarDashboard = (accessSet) => {
-    if (accessSet.has(101)) return "/registrar_dashboard";
-    if (accessSet.has(102)) return "/enrollment_officer_dashboard";
-    if (accessSet.has(103)) return "/admission_officer_dashboard";
-    return "/registrar_dashboard";
-  };
-
-  const getDefaultDashboardByRole = (role) => {
-    const normalizedRole = String(role || "").trim().toLowerCase();
-    switch (normalizedRole) {
-      case "applicant":
-        return "/applicant_dashboard";
-      case "student":
-        return "/student_dashboard";
-      case "faculty":
-        return "/faculty_dashboard";
-      case "superadmin":
-      case "technical":
-        return "/registrar_dashboard";
-      case "administrator":
-        return getRegistrarDashboard(new Set(getStoredAccessList()));
-      default:
-        return "/registrar_dashboard";
-    }
-  };
+  const getDefaultDashboardByRole = () => "/dashboard";
 
   const getLastVisitedPath = () => {
     const path = localStorage.getItem("lastVisitedPath");
     if (!path || typeof path !== "string") return null;
     if (!path.startsWith("/")) return null;
-    const disallowedPublicPaths = new Set(["/", "/login", "/login_applicant", "/register", "/announcement_slider", "/applicant_forgot_password", "/forgot_password"]);
+    const disallowedPublicPaths = new Set([
+      "/",
+      "/login",
+      "/login_applicant",
+      "/register",
+      "/announcement_slider",
+      "/applicant_forgot_password",
+      "/forgot_password",
+      "/registrar_dashboard",
+      "/enrollment_officer_dashboard",
+      "/admission_officer_dashboard",
+      "/faculty_dashboard",
+      "/student_dashboard",
+      "/applicant_dashboard",
+    ]);
     return disallowedPublicPaths.has(path) ? null : path;
   };
 
@@ -708,19 +743,25 @@ function App() {
                       {/* ---------------------------------------------------------- */}
                       {/* PAGES (dashboards)                                         */}
                       {/* ---------------------------------------------------------- */}
-                      <Route path="/registrar_dashboard" element={<ProtectedRoute><ForcePasswordGuard><RegistrarDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></ForcePasswordGuard></ProtectedRoute>} />
-                      <Route path="/faculty_dashboard" element={<GuardedRoute allowedRoles={["faculty"]}><FacultyDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></GuardedRoute>} />
-                      <Route path="/applicant_dashboard" element={<ProtectedRoute><ForcePasswordGuard><ApplicantDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></ForcePasswordGuard></ProtectedRoute>} />
-                      <Route path="/enrollment_officer_dashboard" element={<ProtectedRoute><ForcePasswordGuard><EnrollmentOfficerDashboard /></ForcePasswordGuard></ProtectedRoute>} />
-                      <Route path="/admission_officer_dashboard" element={<ProtectedRoute><ForcePasswordGuard><AdmissionOfficerDashboard /></ForcePasswordGuard></ProtectedRoute>} />
-                      {/* Legacy dashboard URLs: keep old bookmarks working while
-                          the Sidebar becomes the direct module navigation. */}
+                       <Route
+                         path="/dashboard"
+                         element={
+                           <ProtectedRoute
+                             allowedRoles={["administrator", "superadmin", "technical", "faculty", "student", "applicant"]}
+                             strictRoles
+                           >
+                             <ForcePasswordGuard>
+                               <DashboardEntry profileImage={profileImage} setProfileImage={setProfileImage} />
+                             </ForcePasswordGuard>
+                           </ProtectedRoute>
+                         }
+                       />
+                       {/* Legacy module URLs */}
                       <Route path="/admission_dashboard" element={<Navigate to="/admission_applicant_list" replace />} />
                       <Route path="/department_dashboard" element={<Navigate to="/department_section_panel" replace />} />
                       <Route path="/system_dashboard" element={<Navigate to="/settings" replace />} />
                       <Route path="/account_dashboard" element={<Navigate to="/user_page_access" replace />} />
                       <Route path="/select_college" element={<ProtectedRoute><ScheduleFilterer /></ProtectedRoute>} />
-                      <Route path="/student_dashboard" element={<GuardedRoute allowedRoles={"student"}><StudentDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></GuardedRoute>} />
 
                       {/* ---------------------------------------------------------- */}
                       {/* ACCOUNT MANAGEMENT                                         */}

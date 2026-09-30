@@ -45,6 +45,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import API_BASE_URL from "../apiConfig";
+import { formatYearSection } from "../utils/sectionDisplay";
 import ScoreIcon from "@mui/icons-material/Score";
 import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -188,8 +189,8 @@ const formatStudentCurriculum = (yearDesc, courseCode, courseDescription) => {
   return [year, program].filter(Boolean).join(" - ");
 };
 
-const formatSection = (programCode, description) =>
-  [cleanDisplayValue(programCode), cleanDisplayValue(description)]
+const formatSection = (programCode, description, yearLevel) =>
+  [cleanDisplayValue(programCode), formatYearSection(yearLevel, description)]
     .filter(Boolean)
     .join("-");
 
@@ -197,7 +198,7 @@ const formatDepartmentSectionLabel = (section) => {
   if (!section) return "";
   const code = cleanDisplayValue(section.program_code);
   const name = joinDisplayValues(section.program_description, section.major);
-  const desc = cleanDisplayValue(section.description);
+  const desc = formatYearSection(section.year_level_id, section.description);
   return [code ? `(${code})` : "", name, desc ? `— ${desc}` : ""]
     .filter(Boolean)
     .join(" ");
@@ -817,7 +818,11 @@ const RegistrarCourseTaggingSummer = () => {
         String(selectedSection),
     );
     if (!section) return "Unknown Section";
-    return [section.program_description, section.major, section.description]
+    return [
+      section.program_description,
+      section.major,
+      formatYearSection(section.year_level_id, section.description),
+    ]
       .map((value) => cleanDisplayValue(value))
       .filter(Boolean)
       .join(" ");
@@ -2009,8 +2014,11 @@ const RegistrarCourseTaggingSummer = () => {
                           section.program_description,
                           section.major,
                         )}
-                      {cleanDisplayValue(section.description)
-                        ? ` — ${cleanDisplayValue(section.description)}`
+                      {formatYearSection(section.year_level_id, section.description)
+                        ? ` — ${formatYearSection(
+                            section.year_level_id,
+                            section.description,
+                          )}`
                         : ""}
                     </Typography>
                   </li>
@@ -2205,7 +2213,11 @@ const RegistrarCourseTaggingSummer = () => {
                               String(e.department_section_id),
                           ) && (
                             <MenuItem value={String(e.department_section_id)}>
-                              {formatSection(e.program_code, e.description) ||
+                              {formatSection(
+                                e.program_code,
+                                e.description,
+                                e.year_level_id,
+                              ) ||
                                 `Section ${e.department_section_id}`}
                             </MenuItem>
                           )}
@@ -2218,7 +2230,10 @@ const RegistrarCourseTaggingSummer = () => {
                           >
                             {[
                               section.program_code,
-                              section.description,
+                              formatYearSection(
+                                section.year_level_id,
+                                section.description,
+                              ),
                             ]
                               .map((v) => cleanDisplayValue(v))
                               .filter(Boolean)
@@ -2410,7 +2425,10 @@ const RegistrarCourseTaggingSummer = () => {
               [
                 section.program_code,
                 section.major,
-                section.description,
+                              formatYearSection(
+                                section.year_level_id,
+                                section.description,
+                              ),
               ]
                 .map((v) => cleanDisplayValue(v))
                 .filter(Boolean)
@@ -2426,7 +2444,7 @@ const RegistrarCourseTaggingSummer = () => {
                 {[
                   section.program_code,
                   section.major,
-                  section.description,
+                  formatYearSection(section.year_level_id, section.description),
                 ]
                   .map((v) => cleanDisplayValue(v))
                   .filter(Boolean)

@@ -48,6 +48,12 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 const USER_PAGE_ACCESS_PAGE_ID = 69;
 const ALWAYS_USER_PAGE_ACCESS_ROLES = ["superadmin", "technical"];
+const DASHBOARD_PAGE_IDS = [101, 102, 103];
+const DASHBOARD_PAGE_LABELS = {
+  101: "Registrar Dashboard",
+  102: "Enrollment Officer Dashboard",
+  103: "Admission Officer Dashboard",
+};
 
 const normalizeAccessRole = (role) => String(role || "").trim().toLowerCase();
 
@@ -98,6 +104,11 @@ const getCurrentEmployeeId = () => {
 // left commented out below it - update if a different group should win.
 // ─────────────────────────────────────────────────────────────────────────
 const PAGE_ID_TO_GROUP = {
+  // Dashboards
+  101: "Dashboards",
+  102: "Dashboards",
+  103: "Dashboards",
+
   // Admission Management
   7: "Admission Management",
   1: "Admission Management",
@@ -269,6 +280,7 @@ const PAGE_ID_TO_GROUP = {
 
 // Display order for the "Filter by Group" dropdown - mirrors sidebar order
 const ACCESS_GROUP_ORDER = [
+  "Dashboards",
   "Admission Management",
   "Enrollment Management",
   "Medical & Dental Management",
@@ -666,9 +678,12 @@ const UserPageAccess = () => {
       ? `${user.last_name}, ${user.first_name} ${user.middle_name || "."}`.trim()
       : "this user";
 
+  const getPageDisplayName = (page) =>
+    DASHBOARD_PAGE_LABELS[Number(page?.id)] || page?.page_description || `Page ${page?.id}`;
+
   const getPageLabel = (targetPageId) => {
     const page = pages.find((p) => Number(p.id) === Number(targetPageId));
-    return page?.page_description || `Page ${targetPageId}`;
+    return DASHBOARD_PAGE_LABELS[Number(targetPageId)] || page?.page_description || `Page ${targetPageId}`;
   };
 
   const closeAccessConfirm = () => {
@@ -791,7 +806,8 @@ const UserPageAccess = () => {
     return pagesList.filter((page) => {
       const searchableText = [
         page.id,
-        page.page_description,
+        getPageDisplayName(page),
+        PAGE_ID_TO_GROUP[page.id],
         page.page_group,
       ]
         .filter(Boolean)
@@ -921,6 +937,7 @@ const UserPageAccess = () => {
       return;
     }
 
+    const targetId = Number(targetPageId);
     const newState = !hasAccessNow;
     const previousState = pageAccess[targetPageId] || {
       access: false,
@@ -928,6 +945,26 @@ const UserPageAccess = () => {
       can_edit: false,
       can_delete: false,
     };
+    const currentDashboardId =
+      !hasAccessNow && DASHBOARD_PAGE_IDS.includes(targetId)
+        ? DASHBOARD_PAGE_IDS.find(
+            (dashboardPageId) =>
+              dashboardPageId !== targetId &&
+              pageAccess[dashboardPageId]?.access,
+          )
+        : null;
+    const previousDashboardState = currentDashboardId
+      ? pageAccess[currentDashboardId]
+      : null;
+
+    if (currentDashboardId && !canDelete) {
+      setSnack({
+        open: true,
+        severity: "error",
+        message: "You need permission to revoke the current dashboard before switching.",
+      });
+      return;
+    }
 
     setPageAccess((prev) => ({
       ...prev,
@@ -938,9 +975,27 @@ const UserPageAccess = () => {
         can_edit: false,
         can_delete: false,
       },
+      ...(currentDashboardId
+        ? {
+            [currentDashboardId]: {
+              ...previousDashboardState,
+              access: false,
+              can_create: false,
+              can_edit: false,
+              can_delete: false,
+            },
+          }
+        : {}),
     }));
 
     try {
+      if (currentDashboardId) {
+        await axios.delete(
+          `${API_BASE_URL}/api/page_access/${selectedUser.employee_id}/${currentDashboardId}`,
+          getAuditConfigForPage(),
+        );
+      }
+
       if (newState) {
         await axios.post(
           `${API_BASE_URL}/api/page_access/${selectedUser.employee_id}/${targetPageId}`,
@@ -957,14 +1012,37 @@ const UserPageAccess = () => {
       setSnack({
         open: true,
         severity: "success",
-        message: newState ? "Access granted" : "Access revoked",
+        message: currentDashboardId
+          ? "Dashboard access switched successfully"
+          : newState
+            ? "Access granted"
+            : "Access revoked",
       });
     } catch {
+      if (currentDashboardId) {
+        try {
+          await axios.post(
+            `${API_BASE_URL}/api/page_access/${selectedUser.employee_id}/${currentDashboardId}`,
+            {},
+            getAuditConfigForPage(),
+          );
+        } catch (restoreError) {
+          console.error("Failed to restore previous dashboard access:", restoreError);
+        }
+      }
       setPageAccess((prev) => ({ ...prev, [targetPageId]: previousState }));
+      if (currentDashboardId) {
+        setPageAccess((prev) => ({
+          ...prev,
+          [currentDashboardId]: previousDashboardState,
+        }));
+      }
       setSnack({
         open: true,
         severity: "error",
-        message: "Failed to update access",
+        message: currentDashboardId
+          ? "Failed to switch dashboard access"
+          : "Failed to update access",
       });
     }
   };
@@ -1002,14 +1080,42 @@ const UserPageAccess = () => {
       return;
     }
     const employeeName = formatEmployeeName(selectedUser);
-    const pageLabel = getPageLabel(targetPageId);
+    const targetId = Number(targetPageId);
+    const pageLabel = getPageLabel(targetId);
+    const currentDashboardId =
+      !isRevoke && DASHBOARD_PAGE_IDS.includes(targetId)
+        ? DASHBOARD_PAGE_IDS.find(
+            (dashboardPageId) =>
+              dashboardPageId !== targetId &&
+              pageAccess[dashboardPageId]?.access,
+          )
+        : null;
+    const currentDashboardLabel = currentDashboardId
+      ? getPageLabel(currentDashboardId)
+      : "";
+    const isDashboardSwitch = Boolean(currentDashboardId);
+
+    if (isDashboardSwitch && !canDelete) {
+      setSnack({
+        open: true,
+        severity: "error",
+        message: "You need permission to revoke the current dashboard before switching.",
+      });
+      return;
+    }
 
     confirmAccessChange({
-      requiresConfirm: isRevoke,
-      title: isRevoke ? "Revoke Page Access" : "Modify Page Access",
-      message: isRevoke
-        ? `Are you sure you want to revoke ${employeeName}'s access to ${pageLabel}?`
-        : `Are you sure you want to grant ${employeeName} access to ${pageLabel}?`,
+      requiresConfirm: isRevoke || isDashboardSwitch,
+      title: isDashboardSwitch
+        ? "Switch Dashboard Access"
+        : isRevoke
+          ? "Revoke Page Access"
+          : "Grant Page Access",
+      message: isDashboardSwitch
+        ? `Are you sure you want to switch ${employeeName}'s dashboard from ${currentDashboardLabel} to ${pageLabel}?`
+        : isRevoke
+          ? `Are you sure you want to revoke ${employeeName}'s access to ${pageLabel}?`
+          : `Are you sure you want to grant ${employeeName} access to ${pageLabel}?`,
       onConfirm: () => executeToggleChange(targetPageId, hasAccessNow),
     });
   };
@@ -1474,6 +1580,14 @@ const UserPageAccess = () => {
 
     const targetPages = pageGroupFilter ? filteredPagesWithoutAccess : pages;
     if (pageGroupFilter && targetPages.length === 0) return;
+    if (targetPages.some((page) => DASHBOARD_PAGE_IDS.includes(Number(page.id)))) {
+      setSnack({
+        open: true,
+        severity: "warning",
+        message: "Dashboard access must be assigned one dashboard at a time.",
+      });
+      return;
+    }
 
     try {
       await axios.post(`${API_BASE_URL}/api/page_access/grant-all`, {
@@ -2591,7 +2705,7 @@ const UserPageAccess = () => {
                             {p.id}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                            {p.page_description}
+                            {getPageDisplayName(p)}
                           </TableCell>    
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
@@ -2699,7 +2813,7 @@ const UserPageAccess = () => {
                             {p.id}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                            {p.page_description}
+                            {getPageDisplayName(p)}
                           </TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                             <Switch
@@ -2972,8 +3086,8 @@ const UserPageAccess = () => {
                         {(accessTab === 0 ? filteredCreatePagesWithAccess : filteredCreatePagesWithoutAccess).map((p) => (
                           <TableRow key={p.id} sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}>
                             <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
-                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
-                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{getPageDisplayName(p)}</TableCell>
+                            <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{PAGE_ID_TO_GROUP[p.id] || p.page_group}</TableCell>
                             <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                               <Switch checked={createPageAccess[p.id]?.access || false} onChange={() => handleCreateToggle(p.id)} />
                             </TableCell>
@@ -3183,8 +3297,8 @@ const UserPageAccess = () => {
                       {(accessTab === 0 ? filteredEditPagesWithAccess : filteredEditPagesWithoutAccess).map((p) => (
                         <TableRow key={p.id} sx={{ "&:hover": { backgroundColor: "#f5f5f5" } }}>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
-                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_description}</TableCell>
-                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{getPageDisplayName(p)}</TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{PAGE_ID_TO_GROUP[p.id] || p.page_group}</TableCell>
                           <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}><Switch checked={editPageAccess[p.id]?.access || false} onChange={() => handleEditToggle(p.id)} disabled={!editAccessId} /></TableCell>
                           {accessTab === 0 && ["can_create", "can_edit", "can_delete"].map((permissionKey) => (
                             <TableCell key={permissionKey} sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}><Switch checked={editPageAccess[p.id]?.[permissionKey] || false} onChange={() => handleEditPermissionToggle(p.id, permissionKey)} disabled={!editAccessId || !editPageAccess[p.id]?.access} /></TableCell>
@@ -3247,23 +3361,61 @@ const UserPageAccess = () => {
         onClose={closeAccessConfirm}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            border: `1px solid ${borderColor}`,
+            borderRadius: 2,
+            overflow: "hidden",
+          },
+        }}
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <WarningAmberIcon color="warning" />
+        <DialogTitle
+          sx={{
+            px: 3,
+            py: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            backgroundColor: headerColor || "#1976d2",
+            color: "white",
+            fontWeight: 700,
+            fontSize: 18,
+          }}
+        >
+          <WarningAmberIcon sx={{ color: "inherit" }} />
           {accessConfirmDialog.title}
         </DialogTitle>
-        <DialogContent>
-          <Typography>{accessConfirmDialog.message}</Typography>
+        <DialogContent sx={{ px: 3, py: 2.5 }}>
+          <Typography sx={{ color: titleColor || "#1f2937", lineHeight: 1.6 }}>
+            {accessConfirmDialog.message}
+          </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button color="error"
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            gap: 1,
+          }}
+        >
+          <Button
+            color="error"
             variant="outlined"
+            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 1.5 }}
             onClick={closeAccessConfirm}>
             Cancel
           </Button>
           <Button
-            color="warning"
             variant="contained"
+            sx={{
+              backgroundColor: mainButtonColor || "#1976d2",
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: 1.5,
+              "&:hover": {
+                backgroundColor: mainButtonColor || "#1976d2",
+                filter: "brightness(0.9)",
+              },
+            }}
             onClick={() => accessConfirmDialog.onConfirm?.()}
           >
             Confirm
