@@ -1079,6 +1079,16 @@ const SlotMonitoring = () => {
                                             name="course"
                                             value={selectedCourse}
                                             onChange={(e) => setSelectedCourse(e.target.value)}
+                                            displayEmpty
+                                            renderValue={(value) => {
+                                                if (!value) return "All Tagged Subjects";
+                                                const course = courses.find(
+                                                    (item) => String(item.course_id) === String(value),
+                                                );
+                                                return course
+                                                    ? `${course.course_code} - ${course.course_description}`
+                                                    : "All Tagged Subjects";
+                                            }}
                                             sx={{ width: "230px", textAlign: "left" }}
                                             MenuProps={{
                                                 PaperProps: {

@@ -527,8 +527,19 @@ export const downloadClassProgramPdf = async ({
   collegeName,
   signatures,
 }) => {
+  const token = localStorage.getItem("token") || "";
+  const employeeId = localStorage.getItem("employee_id") || "";
+  const actorRole = localStorage.getItem("role") || "";
+  const requestHeaders = {
+    Authorization: `Bearer ${token}`,
+    "x-employee-id": employeeId,
+    "x-audit-actor-id": employeeId,
+    "x-audit-actor-role": actorRole,
+  };
+
   const scheduleRes = await fetch(
     `${apiBaseUrl}/api/get/section_schedule/${sectionId}`,
+    { headers: requestHeaders },
   );
 
   if (!scheduleRes.ok) {
@@ -592,6 +603,7 @@ export const downloadClassProgramPdf = async ({
   const res = await fetch(`${apiBaseUrl}/api/generate-class-program-pdf`, {
     method: "POST",
     headers: {
+      ...requestHeaders,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

@@ -239,8 +239,9 @@ const PAGE_ID_TO_GROUP = {
   // Scholarship Management
   // 116: "Scholarship Management", // dup of Payment Management's 116 - Payment Management wins above
 
-  // System Logs
-  154: "System Logs",
+  // System Logs and Reports
+  154: "System Logs and Reports",
+  176: "System Logs and Reports",
 
   // Account Management
   70: "Account Management",
@@ -299,7 +300,7 @@ const ACCESS_GROUP_ORDER = [
   "Evaluation Management",
   "Payment Management",
   "Scholarship Management",
-  "System Logs",
+  "System Logs and Reports",
   "Reset Password",
   "Account Management",
   "Faculty Management",

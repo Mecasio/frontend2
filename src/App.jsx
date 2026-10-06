@@ -416,6 +416,7 @@ const PaymentExportingModule = lazy(() => import("./system_management/PaymentExp
 const ProgramSlotLimit = lazy(() => import("./system_management/ProgramSlotLimit"));
 const ReceiptCounterAssignment = lazy(() => import("./system_management/ReceiptCounterAssignment"));
 const RequirementsForm = lazy(() => import("./system_management/RequirementsForm"));
+const Reports = lazy(() => import("./system_management/Reports"));
 const SchoolYearPanel = lazy(() => import("./system_management/SchoolYearPanel"));
 const SectionPanel = lazy(() => import("./system_management/SectionPanel"));
 const SemesterPanel = lazy(() => import("./system_management/SemesterPanel"));
@@ -1003,6 +1004,7 @@ function App() {
                       <Route path="/change_grade_period" element={<ProtectedRoute><ChangeGradingPeriod /></ProtectedRoute>} />
                       <Route path="/grade_conversion_admin" element={<ProtectedRoute><GradeConversionAdmin /></ProtectedRoute>} />
                       <Route path="/honors_report" element={<ProtectedRoute><HonorsReport /></ProtectedRoute>} />
+                      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                       <Route path="/evaluation_crud" element={<ProtectedRoute><EvaluationCRUD /></ProtectedRoute>} />
                       <Route path="/settings" element={<ProtectedRoute><Settings onUpdate={fetchSettings} /></ProtectedRoute>} />
                       <Route path="/program_slot_limit" element={<ProtectedRoute><ProgramSlotLimit /></ProtectedRoute>} />

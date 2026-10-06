@@ -384,10 +384,7 @@ const CollegeScheduleChecker = () => {
   const [otherDepartmentProfList, setOtherDepartmentProfList] = useState([]);
   const [otherDepartmentProfessor, setOtherDepartmentProfessor] =
     useState(null);
-  const [otherDepartmentProfessorSchedule, setOtherDepartmentProfessorSchedule] =
-    useState([]);
   const otherDepartmentDraftRef = useRef({ selectedRoom: "" });
-  const scheduleDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
   const filterPlottedScheduleByDepartmentAccess = (entries = []) => {
     if (!Array.isArray(entries)) return [];
@@ -590,10 +587,19 @@ const CollegeScheduleChecker = () => {
         ),
       );
       const rows = mergeUniqueByKey(
-        responses.flatMap((res) => res.data || []),
+        responses.flatMap((res, index) =>
+          (res.data || []).map((section) => ({
+            ...section,
+            dprtmnt_id:
+              section.dprtmnt_id ?? allowedDepartmentIds[index],
+          })),
+        ),
         "dep_section_id",
       );
-      setSectionList(filterCollegeScheduleSections(rows, adminData));
+      const activeSections = rows.filter(
+        (section) => Number(section.dsstat) === 1,
+      );
+      setSectionList(filterCollegeScheduleSections(activeSections, adminData));
     } catch (error) {
       console.log(error);
       setSectionList([]);
@@ -627,15 +633,9 @@ const CollegeScheduleChecker = () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
       const rows = Array.isArray(response.data) ? response.data : [];
-      const blockedDepartmentIds = new Set(allowedDepartmentIds.map(String));
 
       setAllDepartments(rows);
-      setDepartmentOptions(
-        rows.filter(
-          (department) =>
-            !blockedDepartmentIds.has(String(department.dprtmnt_id)),
-        ),
-      );
+      setDepartmentOptions(rows);
     } catch (error) {
       console.error("Error fetching departments:", error);
       setAllDepartments([]);
@@ -1053,98 +1053,6 @@ const CollegeScheduleChecker = () => {
     return room?.room_description || "Not selected";
   };
 
-  const getScheduleEntryDay = (entry) =>
-    String(entry?.day_description || entry?.room_day || "")
-      .toUpperCase()
-      .trim();
-
-  const renderScheduleBlocks = (entries = [], emptyMessage) => {
-    const safeEntries = Array.isArray(entries) ? entries : [];
-
-    return (
-      <Box
-        sx={{
-          border: "1px solid #d1d5db",
-          borderRadius: 2,
-          p: 1.5,
-          maxHeight: 320,
-          overflowY: "auto",
-          backgroundColor: "#fafafa",
-        }}
-      >
-        {safeEntries.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            {emptyMessage}
-          </Typography>
-        ) : (
-          <Box sx={{ display: "grid", gap: 1 }}>
-            {scheduleDays.map((day) => {
-              const dayEntries = safeEntries.filter(
-                (entry) => getScheduleEntryDay(entry) === day,
-              );
-
-              return (
-                <Box
-                  key={day}
-                  sx={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 1.5,
-                    p: 1,
-                    backgroundColor: "white",
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                    {day}
-                  </Typography>
-                  {dayEntries.length === 0 ? (
-                    <Typography variant="caption" color="text.secondary">
-                      No plotted schedule
-                    </Typography>
-                  ) : (
-                    <Box sx={{ display: "grid", gap: 0.75 }}>
-                      {dayEntries.map((entry, index) => (
-                        <Box
-                          key={`${day}-${entry.id || entry.schedule_id || index}`}
-                          sx={{
-                            borderLeft: "4px solid #1976d2",
-                            borderRadius: 1,
-                            px: 1,
-                            py: 0.75,
-                            backgroundColor: "#eef5ff",
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {entry.school_time_start} - {entry.school_time_end}
-                          </Typography>
-                          <Typography variant="caption" display="block">
-                            {entry.course_code ||
-                              entry.course_description ||
-                              entry.description ||
-                              "Schedule"}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            display="block"
-                          >
-                            {entry.section_name ||
-                              entry.program_code ||
-                              entry.room_description ||
-                              ""}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-      </Box>
-    );
-  };
-
   const handleOpenOtherDepartmentDialog = () => {
     otherDepartmentDraftRef.current = {
       selectedRoom,
@@ -1166,7 +1074,6 @@ const CollegeScheduleChecker = () => {
     setOtherDepartmentId("");
     setOtherDepartmentProfList([]);
     setOtherDepartmentProfessor(null);
-    setOtherDepartmentProfessorSchedule([]);
     setSelectedProf("");
   };
 
@@ -1175,7 +1082,6 @@ const CollegeScheduleChecker = () => {
     setOtherDepartmentId("");
     setOtherDepartmentProfList([]);
     setOtherDepartmentProfessor(null);
-    setOtherDepartmentProfessorSchedule([]);
     setSelectedRoom(otherDepartmentDraftRef.current.selectedRoom || "");
     if (!selectedProf) {
       setPickOtherDepartmentProfessor(false);
@@ -1410,7 +1316,6 @@ const CollegeScheduleChecker = () => {
     if (!otherDepartmentId) {
       setOtherDepartmentProfList([]);
       setOtherDepartmentProfessor(null);
-      setOtherDepartmentProfessorSchedule([]);
       return;
     }
 
@@ -1419,35 +1324,37 @@ const CollegeScheduleChecker = () => {
       .then((res) => {
         setOtherDepartmentProfList(res.data || []);
         setOtherDepartmentProfessor(null);
-        setOtherDepartmentProfessorSchedule([]);
       })
       .catch((err) => {
         console.error("Error fetching cross-department professors:", err);
         setOtherDepartmentProfList([]);
         setOtherDepartmentProfessor(null);
-        setOtherDepartmentProfessorSchedule([]);
       });
   }, [otherDepartmentId]);
 
   useEffect(() => {
-    if (!otherDepartmentProfessor?.prof_id) {
-      setOtherDepartmentProfessorSchedule([]);
-      return;
-    }
+    const selectedSectionEntry = sectionList.find(
+      (section) => String(section.dep_section_id) === String(selectedSection),
+    );
+    const currentDepartmentId = selectedSectionEntry?.dprtmnt_id;
 
-    axios
-      .get(
-        `${API_BASE_URL}/api/professor-schedule/${otherDepartmentProfessor.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
-      )
-      .then((res) => setOtherDepartmentProfessorSchedule(res.data || []))
-      .catch((err) => {
-        console.error(
-          "Error fetching cross-department professor schedule:",
-          err,
-        );
-        setOtherDepartmentProfessorSchedule([]);
-      });
-  }, [otherDepartmentProfessor]);
+    setDepartmentOptions(
+      allDepartments.filter(
+        (department) =>
+          !currentDepartmentId ||
+          String(department.dprtmnt_id) !== String(currentDepartmentId),
+      ),
+    );
+
+    if (
+      currentDepartmentId &&
+      String(otherDepartmentId) === String(currentDepartmentId)
+    ) {
+      setOtherDepartmentId("");
+      setOtherDepartmentProfList([]);
+      setOtherDepartmentProfessor(null);
+    }
+  }, [allDepartments, sectionList, selectedSection, otherDepartmentId]);
 
   const insertAuditLog = async (eventType, details = {}) => {
     try {
@@ -4302,60 +4209,6 @@ const CollegeScheduleChecker = () => {
               </Box>
             </Box>
 
-            {/* ---------------------------------------------------------- */}
-            {/* Schedule block previews                                    */}
-            {/* ---------------------------------------------------------- */}
-            <Box
-              sx={{
-                display: "grid",
-                gap: 2,
-                gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
-              }}
-            >
-              <Box
-                sx={{
-                  p: 2,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: 2,
-                  backgroundColor: "white",
-                }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 700, mb: 1.5, color: subtitleColor, }}
-                >
-                  Selected Room — Schedule Blocks
-                </Typography>
-                {renderScheduleBlocks(
-                  filterPlottedScheduleByDepartmentAccess(
-                    schedule.filter((entry) => !isDesignationEntry(entry)),
-                  ),
-                  "No plotted schedule for the selected room.",
-                )}
-              </Box>
-
-              <Box
-                sx={{
-                  p: 2,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: 2,
-                  backgroundColor: "white",
-                }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 700, mb: 1.5, color: subtitleColor, }}
-                >
-                  Selected Professor — Schedule Blocks
-                </Typography>
-                {renderScheduleBlocks(
-                  otherDepartmentProfessorSchedule.filter(
-                    (entry) => !isDesignationEntry(entry),
-                  ),
-                  "No schedule found for the selected professor.",
-                )}
-              </Box>
-            </Box>
           </Box>
         </DialogContent>
 

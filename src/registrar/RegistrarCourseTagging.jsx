@@ -384,7 +384,9 @@ const RegistrarCourseTagging = () => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
+    const storedRole = String(localStorage.getItem("role") || "")
+      .trim()
+      .toLowerCase();
     const storedID = localStorage.getItem("person_id");
     const storedEmployeeID = localStorage.getItem("employee_id");
     if (storedUser && storedRole && storedID) {
@@ -466,6 +468,12 @@ const RegistrarCourseTagging = () => {
   const [error, setError] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [useDepartmentCourses, setUseDepartmentCourses] = useState(false);
+  const studentCourseCacheRef = useRef({ key: "", courses: [] });
+  const studentCourseRequestRef = useRef(0);
+  const departmentCourseRequestRef = useRef(0);
+  const prerequisiteCacheRef = useRef(new Map());
+  const prerequisiteRequestRef = useRef(0);
   const [pendingSectionId, setPendingSectionId] = useState("");
   const [yearLevel, setYearLevel] = useState([]);
   const [subjectCounts, setSubjectCounts] = useState({});
@@ -572,13 +580,59 @@ const RegistrarCourseTagging = () => {
     if (selectedSection) fetchSubjectCounts(selectedSection);
   }, [selectedSection]);
 
+  const fetchDepartmentCourses = async (departmentId) => {
+    if (!departmentId) return;
+    const requestId = departmentCourseRequestRef.current + 1;
+    departmentCourseRequestRef.current = requestId;
+
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/department-active-courses/${departmentId}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
+      );
+      if (requestId !== departmentCourseRequestRef.current) return;
+      setCourses(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      if (requestId !== departmentCourseRequestRef.current) return;
+      console.error("Error fetching department courses:", err);
+      setCourses([]);
+      setSnack((previous) => ({
+        ...previous,
+        open: true,
+        message: "Failed to load courses for the selected department.",
+        severity: "error",
+      }));
+    }
+  };
+
   useEffect(() => {
-    if (currId)
-      axios
-        .get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
-        .then((res) => setCourses(res.data))
-        .catch((err) => console.error(err));
-  }, [currId, userId]);
+    if (!currId) return;
+    if (selectedDepartment && useDepartmentCourses) {
+      fetchDepartmentCourses(selectedDepartment);
+      return;
+    }
+
+    const studentCourseKey = `${userId || ""}:${currId}`;
+    if (studentCourseCacheRef.current.key === studentCourseKey) {
+      setCourses(studentCourseCacheRef.current.courses);
+      return;
+    }
+
+    const requestId = studentCourseRequestRef.current + 1;
+    studentCourseRequestRef.current = requestId;
+    axios
+      .get(`${API_BASE_URL}/api/courses/${currId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
+      .then((res) => {
+        if (requestId !== studentCourseRequestRef.current) return;
+        const nextCourses = Array.isArray(res.data) ? res.data : [];
+        studentCourseCacheRef.current = {
+          key: studentCourseKey,
+          courses: nextCourses,
+        };
+        setCourses(nextCourses);
+      })
+      .catch((err) => console.error(err));
+  }, [currId, userId, selectedDepartment, useDepartmentCourses]);
 
   useEffect(() => {
     if (userId && currId)
@@ -600,8 +654,18 @@ const RegistrarCourseTagging = () => {
         `${API_BASE_URL}/api/department-sections`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }, params: { departmentId } },
       );
-      setSections(response.data);
-      if (pendingSectionId) {
+      const activeSections = (Array.isArray(response.data) ? response.data : []).filter(
+        (section) => Number(section.dsstat) === 1,
+      );
+      setSections(activeSections);
+      if (
+        pendingSectionId &&
+        activeSections.some(
+          (section) =>
+            String(section.department_and_program_section_id) ===
+            String(pendingSectionId),
+        )
+      ) {
         setSelectedSection(String(pendingSectionId));
         setPendingSectionId("");
       }
@@ -742,22 +806,39 @@ const RegistrarCourseTagging = () => {
         return;
       }
 
+      const requestId = prerequisiteRequestRef.current + 1;
+      prerequisiteRequestRef.current = requestId;
+      const getCacheKey = (course) =>
+        `${userId}:${currId}:${course.course_id}:${course.semester_id ?? ""}`;
+      const missingCourses = courses.filter(
+        (course) => !prerequisiteCacheRef.current.has(getCacheKey(course)),
+      );
+
       try {
-        const { data } = await axios.post(
-          `${API_BASE_URL}/api/check-prerequisites-batch`,
-          {
-            student_number: userId,
-            curriculum_id: currId,
-            courses: courses.map((course) => ({
-              course_id: course.course_id,
-              semester_id: course.semester_id,
-            })),
-          }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
-        );
+        if (missingCourses.length > 0) {
+          const { data } = await axios.post(
+            `${API_BASE_URL}/api/check-prerequisites-batch`,
+            {
+              student_number: userId,
+              curriculum_id: currId,
+              courses: missingCourses.map((course) => ({
+                course_id: course.course_id,
+                semester_id: course.semester_id,
+              })),
+            }, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
+          );
+
+          for (const course of missingCourses) {
+            const result = data.results?.[String(course.course_id)];
+            if (result) prerequisiteCacheRef.current.set(getCacheKey(course), result);
+          }
+        }
+
+        if (requestId !== prerequisiteRequestRef.current) return;
 
         const map = {};
         for (const course of courses) {
-          const result = data.results?.[String(course.course_id)];
+          const result = prerequisiteCacheRef.current.get(getCacheKey(course));
           if (!result) continue;
           map[course.course_id] = {
             allowed: !!result.allowed,
@@ -807,7 +888,7 @@ const RegistrarCourseTagging = () => {
     };
     try {
       await axios.post(
-        `${API_BASE_URL}/api/add-to-enrolled-courses/${userId}/${currId}/`,
+        `${API_BASE_URL}/api/add-to-enrolled-courses/${userId}/${course.curriculum_id || currId}/`,
         payload,
         auditConfig,
       );
@@ -925,6 +1006,7 @@ const RegistrarCourseTagging = () => {
     const newCourses = courses.filter(
       (c) =>
         !isEnrolledCourse(c.course_id) &&
+        Number(c.curriculum_id) === Number(currId) &&
         Number(c.year_level_id) === Number(yearLevelId) &&
         (activeSemesterId
           ? Number(c.semester_id) === Number(activeSemesterId)
@@ -1101,10 +1183,18 @@ const RegistrarCourseTagging = () => {
       setStudentYearLevel(cleanDisplayValue(yearLevelDescription));
       setPersonID(cleanDisplayValue(person_id2));
       setSectionDescription(cleanDisplayValue(section));
+      studentCourseCacheRef.current = { key: "", courses: [] };
+      studentCourseRequestRef.current += 1;
+      departmentCourseRequestRef.current += 1;
+      prerequisiteCacheRef.current.clear();
+      prerequisiteRequestRef.current += 1;
       setCourses([]);
       setEnrolled([]);
       setDisableYearButtons(false);
       setIsEnrolled(isEnrolled);
+      // Keep the student's curriculum as the default course source. The
+      // department buttons can explicitly switch to department-wide courses.
+      setUseDepartmentCourses(false);
 
       if (resolvedDepartmentId != null && String(resolvedDepartmentId).trim() !== "") {
         setPendingSectionId(nextSectionId);
@@ -1150,7 +1240,24 @@ const RegistrarCourseTagging = () => {
   }, []);
 
   const [selectedFile, setSelectedFile] = useState(null);
-  const handleSelect = (departmentId) => setSelectedDepartment(departmentId);
+  const handleSelect = (departmentId) => {
+    const isSameDepartment =
+      String(selectedDepartment ?? "") === String(departmentId ?? "");
+
+    if (isSameDepartment && useDepartmentCourses) {
+      departmentCourseRequestRef.current += 1;
+      setUseDepartmentCourses(false);
+      setSelectedDepartment(null);
+      setSelectedSection("");
+      setPendingSectionId("");
+      setSections([]);
+      setCourses(studentCourseCacheRef.current.courses);
+      return;
+    }
+
+    setUseDepartmentCourses(true);
+    setSelectedDepartment(departmentId);
+  };
 
   const handleImport = async () => {
     try {
