@@ -247,24 +247,6 @@ const DepartmentSectionFormDialog = memo(
             </Select>
           </FormControl>
 
-          <Typography fontWeight="bold" mb={1}>
-            Max Slots
-          </Typography>
-          <TextField
-            fullWidth
-            type="number"
-            inputProps={{ min: 0 }}
-            value={form.max_slots ?? 0}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const parsed = raw === "" ? "" : Math.max(0, Number(raw));
-              setForm((prev) => ({
-                ...prev,
-                max_slots: parsed,
-              }));
-            }}
-            sx={{ mb: 2 }}
-          />
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
@@ -295,7 +277,6 @@ const EMPTY_FORM = {
   curriculum_id: "",
   section_id: "",
   year_level_id: "",
-  max_slots: 0,
 };
 
 const DepartmentSectionGrid = memo(
@@ -423,9 +404,6 @@ const DepartmentSectionGrid = memo(
                       </Typography>
                       <Typography fontSize="11px" color="text.secondary">
                         {ds.year_level_description || "No year level"}
-                      </Typography>
-                      <Typography fontSize="11px" color="text.secondary">
-                        Max Slots: {ds.max_slots ?? 0}
                       </Typography>
                     </Box>
 
@@ -765,10 +743,6 @@ const DepartmentSection = () => {
         curriculum_id: formData.curriculum_id,
         section_id: formData.section_id,
         year_level_id: formData.year_level_id,
-        max_slots:
-          formData.max_slots === "" || formData.max_slots == null
-            ? 0
-            : Number(formData.max_slots),
         dsstat: overrides.dsstat ?? 0,
         program_code: curriculum?.program_code || "",
         program_description: curriculum?.program_description || "",
@@ -926,7 +900,6 @@ const DepartmentSection = () => {
           curriculum_id: section.curriculum_id ?? "",
           section_id: section.section_id ?? "",
           year_level_id: section.year_level_id ?? "",
-          max_slots: section.max_slots ?? 0,
         },
       });
     },
@@ -1575,9 +1548,6 @@ const DepartmentSection = () => {
               <Typography fontSize="14px">
                 <strong>Year Level:</strong>{" "}
                 {deleteTarget.year_level_description || "—"}
-              </Typography>
-              <Typography fontSize="14px">
-                <strong>Max Slots:</strong> {deleteTarget.max_slots ?? 0}
               </Typography>
             </Box>
           )}

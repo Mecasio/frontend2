@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -22,7 +23,9 @@ import {
   Typography,
 } from "@mui/material";
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import * as XLSX from "xlsx";
 import API_BASE_URL from "../apiConfig";
 import { SettingsContext } from "../App";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -40,6 +43,8 @@ const emptyFilters = {
   page: 0,
   pageSize: 25,
   search: "",
+  startDate: "",
+  endDate: "",
 };
 
 const emptyOptions = {
@@ -114,7 +119,7 @@ const Reports = () => {
   const [hasAccess, setHasAccess] = useState(null);
   const [filters, setFilters] = useState({
     migrated: { ...emptyFilters, curriculumId: "all" },
-    enrolled: { ...emptyFilters },
+    enrolled: { ...emptyFilters, curriculumId: "all" },
   });
   const [options, setOptions] = useState({
     migrated: emptyOptions,
@@ -126,6 +131,7 @@ const Reports = () => {
   });
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
 
   const activeFilters = filters[tab];
@@ -204,9 +210,9 @@ const Reports = () => {
           const curriculumExists = nextOptions.curricula.some(
             (item) => String(item.curriculum_id) === String(current.curriculumId),
           );
-          const nextCurriculum = tab === "migrated"
-            ? (current.curriculumId === "all" || curriculumExists ? current.curriculumId : "all")
-            : (curriculumExists ? current.curriculumId : nextOptions.curricula[0]?.curriculum_id || "");
+          const nextCurriculum = current.curriculumId === "all" || curriculumExists
+            ? current.curriculumId
+            : "all";
           const termExists = nextOptions.terms.some(
             (term) =>
               String(term.year_id) === String(current.yearId) &&
@@ -266,6 +272,8 @@ const Reports = () => {
             page: activeFilters.page + 1,
             pageSize: activeFilters.pageSize,
             search: activeFilters.search,
+            startDate: activeFilters.startDate || undefined,
+            endDate: activeFilters.endDate || undefined,
           },
         });
         if (!cancelled) {
@@ -295,6 +303,8 @@ const Reports = () => {
     activeFilters.page,
     activeFilters.pageSize,
     activeFilters.search,
+    activeFilters.startDate,
+    activeFilters.endDate,
     selectedTerm,
   ]);
 
@@ -314,7 +324,7 @@ const Reports = () => {
     updateFilters(tab, () => {
       const changes = { [field]: value, page: 0 };
       if (field === "campusId") {
-        changes.curriculumId = tab === "migrated" ? "all" : "";
+        changes.curriculumId = "all";
         changes.sectionId = "all";
       }
       if (field === "curriculumId" || field === "yearLevelId") changes.sectionId = "all";
@@ -328,6 +338,51 @@ const Reports = () => {
       if (field === "semesterId") changes.sectionId = "all";
       return changes;
     });
+  };
+
+  const handleExportXlsx = async () => {
+    if (!selectedTerm || activeReport.pagination?.total_records === 0) return;
+
+    setExporting(true);
+    setError("");
+
+    try {
+      const { data } = await axios.get(`${API_BASE_URL}/api/reports/${tab}/export`, {
+        ...authConfig(),
+        params: {
+          campusId: activeFilters.campusId,
+          curriculumId: activeFilters.curriculumId,
+          activeSchoolYearId: selectedTerm.active_school_year_id,
+          yearLevelId: activeFilters.yearLevelId,
+          sectionId: activeFilters.sectionId,
+          search: activeFilters.search,
+          startDate: activeFilters.startDate || undefined,
+          endDate: activeFilters.endDate || undefined,
+        },
+      });
+      const students = data.students || [];
+
+      const worksheet = XLSX.utils.aoa_to_sheet([
+        ["Student Number", "Student Full Name", "Curriculum"],
+        ...students.map((student) => [
+          student.student_number,
+          student.student_full_name,
+          student.curriculum_name || "",
+        ]),
+      ]);
+      worksheet["!cols"] = [{ wch: 22 }, { wch: 45 }, { wch: 65 }];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+
+      const reportName = tab === "migrated" ? "imported-students" : "enrolled-students";
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `${reportName}-${date}.xlsx`);
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || "Unable to export the student list.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (hasAccess === null) return <LoadingOverlay open message="Loading reports..." />;
@@ -383,7 +438,7 @@ const Reports = () => {
               value={activeFilters.curriculumId}
               onChange={(event) => handleFilterChange("curriculumId", event.target.value)}
             >
-              {tab === "migrated" && <MenuItem value="all">All</MenuItem>}
+              <MenuItem value="all">All</MenuItem>
               {activeOptions.curricula.map((curriculum) => (
                 <MenuItem key={curriculum.curriculum_id} value={curriculum.curriculum_id}>
                   {curriculum.curriculum_name}
@@ -455,6 +510,32 @@ const Reports = () => {
               </Select>
             </FormControl>
           )}
+
+          <TextField
+            fullWidth
+            size="small"
+            type="date"
+            label="Start Date"
+            value={activeFilters.startDate}
+            onChange={(event) => handleFilterChange("startDate", event.target.value)}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { max: activeFilters.endDate || undefined },
+            }}
+          />
+
+          <TextField
+            fullWidth
+            size="small"
+            type="date"
+            label="End Date"
+            value={activeFilters.endDate}
+            onChange={(event) => handleFilterChange("endDate", event.target.value)}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: activeFilters.startDate || undefined },
+            }}
+          />
         </Box>
       </Paper>
 
@@ -505,19 +586,31 @@ const Reports = () => {
                 {tab === "migrated" ? "Imported Student List" : "Enrolled Student List"}
               </Typography>
             </Box>
-            <TextField
-              size="small"
-              label="Search student"
-              value={activeFilters.search}
-              onChange={(event) => handleFilterChange("search", event.target.value)}
-              sx={{ width: { xs: "100%", sm: 280 } }}
-            />
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: { xs: "100%", sm: "auto" } }}>
+              <TextField
+                size="small"
+                label="Search student"
+                value={activeFilters.search}
+                onChange={(event) => handleFilterChange("search", event.target.value)}
+                sx={{ flexGrow: 1, width: { xs: "100%", sm: 280 } }}
+              />
+              <Button
+                variant="contained"
+                startIcon={exporting ? <CircularProgress size={18} color="inherit" /> : <FileDownloadOutlinedIcon />}
+                onClick={handleExportXlsx}
+                disabled={exporting || loadingReport || !activeReport.pagination?.total_records}
+                sx={{ bgcolor: "#217346", whiteSpace: "nowrap", "&:hover": { bgcolor: "#185c37" } }}
+              >
+                {exporting ? "Exporting..." : "Export XLSX"}
+              </Button>
+            </Box>
           </Box>
           <Table size="small">
             <TableHead sx={{ bgcolor: headerColor }}>
               <TableRow>
-                <TableCell sx={{ color: "white", fontWeight: 700, width: "35%" }}>Student Number</TableCell>
-                <TableCell sx={{ color: "white", fontWeight: 700 }}>Student Full Name</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: 700, width: "18%" }}>Student Number</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: 700, width: "30%" }}>Student Full Name</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: 700, width: "52%" }}>Curriculum</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -526,11 +619,12 @@ const Reports = () => {
                   <TableRow key={student.student_number} hover>
                     <TableCell>{student.student_number}</TableCell>
                     <TableCell>{student.student_full_name}</TableCell>
+                    <TableCell>{student.curriculum_name || ""}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  <TableCell colSpan={3} align="center" sx={{ py: 4, color: "text.secondary" }}>
                     No students found for the selected filters.
                   </TableCell>
                 </TableRow>

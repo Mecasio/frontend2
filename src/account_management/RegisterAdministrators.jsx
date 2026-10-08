@@ -29,7 +29,8 @@ import {
   Chip,
   Checkbox,
   FormControlLabel,
-  Autocomplete
+  Autocomplete,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -80,6 +81,89 @@ const getRegistrarSuggestionText = (registrar) =>
 const getRegistrarSuggestionValue = (registrar) =>
   cleanSuggestionValue(registrar?.employee_id) ||
   cleanSuggestionValue(registrar?.email);
+
+const formatRoleLabel = (role) => {
+  const normalizedRole = cleanSuggestionValue(role).toLowerCase();
+  const roleLabels = {
+    superadmin: "Superadmin",
+    administrator: "Administrator",
+    technical: "Technical",
+  };
+
+  return roleLabels[normalizedRole] || "-";
+};
+
+const getAssignedPrograms = (registrar) => {
+  if (!Array.isArray(registrar?.scopes)) return [];
+
+  const uniquePrograms = new Map();
+  registrar.scopes.forEach((scope) => {
+    const key = `${scope.dprtmnt_id ?? ""}:${scope.program_id ?? scope.program_code ?? ""}`;
+    if (!uniquePrograms.has(key)) uniquePrograms.set(key, scope);
+  });
+
+  return [...uniquePrograms.values()];
+};
+
+const getAssignedProgramLabel = (scope) =>
+  [scope?.program_code, scope?.program_description]
+    .map(cleanSuggestionValue)
+    .filter(Boolean)
+    .join(" - ") || "Unnamed program";
+
+const getAssignedDepartmentLabel = (registrar) => {
+  const departmentNames = new Set(
+    [
+      cleanSuggestionValue(registrar?.dprtmnt_name),
+      ...getAssignedPrograms(registrar).map((scope) =>
+        cleanSuggestionValue(scope?.dprtmnt_name),
+      ),
+    ].filter(Boolean),
+  );
+
+  if (departmentNames.size > 1) return "Multiple assigned departments";
+  return [...departmentNames][0] || "";
+};
+
+const hasAssignedProgram = (registrar) =>
+  getAssignedPrograms(registrar).length > 0 ||
+  Boolean(
+    cleanSuggestionValue(registrar?.scopes_summary) ||
+      cleanSuggestionValue(registrar?.program_code) ||
+      cleanSuggestionValue(registrar?.program_description),
+  );
+
+const compactDialogControlStyles = {
+  "& .MuiInputBase-input, & .MuiInputLabel-root, & .MuiFormHelperText-root, & .MuiButton-root, & .MuiSelect-select, & .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle2, & .MuiTableCell-root, & .MuiChip-label": {
+    fontSize: "12px",
+  },
+  "& .MuiInputBase-input::placeholder": {
+    fontSize: "12px",
+    opacity: 1,
+  },
+};
+
+const compactSelectMenuProps = {
+  PaperProps: {
+    sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+  },
+};
+
+const groupAssignedPrograms = (registrar) => {
+  const groups = new Map();
+
+  getAssignedPrograms(registrar).forEach((scope) => {
+    const departmentName =
+      cleanSuggestionValue(scope.dprtmnt_name) || "Unspecified college";
+    if (!groups.has(departmentName)) groups.set(departmentName, []);
+    groups.get(departmentName).push(scope);
+  });
+
+  return [...groups.entries()].map(([departmentName, assignedPrograms]) => ({
+    departmentName,
+    assignedPrograms,
+  }));
+};
 
 const RegisterAdministrators = () => {
   useAccountAuditMac();
@@ -218,6 +302,7 @@ const RegisterAdministrators = () => {
   const [registrars, setRegistrars] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [assignedProgramsRegistrar, setAssignedProgramsRegistrar] = useState(null);
   const [editData, setEditData] = useState(null);
   const [registrarToDelete, setRegistrarToDelete] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -237,7 +322,7 @@ const RegisterAdministrators = () => {
     curriculum_id: "",
     role: "",
   });
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const itemsPerPage = 9;
   const [scopes, setScopes] = useState([]);
   const [scopeDeptPick, setScopeDeptPick] = useState("");
   const [scopeProgramPick, setScopeProgramPick] = useState("");
@@ -1044,7 +1129,15 @@ const RegisterAdministrators = () => {
       <br />
       <br />
 
-      <TableContainer component={Paper} sx={{ width: "100%" }}>
+      <TableContainer
+        component={Paper}
+        sx={{
+          width: "100%",
+          "& .MuiButton-root, & .MuiTypography-root, & .MuiSelect-select": {
+            fontSize: "12px",
+          },
+        }}
+      >
         <Table size="small">
           <TableHead
             sx={{
@@ -1068,7 +1161,7 @@ const RegisterAdministrators = () => {
                   alignItems="center"
                 >
                   {/* Left: Registrar List Count */}
-                  <Typography fontSize="14px" fontWeight="bold" color="white">
+                  <Typography fontSize="12px" fontWeight="bold" color="white">
                     Total Administrator Records : {filteredRegistrar.length}{" "}
        
                   </Typography>
@@ -1157,6 +1250,7 @@ const RegisterAdministrators = () => {
                             sx: {
                               maxHeight: 200,
                               backgroundColor: "#fff",
+                              "& .MuiMenuItem-root": { fontSize: "12px" },
                             },
                           },
                         }}
@@ -1169,7 +1263,7 @@ const RegisterAdministrators = () => {
                       </Select>
                     </FormControl>
 
-                    <Typography fontSize="11px" color="white">
+                    <Typography fontSize="12px" color="white">
                       of {totalPages} page{totalPages > 1 ? "s" : ""}
                     </Typography>
 
@@ -1236,11 +1330,20 @@ const RegisterAdministrators = () => {
         component={Paper}
         sx={{
           width: "100%",
-
           border: `1px solid ${borderColor}`,
+          "& .MuiButton-root, & .MuiInputLabel-root, & .MuiSelect-select": {
+            fontSize: "12px",
+          },
         }}
       >
-        <Table>
+        <Table
+          size="small"
+          sx={{
+            "& .MuiTableCell-root, & .MuiAvatar-root, & .MuiButton-root": {
+              fontSize: "12px",
+            },
+          }}
+        >
           <TableBody>
             <TableRow>
               <TableCell>
@@ -1283,7 +1386,7 @@ const RegisterAdministrators = () => {
                       color: "white",
                       textTransform: "none",
                       fontWeight: "bold",
-                      width: "350px",
+                      width: "200px",
                       "&:hover": { backgroundColor: "#000" },
                     }}
                   >
@@ -1294,16 +1397,22 @@ const RegisterAdministrators = () => {
                   <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                     {/* Department Filter */}
                     <FormControl sx={{ width: "350px" }} size="small">
-                      <InputLabel id="filter-department-label">
-                        Filter by Department
-                      </InputLabel>
                       <Select
-                        labelId="filter-department-label"
                         value={selectedDepartmentFilter}
                         onChange={(e) =>
                           setSelectedDepartmentFilter(e.target.value)
                         }
-                        label="Filter by Department"
+                        displayEmpty
+                        renderValue={(selected) =>
+                          selected || "Filter by Department"
+                        }
+                        sx={{
+                          "& .MuiSelect-select": {
+                            display: "flex",
+                            alignItems: "center",
+                          },
+                        }}
+                        MenuProps={compactSelectMenuProps}
                       >
                         <MenuItem value="">All Departments</MenuItem>
                         {department.map((dep) => (
@@ -1323,6 +1432,7 @@ const RegisterAdministrators = () => {
                         value={sortOrder}
                         onChange={(e) => setSortOrder(e.target.value)}
                         displayEmpty
+                        MenuProps={compactSelectMenuProps}
                       >
                         <MenuItem value="">Select Order</MenuItem>
                         <MenuItem value="asc">Ascending</MenuItem>
@@ -1357,13 +1467,20 @@ const RegisterAdministrators = () => {
         component={Paper}
         sx={{ width: "100%", border: `1px solid ${borderColor}`,  }}
       >
-        <Table>
+        <Table
+          size="small"
+          sx={{
+            "& .MuiTableCell-root, & .MuiAvatar-root, & .MuiButton-root": {
+              fontSize: "12px",
+            },
+          }}
+        >
           <TableHead
             sx={{ backgroundColor: headerColor || "#1976d2" }}
           >
             <TableRow>
               {[
-                "EMPLOYEE ID",
+                "Employee ID",
                 "Image",
                 "Full Name",
                 "Email",
@@ -1378,6 +1495,7 @@ const RegisterAdministrators = () => {
                   sx={{
                     color: "white",
                     fontWeight: "bold",
+                    fontSize: "12px",
                     textAlign: "center",
                     border: `1px solid ${borderColor}`,
                   }}
@@ -1387,7 +1505,6 @@ const RegisterAdministrators = () => {
               ))}
             </TableRow>
           </TableHead>
-
           <TableBody>
             {registrars.length > 0 ? (
               currentRegistrar.map((r, i) => (
@@ -1420,8 +1537,8 @@ const RegisterAdministrators = () => {
                       }
                       alt={r.first_name}
                       sx={{
-                        width: 60,
-                        height: 60,
+                        width: 42,
+                        height: 42,
                         margin: "auto",
                         border: `1px solid ${borderColor}`,
                         bgcolor: r.profile_picture ? "transparent" : "#6D2323",
@@ -1449,25 +1566,66 @@ const RegisterAdministrators = () => {
                     {r.email}
                   </TableCell>
 
-                  <TableCell
-                    sx={{
-                      textAlign: "center",
-                      border: `1px solid ${borderColor}`,
-                    }}
-                  >
-                    {r.dprtmnt_name || "-"}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      textAlign: "center",
-                      border: `1px solid ${borderColor}`,
-                    }}
-                  >
-                    {r.scopes_summary ||
+                  {!getAssignedDepartmentLabel(r) &&
+                  !hasAssignedProgram(r) ? (
+                    <TableCell
+                      colSpan={2}
+                      sx={{
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      No assigned Department and Program
+                    </TableCell>
+                  ) : (
+                    <>
+                      <TableCell
+                        sx={{
+                          textAlign: "center",
+                          border: `1px solid ${borderColor}`,
+                        }}
+                      >
+                        {getAssignedDepartmentLabel(r) ||
+                          "No assigned department"}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          textAlign: "center",
+                          border: `1px solid ${borderColor}`,
+                        }}
+                      >
+                    {getAssignedPrograms(r).length > 1 ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Visibility />}
+                        onClick={() => setAssignedProgramsRegistrar(r)}
+                        sx={{
+                          borderColor: headerColor,
+                          color: headerColor,
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          textTransform: "uppercase",
+                          "&:hover": {
+                            borderColor: headerColor,
+                            backgroundColor: `${headerColor}12`,
+                          },
+                        }}
+                      >
+                        View All Assigned Program
+                      </Button>
+                    ) : getAssignedPrograms(r).length === 1 ? (
+                      getAssignedProgramLabel(getAssignedPrograms(r)[0])
+                    ) : (
+                      r.scopes_summary ||
                       (r.program_description
                         ? `${r.program_description}${r.major ? ` — ${r.major}` : ""} (${r.program_code}${r.current_year ? `, ${r.current_year}-${r.next_year}` : ""})`
-                        : "-")}
-                  </TableCell>
+                        : "No assigned program")
+                    )}
+                      </TableCell>
+                    </>
+                  )}
 
                   <TableCell
                     sx={{
@@ -1475,7 +1633,7 @@ const RegisterAdministrators = () => {
                       border: `1px solid ${borderColor}`,
                     }}
                   >
-                    {r.role || "-"}
+                    {formatRoleLabel(r.role)}
                   </TableCell>
 
                   {/* ℹ️ Status is now changed from inside the Edit modal — this is a
@@ -1486,12 +1644,7 @@ const RegisterAdministrators = () => {
                       textAlign: "center",
                     }}
                   >
-                    <Typography
-
-                      sx={{ textAlign: "center" }}
-                    >
-                      {Number(r.status) === 1 ? "Active" : "Inactive"}
-                    </Typography>
+                    {Number(r.status) === 1 ? "Active" : "Inactive"}
                   </TableCell>
 
                   <TableCell
@@ -1502,39 +1655,64 @@ const RegisterAdministrators = () => {
                     <Box
                       sx={{
                         display: "flex",
-                        justifyContent: "space-between",
+                        justifyContent: "center",
                         alignItems: "center",
+                        gap: 1.5,
                         width: "100%",
                       }}
                     >
-                      <Button
-                        onClick={() => handleEdit(r)}
-                        sx={{
-                          backgroundColor: "green",
-                          color: "white",
-                          borderRadius: "5px",
-                          padding: "8px 14px",
-                          width: "100px",
+                      <Tooltip
+                        title="Edit"
+                        arrow
+                        slotProps={{
+                          tooltip: {
+                            sx: { fontSize: "14px", fontWeight: 600, px: 1.25, py: 0.75 },
+                          },
                         }}
                       >
-                        <EditIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        Edit
-                      </Button>
-
-                      {canDelete && (
-                        <Button
-                          onClick={() => handleDeleteClick(r)}
+                        <IconButton
+                          aria-label="Edit administrator"
+                          onClick={() => handleEdit(r)}
+                          size="small"
                           sx={{
-                            backgroundColor: "#9E0000",
+                            backgroundColor: "green",
                             color: "white",
                             borderRadius: "5px",
-                            padding: "8px 14px",
-                            width: "100px",
+                            width: 36,
+                            height: 36,
+                            "&:hover": { backgroundColor: "#006b00" },
                           }}
                         >
-                          <DeleteIcon fontSize="small" sx={{ mr: 0.5 }} />
-                          Delete
-                        </Button>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      {canDelete && (
+                        <Tooltip
+                          title="Delete"
+                          arrow
+                          slotProps={{
+                            tooltip: {
+                              sx: { fontSize: "14px", fontWeight: 600, px: 1.25, py: 0.75 },
+                            },
+                          }}
+                        >
+                          <IconButton
+                            aria-label="Delete administrator"
+                            onClick={() => handleDeleteClick(r)}
+                            size="small"
+                            sx={{
+                              backgroundColor: "#9E0000",
+                              color: "white",
+                              borderRadius: "5px",
+                              width: 36,
+                              height: 36,
+                              "&:hover": { backgroundColor: "#7d0000" },
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
@@ -1548,193 +1726,6 @@ const RegisterAdministrators = () => {
               </TableRow>
             )}
           </TableBody>
-        </Table>
-      </TableContainer>
-          <TableContainer component={Paper} sx={{ width: "100%" }}>
-        <Table size="small">
-          <TableHead
-            sx={{
-              backgroundColor: headerColor || "#1976d2",
-              color: "white",
-            }}
-          >
-            <TableRow>
-              <TableCell
-                colSpan={10}
-                sx={{
-                  border: `1px solid ${borderColor}`,
-                  py: 0.5,
-                  backgroundColor: headerColor || "#1976d2",
-                  color: "white",
-                }}
-              >
-                <Box
-                  display="flex"
-                  justifyContent="space-between"
-                  alignItems="center"
-                >
-                  {/* Left: Registrar List Count */}
-                  <Typography fontSize="14px" fontWeight="bold" color="white">
-                    Total Administrator Records : {filteredRegistrar.length}{" "}
-      
-                  </Typography>
-
-                  {/* Right: Pagination Controls */}
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Button
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      First
-                    </Button>
-
-                    <Button
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.max(prev - 1, 1))
-                      }
-                      disabled={currentPage === 1}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Prev
-                    </Button>
-
-                    {/* Page Dropdown */}
-                    <FormControl size="small" sx={{ minWidth: 80 }}>
-                      <Select
-                        value={currentPage}
-                        onChange={(e) => setCurrentPage(Number(e.target.value))}
-                        displayEmpty
-                        sx={{
-                          fontSize: "12px",
-                          height: 36,
-                          color: "white",
-                          border: "1px solid white",
-                          backgroundColor: "transparent",
-                          ".MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "white",
-                          },
-                          "& svg": {
-                            color: "white",
-                          },
-                        }}
-                        MenuProps={{
-                          PaperProps: {
-                            sx: {
-                              maxHeight: 200,
-                              backgroundColor: "#fff",
-                            },
-                          },
-                        }}
-                      >
-                        {Array.from({ length: totalPages }, (_, i) => (
-                          <MenuItem key={i + 1} value={i + 1}>
-                            Page {i + 1}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <Typography fontSize="11px" color="white">
-                      of {totalPages} page{totalPages > 1 ? "s" : ""}
-                    </Typography>
-
-                    <Button
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                      }
-                      disabled={currentPage === totalPages}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Next
-                    </Button>
-
-                    <Button
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Last
-                    </Button>
-                  </Box>
-                </Box>
-              </TableCell>
-            </TableRow>
-          </TableHead>
         </Table>
       </TableContainer>
 
@@ -1751,6 +1742,42 @@ const RegisterAdministrators = () => {
             borderRadius: 3,
             overflow: "hidden",
             boxShadow: 6,
+            ...compactDialogControlStyles,
+            "& .MuiInputLabel-root.MuiInputLabel-shrink": {
+              fontSize: "14px",
+              lineHeight: 1.2,
+              transform: "translate(14px, -8px) scale(0.75)",
+              transformOrigin: "top left",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend": {
+              fontSize: "10.5px",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend > span": {
+              paddingLeft: "3px",
+              paddingRight: "6px",
+            },
+            "& .MuiInputLabel-root.Mui-focused": {
+              color: headerColor,
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+              borderColor: headerColor,
+              borderWidth: "1px",
+            },
+            "& .MuiCheckbox-root.Mui-checked, & .MuiCheckbox-root.MuiCheckbox-indeterminate": {
+              color: headerColor,
+            },
+            "& .MuiChip-filledPrimary": {
+              backgroundColor: headerColor,
+              color: "#fff",
+            },
+            "& .MuiChip-outlinedPrimary": {
+              borderColor: headerColor,
+              color: headerColor,
+            },
+            "& .MuiChip-outlinedPrimary .MuiChip-deleteIcon": {
+              color: headerColor,
+              "&:hover": { color: headerColor },
+            },
           },
         }}
       >
@@ -1899,7 +1926,12 @@ const RegisterAdministrators = () => {
               <Typography
                 fontWeight={700}
                 mb={1.5}
-                sx={{ gridColumn: { md: "1 / -1" }, gridRow: { md: "1" } }}
+                sx={{
+                  gridColumn: { md: "1 / -1" },
+                  gridRow: { md: "1" },
+                  fontSize: "16px !important",
+                  textTransform: "uppercase",
+                }}
               >
                 User's Account Information
               </Typography>
@@ -1998,6 +2030,19 @@ const RegisterAdministrators = () => {
                   onChange={handleChange}
                   type={showPassword ? "text" : "password"}
                   fullWidth
+                  sx={{
+                    "& .MuiInputLabel-root.Mui-focused": {
+                      color: headerColor,
+                    },
+                    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: headerColor,
+                    },
+                    ...(!showPassword && {
+                      "& .MuiOutlinedInput-root.Mui-focused .MuiIconButton-root": {
+                        color: headerColor,
+                      },
+                    }),
+                  }}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -2005,8 +2050,11 @@ const RegisterAdministrators = () => {
                           onClick={() => setShowPassword((prev) => !prev)}
                           edge="end"
                           size="small"
+                          sx={{ color: "text.secondary" }}
                         >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                          {showPassword
+                            ? <VisibilityOff sx={{ fontSize: 18 }} />
+                            : <Visibility sx={{ fontSize: 18 }} />}
                         </IconButton>
                       </InputAdornment>
                     ),
@@ -2024,7 +2072,7 @@ const RegisterAdministrators = () => {
                 mt={1}
                 p={2.5}
                   sx={{
-                  border: "2px dashed #1976d2",
+                  border: `2px dashed ${headerColor}`,
                   borderRadius: 2,
                   textAlign: "center",
                   backgroundColor: "#f9f9f9",
@@ -2064,7 +2112,15 @@ const RegisterAdministrators = () => {
                   size="small"
                   startIcon={<LockResetIcon />}
                   onClick={handleGeneratePassword}
-                  sx={{ fontWeight: 600 }}
+                  sx={{
+                    fontWeight: 600,
+                    color: mainButtonColor,
+                    borderColor: mainButtonColor,
+                    "&:hover": {
+                      borderColor: mainButtonColor,
+                      backgroundColor: `${mainButtonColor}12`,
+                    },
+                  }}
                 >
                   Generate
                 </Button>
@@ -2077,7 +2133,15 @@ const RegisterAdministrators = () => {
                   onClick={() =>
                     printRegistrarSlip(form, form.password, form.email)
                   }
-                  sx={{ fontWeight: 600 }}
+                  sx={{
+                    fontWeight: 600,
+                    color: mainButtonColor,
+                    borderColor: mainButtonColor,
+                    "&:hover": {
+                      borderColor: mainButtonColor,
+                      backgroundColor: `${mainButtonColor}12`,
+                    },
+                  }}
                 >
                   Print
                 </Button>
@@ -2092,6 +2156,7 @@ const RegisterAdministrators = () => {
                     value={form.role}
                     label="Role"
                     onChange={handleChange}
+                    MenuProps={compactSelectMenuProps}
                   >
                     <MenuItem value="">Select Role</MenuItem>
                     <MenuItem value="superadmin">Superadmin</MenuItem>
@@ -2109,6 +2174,7 @@ const RegisterAdministrators = () => {
                     onChange={(e) =>
                       setForm({ ...form, access_level: e.target.value })
                     }
+                    MenuProps={compactSelectMenuProps}
                   >
                     <MenuItem value="">Select Access Level</MenuItem>
                     {accessLevels.map((access) => (
@@ -2126,6 +2192,7 @@ const RegisterAdministrators = () => {
                     value={form.status}
                     label="Status"
                     onChange={handleChange}
+                    MenuProps={compactSelectMenuProps}
                   >
                     <MenuItem value="">Select Status</MenuItem>
                     <MenuItem value={1}>Active</MenuItem>
@@ -2151,13 +2218,13 @@ const RegisterAdministrators = () => {
                 },
               }}
             >
-              <Typography fontWeight={700} mb={0.5} sx={{ mt: 2 }}>
+              <Typography
+                fontWeight={700}
+                mb={0.5}
+                sx={{ mt: 0, fontSize: "16px !important", textTransform: "uppercase" }}
+              >
                 Department & Program Scopes
               </Typography>
-              <Typography fontSize="13px" color="text.secondary" mb={1.5}>
-                Use the search to quickly find programs, or expand departments to check individually.
-              </Typography>
-
               {/* (17) Search bar */}
               <Autocomplete
                 size="small"
@@ -2166,12 +2233,12 @@ const RegisterAdministrators = () => {
                   const seen = new Set(scopes.map((s) => `${s.dprtmnt_id}:${s.program_id}`));
                   return !seen.has(`${p.dprtmnt_id}:${p.program_id}`);
                 })}
-                getOptionLabel={(p) =>
-                  `${p.program_code} - ${p.program_description}${p.major ? ` (${p.major})` : ""}`
-                }
-                groupBy={(p) => {
-                  const dept = department.find((d) => String(d.dprtmnt_id) === String(p.dprtmnt_id));
-                  return dept ? `${dept.dprtmnt_name} (${dept.dprtmnt_code})` : "Unknown";
+                getOptionLabel={(p) => {
+                  const dept = department.find(
+                    (d) => String(d.dprtmnt_id) === String(p.dprtmnt_id),
+                  );
+                  const programLabel = `${p.program_code} - ${p.program_description}${p.major ? ` (${p.major})` : ""}`;
+                  return dept ? `${programLabel} — ${dept.dprtmnt_code}` : programLabel;
                 }}
                 onChange={(_, value) => {
                   if (!value) return;
@@ -2202,17 +2269,47 @@ const RegisterAdministrators = () => {
                       ...params.InputProps,
                       startAdornment: (
                         <>
-                          <SearchIcon sx={{ ml: 0.5, mr: 0.5, color: "gray", fontSize: 18 }} />
+                          <SearchIcon
+                            className="program-search-icon"
+                            sx={{ ml: 0.5, mr: 0.5, color: "gray", fontSize: 18 }}
+                          />
                           {params.InputProps.startAdornment}
                         </>
                       ),
                     }}
                   />
                 )}
-                sx={{ mb: 1.5 }}
+                sx={{
+                  mb: 1.5,
+                  "& .MuiOutlinedInput-notchedOutline legend": {
+                    maxWidth: "0.01px",
+                  },
+                  "& .MuiOutlinedInput-notchedOutline legend > span": {
+                    padding: 0,
+                  },
+                  "& .MuiInputBase-input:focus::placeholder": {
+                    color: "text.secondary",
+                    opacity: 1,
+                  },
+                  "&.Mui-focused .program-search-icon": {
+                    color: headerColor,
+                  },
+                  "&.Mui-focused .MuiAutocomplete-popupIndicator": {
+                    color: headerColor,
+                  },
+                }}
                 value={null}
                 blurOnSelect
                 clearOnBlur
+                slotProps={{
+                  paper: {
+                    sx: {
+                      "& .MuiAutocomplete-option, & .MuiAutocomplete-groupLabel, & .MuiAutocomplete-noOptions, & .MuiAutocomplete-loading": {
+                        fontSize: "12px",
+                      },
+                    },
+                  },
+                }}
               />
 
               {/* (16) Scrollable scope list — selected chips + department checkboxes */}
@@ -2305,13 +2402,66 @@ const RegisterAdministrators = () => {
                             })
                           }
                         >
-                          <Typography fontSize="13px" fontWeight={600} sx={{ flex: 1 }}>
+                          <Typography
+                            fontSize="12px"
+                            fontWeight={600}
+                            sx={{
+                              flex: 1,
+                              textTransform: "uppercase",
+                              display: "-webkit-box",
+                              WebkitBoxOrient: "vertical",
+                              WebkitLineClamp: 2,
+                              overflow: "hidden",
+                              lineHeight: 1.25,
+                            }}
+                          >
                             {dept.dprtmnt_name}
                           </Typography>
-                          <Chip label={dept.dprtmnt_code} size="small" />
-                          {checkedCount > 0 && (
-                            <Chip label={`${checkedCount}/${progs.length}`} size="small" color="primary" />
-                          )}
+                          <Box
+                            sx={{
+                              width: 64,
+                              minWidth: 64,
+                              borderRadius: 1,
+                              overflow: "hidden",
+                              textAlign: "right",
+                              lineHeight: 1,
+                              flexShrink: 0,
+                              bgcolor: headerColor,
+                              color: "#fff",
+                              py: "3px",
+                            }}
+                          >
+                            <Typography
+                              component="div"
+                              sx={{
+                                px: 0.75,
+                                py: 0,
+                                bgcolor: headerColor,
+                                color: "#fff",
+                                textAlign: "left",
+                                lineHeight: 1,
+                                fontSize: "10px !important",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {dept.dprtmnt_code}
+                            </Typography>
+                            <Typography
+                              component="div"
+                              sx={{
+                                px: 0.75,
+                                py: 0,
+                                bgcolor: headerColor,
+                                color: "#fff",
+                                textAlign: "right",
+                                lineHeight: 1,
+                                fontSize: "10px !important",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {checkedCount}/{progs.length}
+                            </Typography>
+                          </Box>
                           {isOpen ? (
                             <ExpandLessIcon fontSize="small" sx={{ color: "text.secondary" }} />
                           ) : (
@@ -2332,7 +2482,14 @@ const RegisterAdministrators = () => {
                             return (
                               <FormControlLabel
                                 key={p.program_id}
-                                sx={{ m: 0 }}
+                                sx={{
+                                  m: 0,
+                                  width: "100%",
+                                  "& .MuiFormControlLabel-label": {
+                                    flex: 1,
+                                    minWidth: 0,
+                                  },
+                                }}
                                 control={
                                   <Checkbox
                                     size="small"
@@ -2364,9 +2521,15 @@ const RegisterAdministrators = () => {
                                   />
                                 }
                                 label={
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                    <Typography fontSize="13px">{p.program_description}</Typography>
-                                    <Typography fontSize="11px" color="text.secondary">
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                                    <Typography fontSize="12px" sx={{ flex: 1, textAlign: "left" }}>
+                                      {p.program_description}
+                                    </Typography>
+                                    <Typography
+                                      fontSize="11px"
+                                      color="text.secondary"
+                                      sx={{ ml: "auto", textAlign: "right", flexShrink: 0, fontWeight: 700 }}
+                                    >
                                       {p.program_code}
                                     </Typography>
                                   </Box>
@@ -2382,7 +2545,11 @@ const RegisterAdministrators = () => {
                 {/* Selected scopes are shown below the college list. */}
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1.5 }}>
                   {scopes.length === 0 ? (
-                    <Typography fontSize="13px" color="text.secondary">
+                    <Typography
+                      fontSize="12px"
+                      color="text.secondary"
+                      sx={{ width: "100%", textAlign: "center" }}
+                    >
                       No scopes selected yet.
                     </Typography>
                   ) : (
@@ -2471,7 +2638,12 @@ const RegisterAdministrators = () => {
         maxWidth="xs"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 },
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            boxShadow: 6,
+            ...compactDialogControlStyles,
+          },
         }}
       >
         <DialogTitle
@@ -2497,7 +2669,7 @@ const RegisterAdministrators = () => {
             ?
           </Typography>
 
-          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>
+          <Typography sx={{ color: "#d32f2f", fontSize: "12px" }}>
             Deleting this registrar will permanently remove their account from
             the system.
             <br />
@@ -2523,6 +2695,109 @@ const RegisterAdministrators = () => {
             variant="contained"
           >
             Yes, Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(assignedProgramsRegistrar)}
+        onClose={() => setAssignedProgramsRegistrar(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            boxShadow: 6,
+            ...compactDialogControlStyles,
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.2rem",
+            py: 2,
+          }}
+        >
+          Assigned Programs
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          {assignedProgramsRegistrar && (
+            <>
+              <Box sx={{ mb: 2.5 }}>
+                <Typography fontWeight={700} fontSize="16px">
+                  {[
+                    assignedProgramsRegistrar.first_name,
+                    assignedProgramsRegistrar.middle_name,
+                    assignedProgramsRegistrar.last_name,
+                  ]
+                    .map(cleanSuggestionValue)
+                    .filter(Boolean)
+                    .join(" ")}
+                </Typography>
+                <Typography color="text.secondary" fontSize="12px">
+                  Employee ID: {assignedProgramsRegistrar.employee_id || "-"}
+                </Typography>
+              </Box>
+
+              <Stack spacing={2}>
+                {groupAssignedPrograms(assignedProgramsRegistrar).map((group) => (
+                  <Box
+                    key={group.departmentName}
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        backgroundColor: `${headerColor}12`,
+                        borderBottom: `1px solid ${borderColor}`,
+                        fontWeight: 700,
+                        px: 2,
+                        py: 1.25,
+                      }}
+                    >
+                      {group.departmentName}
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      useFlexGap
+                      flexWrap="wrap"
+                      spacing={1}
+                      sx={{ p: 2 }}
+                    >
+                      {group.assignedPrograms.map((scope) => (
+                        <Chip
+                          key={`${scope.dprtmnt_id ?? ""}-${scope.program_id ?? scope.program_code ?? ""}`}
+                          label={getAssignedProgramLabel(scope)}
+                          variant="outlined"
+                          sx={{
+                            height: "auto",
+                            "& .MuiChip-label": { py: 0.75 },
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => setAssignedProgramsRegistrar(null)}
+            sx={{ backgroundColor: headerColor, fontWeight: 700 }}
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>

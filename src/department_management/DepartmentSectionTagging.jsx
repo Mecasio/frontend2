@@ -31,7 +31,7 @@ import {
 import {
   Search as SearchIcon,
   PersonRemove as UnenrollIcon,
-  GroupAdd as EnrollAllIcon,
+  // GroupAdd as EnrollAllIcon, // Temporarily disabled with Tag All.
   GroupRemove as UnenrollAllIcon,
 } from "@mui/icons-material";
 import API_BASE_URL from "../apiConfig";
@@ -694,6 +694,7 @@ const DepartmentSectionTagging = () => {
   };
 
   // ── Enroll All ────────────────────────────────────────────────────────────
+  /* Temporarily disabled: Tag All.
   const handleEnrollAll = async () => {
     if (!insertSection) {
       setSnackbar({
@@ -747,6 +748,8 @@ const DepartmentSectionTagging = () => {
   };
 
   // ── Unenroll All ──────────────────────────────────────────────────────────
+  */
+
   const handleUnenrollAll = async () => {
     if (!insertSection) {
       setSnackbar({
@@ -1118,6 +1121,7 @@ const DepartmentSectionTagging = () => {
 
       {/* ── Tag All / Untag All ───────────────────────────────────────────── */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+        {/* Temporarily disabled: Tag All.
         <Tooltip
           title={
             canManageStudents
@@ -1153,6 +1157,7 @@ const DepartmentSectionTagging = () => {
             </Button>
           </span>
         </Tooltip>
+        */}
 
         <Tooltip
           title={

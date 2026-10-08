@@ -26,7 +26,9 @@ import {
   MenuItem,
   Grid,
   FormControl,
-  InputLabel
+  InputLabel,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
@@ -38,9 +40,11 @@ import SearchIcon from "@mui/icons-material/Search";
 import { Snackbar, Alert } from "@mui/material";
 
 import PrintIcon from "@mui/icons-material/Print";
-import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import SendIcon from "@mui/icons-material/Send";
 import SaveIcon from "@mui/icons-material/Save";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import Avatar from "@mui/material/Avatar";
 import ImageIcon from "@mui/icons-material/Image";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
@@ -71,7 +75,41 @@ const getStudentSuggestionValue = (student) =>
   cleanSuggestionValue(student?.student_number) ||
   cleanSuggestionValue(student?.emailAddress);
 
+const normalizeNameWords = (value) =>
+  String(value || "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/(^|[\s'-])(\p{L})/gu, (_, separator, letter) =>
+      `${separator}${letter.toLocaleUpperCase()}`,
+    );
+
+const formatStudentName = (student) => {
+  const lastName = normalizeNameWords(student?.last_name);
+  const givenNames = [student?.first_name, student?.middle_name]
+    .map(normalizeNameWords)
+    .filter(Boolean)
+    .join(" ");
+
+  return [lastName, givenNames].filter(Boolean).join(", ");
+};
+
 const rowsPerPage = 100;
+
+const compactDialogControlStyles = {
+  "& .MuiInputBase-input, & .MuiInputLabel-root, & .MuiFormHelperText-root, & .MuiButton-root, & .MuiSelect-select, & .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle2": {
+    fontSize: "12px",
+  },
+  "& .MuiInputBase-input::placeholder": {
+    fontSize: "12px",
+    opacity: 1,
+  },
+};
+
+const compactSelectMenuProps = {
+  PaperProps: {
+    sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+  },
+};
 
 export default function StudentAccounts() {
   const settings = useContext(SettingsContext);
@@ -237,6 +275,7 @@ export default function StudentAccounts() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
@@ -277,6 +316,7 @@ export default function StudentAccounts() {
     setSelectedPerson(person);
     setEmail(person.emailAddress || "");
     setGeneratedPassword("");
+    setShowPassword(false);
     setStatus(person.account_status === 0 ? 0 : 1);
     setPhotoFile(null);
     setPhotoPreview(
@@ -883,6 +923,9 @@ export default function StudentAccounts() {
               width: "100%",
               backgroundColor: "#fff",
               borderRadius: 1,
+              "& .MuiInputBase-input": {
+                fontSize: "12px",
+              },
               "& .MuiOutlinedInput-root": {
                 borderRadius: "10px",
               },
@@ -903,14 +946,14 @@ export default function StudentAccounts() {
                   const program = cleanSuggestionValue(student?.program_code || student?.program_description);
 
                   return (
-                    <Box key={`${studentNumber}-${student?.emailAddress}`} onMouseDown={(e) => { e.preventDefault(); setSearchQuery(getStudentSuggestionValue(student)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                    <Box key={`${studentNumber}-${student?.emailAddress}`} onMouseDown={(e) => { e.preventDefault(); setSearchQuery(getStudentSuggestionValue(student)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: "12px", borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" }, "& .MuiTypography-root": { fontSize: "12px" } }}>
                       <Typography component="span" sx={{ fontWeight: 700, minWidth: 110 }}>{studentNumber || "No number"}</Typography>
                       <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[name, program].filter(Boolean).join(" - ") || student?.emailAddress}</Typography>
                     </Box>
                   );
                 })
               ) : (
-                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching students</Box>
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: "12px" }}>No matching students</Box>
               )}
             </Box>
           )}
@@ -930,6 +973,7 @@ export default function StudentAccounts() {
           color: "white",
           borderRadius: 2,
           fontWeight: 700,
+          fontSize: "12px",
           "&:hover": { backgroundColor: "#b71c1c" },
         }}
       >
@@ -941,7 +985,14 @@ export default function StudentAccounts() {
 
       {/* TOP PAGINATION + TOTAL */}
       <TableContainer>
-        <Table size="small">
+        <Table
+          size="small"
+          sx={{
+            "& .MuiTableCell-root, & .MuiButton-root, & .MuiTypography-root, & .MuiSelect-select": {
+              fontSize: "12px",
+            },
+          }}
+        >
           <TableHead>
             <TableRow>
               <TableCell
@@ -961,7 +1012,7 @@ export default function StudentAccounts() {
                   gap={1}
                 >
                   {/* TOTAL STUDENTS */}
-                  <Typography fontSize="14px" fontWeight="bold" color="white">
+                  <Typography fontSize="12px" fontWeight="bold" color="white">
                     Total Student's Records: {totalStudents}
                   </Typography>
 
@@ -1003,6 +1054,7 @@ export default function StudentAccounts() {
                           PaperProps: {
                             sx: {
                               maxHeight: 200,
+                              "& .MuiMenuItem-root": { fontSize: "12px" },
                             },
                           },
                         }}
@@ -1015,7 +1067,7 @@ export default function StudentAccounts() {
                       </Select>
                     </FormControl>
 
-                    <Typography fontSize="11px" color="white">
+                    <Typography fontSize="12px" color="white">
                       of {totalPages} page
                       {totalPages > 1 ? "s" : ""}
                     </Typography>
@@ -1055,13 +1107,25 @@ export default function StudentAccounts() {
           overflowY: "auto",
         }}
       >
-        <Table stickyHeader size="small">
+        <Table
+          stickyHeader
+          size="small"
+          sx={{
+            "& .MuiTableCell-root, & .MuiTypography-root, & .MuiButton-root": {
+              fontSize: "12px",
+            },
+          }}
+        >
           <TableHead>
             <TableRow>
               <TableCell
+                align="center"
                 sx={{
                   border: `1px solid ${borderColor}`,
                   backgroundColor: "#f5f5f5",
+                  width: "40px",
+                  minWidth: "40px",
+                  maxWidth: "40px",
                 }}
               >
                 #
@@ -1070,9 +1134,15 @@ export default function StudentAccounts() {
                 Image
               </TableCell>
               <TableCell
+                align="center"
                 sx={{
                   border: `1px solid ${borderColor}`,
                   backgroundColor: "#f5f5f5",
+                  width: "80px",
+                  minWidth: "80px",
+                  maxWidth: "80px",
+                  px: 0,
+                  textAlign: "center !important",
                 }}
               >
                 Campus
@@ -1081,15 +1151,19 @@ export default function StudentAccounts() {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   backgroundColor: "#f5f5f5",
+                  width: "130px",
+                  minWidth: "130px",
                 }}
               >
-                Student Number
+                Student No.
               </TableCell>
 
               <TableCell
                 sx={{
                   border: `1px solid ${borderColor}`,
                   backgroundColor: "#f5f5f5",
+                  width: "260px",
+                  minWidth: "260px",
                 }}
               >
                 Name
@@ -1099,15 +1173,8 @@ export default function StudentAccounts() {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   backgroundColor: "#f5f5f5",
-                }}
-              >
-                Department
-              </TableCell>
-
-              <TableCell
-                sx={{
-                  border: `1px solid ${borderColor}`,
-                  backgroundColor: "#f5f5f5",
+                  width: "500px",
+                  minWidth: "500px",
                 }}
               >
                 Program
@@ -1138,7 +1205,7 @@ export default function StudentAccounts() {
             {listLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   sx={{
                     border: `1px solid ${borderColor}`,
                     textAlign: "center",
@@ -1151,7 +1218,7 @@ export default function StudentAccounts() {
             ) : currentData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   sx={{
                     border: `1px solid ${borderColor}`,
                     textAlign: "center",
@@ -1170,8 +1237,12 @@ export default function StudentAccounts() {
                   }}
                 >
                   <TableCell
+                    align="center"
                     sx={{
                       border: `1px solid ${borderColor}`,
+                      width: "40px",
+                      minWidth: "40px",
+                      maxWidth: "40px",
                     }}
                   >
                     {startIndex + index + 1}
@@ -1188,23 +1259,29 @@ export default function StudentAccounts() {
                           ? `${API_BASE_URL}/uploads/Student1by1/${row.profile_img}`
                           : undefined
                       }
-                      alt={row.first_name}
+                      alt={row.last_name}
                       sx={{
-                        width: 60,
-                        height: 60,
+                        width: 42,
+                        height: 42,
                         margin: "auto",
                         border: `1px solid ${borderColor}`,
                         bgcolor: row.profile_img ? "transparent" : "#6D2323",
                       }}
                     >
-                      {row.first_name?.[0] || "?"}
+                      {row.last_name?.trim()?.[0]?.toLocaleUpperCase() || "?"}
                     </Avatar>
                   </TableCell>
 
 
                   <TableCell
+                    align="center"
                     sx={{
                       border: `1px solid ${borderColor}`,
+                      width: "80px",
+                      minWidth: "80px",
+                      maxWidth: "80px",
+                      px: 0,
+                      textAlign: "center !important",
                     }}
                   >
                     {branchMap[row.campus] || ""}
@@ -1213,40 +1290,28 @@ export default function StudentAccounts() {
                   <TableCell
                     sx={{
                       border: `1px solid ${borderColor}`,
+                      width: "130px",
+                      minWidth: "130px",
                     }}
                   >
-                    <Typography
-                      sx={{
-                        color: "blue",
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                      }}
-                      onClick={() => handleOpen(row)}
-                    >
-                      {row.student_number}
-                    </Typography>
+                    {row.student_number}
                   </TableCell>
 
                   <TableCell
                     sx={{
                       border: `1px solid ${borderColor}`,
+                      width: "260px",
+                      minWidth: "260px",
                     }}
                   >
-                    {row.last_name},{row.first_name}
-                    {row.middle_name}
+                    {formatStudentName(row)}
                   </TableCell>
 
                   <TableCell
                     sx={{
                       border: `1px solid ${borderColor}`,
-                    }}
-                  >
-                    {row.dprtmnt_name}
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      border: `1px solid ${borderColor}`,
+                      width: "500px",
+                      minWidth: "500px",
                     }}
                   >
                     {row.program_code} - {row.program_description} ({row.major})
@@ -1409,6 +1474,30 @@ export default function StudentAccounts() {
             borderRadius: 3,
             overflow: "hidden",
             boxShadow: 6,
+            ...compactDialogControlStyles,
+            "& .MuiInputLabel-root.MuiInputLabel-shrink": {
+              fontSize: "14px",
+              lineHeight: 1.2,
+              transform: "translate(14px, -8px) scale(0.75)",
+              transformOrigin: "top left",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend": {
+              fontSize: "10.5px",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend > span": {
+              paddingLeft: "3px",
+              paddingRight: "6px",
+            },
+            "& .MuiInputLabel-root.Mui-focused": {
+              color: headerColor,
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+              borderColor: headerColor,
+              borderWidth: "1px",
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiSelect-icon": {
+              color: headerColor,
+            },
           },
         }}
       >
@@ -1426,182 +1515,295 @@ export default function StudentAccounts() {
         </DialogTitle>
 
         {/* CONTENT */}
-        <DialogContent sx={{ p: 3 }}>
+        <DialogContent sx={{ p: { xs: 2, md: 2.5 }, pt: { xs: 3, md: 3 } }}>
+          <Box
+            sx={{
+              display: { xs: "block", sm: "grid" },
+              gridTemplateColumns: { sm: "110px minmax(0, 1fr)" },
+              columnGap: { sm: 2 },
+              alignItems: "center",
+            }}
+          >
+            <Typography
+              fontWeight={700}
+              sx={{
+                gridColumn: { sm: "1 / -1" },
+                gridRow: { sm: "1" },
+                mt: 2,
+                mb: 1.5,
+                fontSize: "16px !important",
+                textTransform: "uppercase",
+              }}
+            >
+              User's Account Information
+            </Typography>
 
-          {/* ✅ Avatar upload — same concept as Faculty */}
-          <Box display="flex" flexDirection="column" alignItems="center" mb={3} mt={3}>
-            <Box position="relative" component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
-              <Avatar
-                src={photoPreview}
+            <Box
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              mt={2}
+              sx={{
+                gridColumn: { sm: "1" },
+                gridRow: { sm: "2" },
+                position: "relative",
+              }}
+            >
+              <Box
+                position="relative"
+                component="label"
+                sx={{ cursor: "pointer", display: "inline-flex" }}
+              >
+                <Avatar
+                  src={photoPreview}
+                  sx={{
+                    width: 78,
+                    height: 78,
+                    border: "1.5px solid black",
+                    boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                  }}
+                >
+                  {!photoPreview && <ImageIcon sx={{ fontSize: 36, color: "#999" }} />}
+                </Avatar>
+
+                <label
+                  htmlFor="student-avatar-upload"
+                  style={{
+                    position: "absolute",
+                    bottom: 2,
+                    right: 2,
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                  }}
+                >
+                  <AddCircleIcon sx={{ fontSize: 24, color: mainButtonColor }} />
+                </label>
+
+                <input
+                  hidden
+                  id="student-avatar-upload"
+                  type="file"
+                  name="student_photo"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                />
+              </Box>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
                 sx={{
-                  width: 110,
-                  height: 110,
-                  border: "1.5px solid black",
-                  boxShadow: "0 2px 8px rgba(0,0,0,.15)",
-                }}
-              >
-                {!photoPreview && <ImageIcon sx={{ fontSize: 40, color: "#999" }} />}
-              </Avatar>
-
-              <label
-                htmlFor="student-avatar-upload"
-                style={{
                   position: "absolute",
-                  bottom: 2,
-                  right: 2,
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                  top: { sm: -28, xs: -28 },
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 160,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  lineHeight: 1.15,
                 }}
               >
-                <AddCircleIcon sx={{ fontSize: 26, color: mainButtonColor }} />
-              </label>
-
-              <input
-                hidden
-                id="student-avatar-upload"
-                type="file"
-                name="student_photo"
-                accept="image/*"
-                onChange={handlePhotoChange}
-              />
+                Click to upload 2x2<br />
+                profile picture
+              </Typography>
             </Box>
 
-            <Typography variant="caption" color="text.secondary" mt={1}>
-              Click to upload 2x2 profile picture
-            </Typography>
+            <Grid
+              container
+              spacing={1}
+              sx={{
+                gridColumn: { sm: "2" },
+                gridRow: { sm: "2" },
+                mt: { sm: 2 },
+              }}
+            >
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Student Number"
+                  fullWidth
+                  value={selectedPerson?.student_number || ""}
+                  InputProps={{ readOnly: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="First Name"
+                  fullWidth
+                  value={selectedPerson?.first_name || ""}
+                  onChange={(e) =>
+                    updateSelectedPersonField("first_name", e.target.value)
+                  }
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Middle Name"
+                  fullWidth
+                  value={selectedPerson?.middle_name || ""}
+                  onChange={(e) =>
+                    updateSelectedPersonField("middle_name", e.target.value)
+                  }
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  label="Last Name"
+                  fullWidth
+                  value={selectedPerson?.last_name || ""}
+                  onChange={(e) =>
+                    updateSelectedPersonField("last_name", e.target.value)
+                  }
+                />
+              </Grid>
+            </Grid>
           </Box>
 
-          <Typography
-            variant="subtitle1"
-            fontWeight={700}
-            sx={{ mb: 2, mt: 1 }}
-          >
-            Student Information
-          </Typography>
-
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                label="Student Number"
-                fullWidth
-                value={selectedPerson?.student_number || ""}
-                InputProps={{ readOnly: true }}
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <TextField
-                label="Last Name"
-                fullWidth
-                value={selectedPerson?.last_name || ""}
-                onChange={(e) =>
-                  updateSelectedPersonField("last_name", e.target.value)
-                }
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <TextField
-                label="First Name"
-                fullWidth
-                value={selectedPerson?.first_name || ""}
-                onChange={(e) =>
-                  updateSelectedPersonField("first_name", e.target.value)
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                label="Middle Name"
-                fullWidth
-                value={selectedPerson?.middle_name || ""}
-                onChange={(e) =>
-                  updateSelectedPersonField("middle_name", e.target.value)
-                }
-              />
-            </Grid>
-          </Grid>
-
-          <Typography
-            variant="subtitle1"
-            fontWeight={700}
-            sx={{ mt: 4, mb: 2 }}
-          >
-            Account Details
-          </Typography>
-
           <TextField
-            label="Email Address"
+            size="small"
+            label="Email"
             fullWidth
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            sx={{ mb: 1.5, mt: 2 }}
           />
 
           <TextField
-            label="Password"
+            size="small"
+            label="New Password (leave blank to keep current)"
             fullWidth
-            sx={{ mt: 2 }}
             value={generatedPassword}
             onChange={(e) => setGeneratedPassword(e.target.value)}
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
             helperText="Generate a password or type one here before saving."
+            sx={{
+              ...(!showPassword && {
+                "& .MuiOutlinedInput-root.Mui-focused .MuiIconButton-root": {
+                  color: headerColor,
+                },
+              }),
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword((previous) => !previous)}
+                    edge="end"
+                    size="small"
+                    sx={{ color: "text.secondary" }}
+                  >
+                    {showPassword
+                      ? <VisibilityOff sx={{ fontSize: 18 }} />
+                      : <Visibility sx={{ fontSize: 18 }} />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
-          {generatedPassword && (
-            <Box
-              mt={3}
-              p={3}
+          <Box
+            mt={1}
+            p={2.5}
+            sx={{
+              border: "2px dashed " + headerColor,
+              borderRadius: 2,
+              textAlign: "center",
+              backgroundColor: "#f9f9f9",
+              minHeight: 96,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {generatedPassword ? (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  Generated Password
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{ fontWeight: "bold", letterSpacing: 2, color: "#d32f2f" }}
+                >
+                  {generatedPassword}
+                </Typography>
+                <Typography variant="caption" mt={0.5}>
+                  Please print or save this password.
+                </Typography>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No password generated yet.
+              </Typography>
+            )}
+          </Box>
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 1.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LockResetIcon />}
+              onClick={() => setGeneratedPassword(generatePassword(10))}
               sx={{
-                border: "2px dashed #1976d2",
-                borderRadius: 2,
-                textAlign: "center",
-                backgroundColor: "#f9f9f9",
+                fontWeight: 600,
+                color: mainButtonColor,
+                borderColor: mainButtonColor,
+                "&:hover": {
+                  borderColor: mainButtonColor,
+                  backgroundColor: mainButtonColor + "12",
+                },
               }}
             >
-              <Typography variant="h6" gutterBottom>
-                Generated Password
-              </Typography>
+              Generate
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PrintIcon />}
+              disabled={!generatedPassword}
+              onClick={() =>
+                printAccountSlip(selectedPerson, generatedPassword, email)
+              }
+              sx={{
+                fontWeight: 600,
+                color: mainButtonColor,
+                borderColor: mainButtonColor,
+                "&:hover": {
+                  borderColor: mainButtonColor,
+                  backgroundColor: mainButtonColor + "12",
+                },
+              }}
+            >
+              Print
+            </Button>
+          </Box>
 
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: "bold",
-                  letterSpacing: 2,
-                  color: "#d32f2f",
-                }}
-              >
-                {generatedPassword}
-              </Typography>
-
-              <Typography variant="body2" mt={1}>
-                Please print or save this password.
-              </Typography>
-            </Box>
-          )}
-
-          {/* ✅ Status now lives inside the modal — same concept as Faculty */}
           {selectedPerson && (
-            <FormControl fullWidth margin="dense" sx={{ mt: 3 }}>
+            <FormControl fullWidth size="small" margin="dense" sx={{ mt: 2 }}>
               <InputLabel>Status</InputLabel>
               <Select
                 value={status}
                 onChange={(e) => setStatus(Number(e.target.value))}
                 label="Status"
+                MenuProps={compactSelectMenuProps}
               >
                 <MenuItem value={1}>Active</MenuItem>
                 <MenuItem value={0}>Inactive</MenuItem>
               </Select>
             </FormControl>
           )}
-
         </DialogContent>
 
         {/* ACTIONS */}
@@ -1634,32 +1836,6 @@ export default function StudentAccounts() {
               flexWrap: "nowrap",
             }}
           >
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<VpnKeyIcon />}
-              onClick={() => {
-                const pwd = generatePassword(10);
-                setGeneratedPassword(pwd);
-              }}
-              sx={{ fontWeight: 600 }}
-            >
-              Generate
-            </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<PrintIcon />}
-              disabled={!generatedPassword}
-              onClick={() =>
-                printAccountSlip(selectedPerson, generatedPassword, email)
-              }
-              sx={{ fontWeight: 600 }}
-            >
-              Print
-            </Button>
-
             <Button
               variant="contained"
               size="small"
