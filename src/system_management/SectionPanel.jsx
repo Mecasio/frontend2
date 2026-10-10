@@ -84,9 +84,25 @@ const SectionPanel = () => {
 
   const [sectionSearchQuery, setSectionSearchQuery] = useState("");
 
-  const filteredSections = sections.filter((section) =>
-    section.description.toLowerCase().includes(sectionSearchQuery.toLowerCase())
-  );
+  const sectionDescriptionCollator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  const filteredSections = sections
+    .filter((section) =>
+      String(section.description ?? "")
+        .toLowerCase()
+        .includes(sectionSearchQuery.toLowerCase()),
+    )
+    .sort((first, second) => {
+      const firstDescription = String(first.description ?? "").trim();
+      const secondDescription = String(second.description ?? "").trim();
+      const lengthDifference =
+        [...firstDescription].length - [...secondDescription].length;
+      if (lengthDifference !== 0) return lengthDifference;
+
+      return sectionDescriptionCollator.compare(firstDescription, secondDescription);
+    });
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState({
@@ -511,7 +527,7 @@ const SectionPanel = () => {
         <Table>
           <TableHead style={{ backgroundColor: headerColor, }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>ID</TableCell>
+              <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>#</TableCell>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Section Description</TableCell>
               {showActionColumn && (
                 <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Action</TableCell>

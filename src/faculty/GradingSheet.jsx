@@ -16,7 +16,6 @@ import {
   Button,
   FormControl,
   Select,
-  InputLabel,
   MenuItem,
   Box,
   Typography,
@@ -290,7 +289,6 @@ const GradingSheet = () => {
   const pendingDraftsRef = useRef({});
   const [selectedFile, setSelectedFile] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState("asc");
   const [gradeConversions, setGradeConversions] = useState([]);
   const [gradeEditScope, setGradeEditScope] = useState({
     midtermOpen: false,
@@ -601,78 +599,6 @@ const GradingSheet = () => {
       }),
     [students, searchQuery],
   );
-
-  const findPastClass = async () => {
-    try {
-      if (!profData.prof_id || !selectedSchoolYear || !selectedSchoolSemester || !selectedActiveSchoolYear) {
-        setSnack({
-          open: true,
-          message: "Please select School Year and Semester first!",
-          severity: "warning",
-        });
-        return;
-      }
-
-      const res = await axios.get(`${API_BASE_URL}/api/grading_sheet_bootstrap/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-        params: {
-          course_id: selectedCourse || undefined,
-          department_section_id: selectedSectionID || undefined,
-          active_school_year_id: selectedActiveSchoolYear,
-        },
-      });
-
-      const data = res.data || {};
-      const courses = Array.isArray(data.courses) ? data.courses : [];
-      const sections = Array.isArray(data.sections) ? data.sections : [];
-      const selectedCourseId = data.selectedCourse || courses[0]?.course_id || "";
-      const selectedSectionId = data.selectedSection || sections[0]?.department_section_id || "";
-      const fetchedStudents = Array.isArray(data.students) ? data.students : [];
-
-      if (courses.length === 0) {
-        setSectionsHandle([]);
-        setStudents([]);
-        setSnack({
-          open: true,
-          message: "No courses found for this period.",
-          severity: "info",
-        });
-        return;
-      }
-
-      setCoursesAssignedTo(courses);
-      setSectionsHandle(sections);
-
-      if (sections.length === 0) {
-        setStudents([]);
-        setSnack({
-          open: true,
-          message: "No sections found for this course.",
-          severity: "info",
-        });
-        return;
-      }
-
-      skipNextSectionFetchRef.current = true;
-      skipNextStudentFetchRef.current = true;
-      setSelectedCourse(selectedCourseId);
-      setSelectedSectionID(selectedSectionId);
-      setStudents(
-        fetchedStudents.map((student) => ({
-          ...withInitialSaveStatus(student),
-          selectedCourse: selectedCourseId,
-          department_section_id: selectedSectionId,
-        })),
-      );
-      setMessage(fetchedStudents.length ? "" : "There are no currently enrolled students in this subject and section");
-    } catch (err) {
-      console.error("Error fetching past class data:", err);
-      setSnack({
-        open: true,
-        message: "Failed to fetch data.",
-        severity: "error",
-      });
-    }
-  };
 
   // useMemo so stats only recompute when filteredStudents changes
   const gradeStats = useMemo(() =>
@@ -1260,22 +1186,6 @@ const GradingSheet = () => {
     currentPage * itemsPerPage,
   );
 
-  const handleSort = () => {
-    const newOrder = sortOrder === "asc" ? "desc" : "asc";
-    setSortOrder(newOrder);
-
-    const sorted = [...students].sort((a, b) => {
-      const nameA = a.last_name.toLowerCase();
-      const nameB = b.last_name.toLowerCase();
-
-      return newOrder === "asc"
-        ? nameA.localeCompare(nameB)
-        : nameB.localeCompare(nameA);
-    });
-
-    setStudents(sorted);
-  };
-
   const handlePostStudentGrades = async () => {
     if (students.length === 0) {
       setSnack({
@@ -1831,28 +1741,39 @@ const GradingSheet = () => {
         <Box
           sx={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
+            alignItems: "center",
             gap: 2,
+            flexWrap: "wrap",
           }}
         >
           {/* â”€â”€ LEFT: Course / Section / Sort + School Year + Semester + Find â”€â”€ */}
-          <Box display="flex" flexDirection="column" gap={2}>
+          {/* Course, section, school year, and semester filters */}
+          <Box
+            sx={{
+              flex: "1 1 850px",
+              minWidth: 0,
+              display: "grid",
+              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+              gap: 1.5,
+              alignItems: "end",
+            }}
+          >
 
             
 
             {/* Course */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Course:</Typography>
-              <FormControl sx={{ width: "510px" }}>
-                <InputLabel id="demo-simple-select-label">Course</InputLabel>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 14, fontWeight: 600, color: "#374151" }}>Course</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="demo-simple-select-label"
                   id="demo-simple-select"
                   value={selectedCourseValue}
-                  label="Course"
                   onChange={handleSelectCourseChange}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 14 }}
                 >
+                  <MenuItem value="" disabled>Select Course</MenuItem>
                   {courseAssignedTo.length > 0 ? (
                     courseAssignedTo.map((course) => (
                       <MenuItem value={course.course_id} key={course.course_id}>
@@ -1867,17 +1788,20 @@ const GradingSheet = () => {
             </Box>
 
             {/* Section */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Section:</Typography>
-              <FormControl sx={{ width: "510px" }}>
-                <InputLabel id="section-select-label">Section</InputLabel>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 14, fontWeight: 600, color: "#374151" }}>Section</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="section-select-label"
-                  label="Section"
                   value={selectedSectionValue}
                   onChange={(event) => setSelectedSectionID(event.target.value)}
                   disabled={!selectedCourse || sectionsHandle.length === 0}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 14 }}
                 >
+                  <MenuItem value="" disabled>
+                    {!selectedCourse ? "Select a course first" : "Select Section"}
+                  </MenuItem>
                   {!selectedCourse ? (
                     <MenuItem value="" disabled>Please select a course first</MenuItem>
                   ) : sectionsHandle.length > 0 ? (
@@ -1892,41 +1816,19 @@ const GradingSheet = () => {
                 </Select>
               </FormControl>
 
-              {/* Sort — beside Section */}
-              <Button
-                onClick={handleSort}
-                variant="outlined"
-                size="small"
-                sx={{
-                  minWidth: 100,
-                  color: "white",
-                  borderColor: "white",
-                  backgroundColor: "transparent",
-                  "&:hover": { borderColor: "white", backgroundColor: "rgba(65,64,64,0.1)" },
-                }}
-              >
-                Sort: {sortOrder === "asc" ? "A–Z" : "Z–A"}
-              </Button>
             </Box>
 
-            {/* School Year + Semester + Find Last Grade — all in one row */}
-            <Box display="flex" alignItems="center" gap={2}>
-              <Typography fontSize={13} sx={{ minWidth: "90px" }}>School Year:</Typography>
-              <FormControl sx={{ width: "210px" }}>
-                <InputLabel id="school-year-label">School Year</InputLabel>
+            {/* School Year + Semester */}
+            <Box sx={{ display: "contents" }}>
+              <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 14, fontWeight: 600, color: "#374151" }}>School Year</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="school-year-label"
-                  label="School Year"
                   value={selectedSchoolYearValue}
                   onChange={(e) => setSelectedSchoolYear(e.target.value)}
-                  sx={{
-                    fontSize: "13px",
-                    color: "inherit",
-                    ".MuiOutlinedInput-notchedOutline": { borderColor: "rgba(0,0,0,0.23)" },
-                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(0,0,0,0.87)" },
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "primary.main" },
-                    "& svg": { color: "inherit" },
-                  }}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 14 }}
                   MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}
                 >
                   <MenuItem value="" disabled>Select School Year</MenuItem>
@@ -1937,23 +1839,17 @@ const GradingSheet = () => {
                   ))}
                 </Select>
               </FormControl>
+              </Box>
 
-              <Typography fontSize={13} sx={{ minWidth: "90px" }}>Semester:</Typography>
-              <FormControl sx={{ width: "180px" }}>
-                <InputLabel id="semester-label">Semester</InputLabel>
+              <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 14, fontWeight: 600, color: "#374151" }}>Semester</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="semester-label"
-                  label="Semester"
                   value={selectedSchoolSemesterValue}
                   onChange={(e) => setSelectedSchoolSemester(e.target.value)}
-                  sx={{
-                    fontSize: "13px",
-                    color: "inherit",
-                    ".MuiOutlinedInput-notchedOutline": { borderColor: "rgba(0,0,0,0.23)" },
-                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(0,0,0,0.87)" },
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "primary.main" },
-                    "& svg": { color: "inherit" },
-                  }}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 14 }}
                   MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}
                 >
                   <MenuItem value="" disabled>Select Semester</MenuItem>
@@ -1964,26 +1860,29 @@ const GradingSheet = () => {
                   ))}
                 </Select>
               </FormControl>
+              </Box>
 
-              <Button
-                onClick={findPastClass}
-                variant="outlined"
-                size="small"
-                sx={{
-                  minWidth: 130,
-                  color: "white",
-                  borderColor: "white",
-                  backgroundColor: "transparent",
-                  "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                }}
-              >
-                Find Last Grade
-              </Button>
             </Box>
           </Box>
 
           {/* â”€â”€ RIGHT: File upload + actions â”€â”€ */}
-          <Box display="flex" flexDirection="column" gap={1.5} alignItems="flex-end" sx={{ minWidth: 260 }}>
+          <Box
+            sx={{
+              display: { xs: "none", lg: "block" },
+              borderLeft: "1px solid #d1d5db",
+              alignSelf: "stretch",
+            }}
+          />
+          <Box
+            sx={{
+              flex: "1 1 560px",
+              minWidth: 0,
+              display: "grid",
+              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+              gap: 1,
+              alignItems: "center",
+            }}
+          >
 
             {/* Import Excel button */}
             <input
@@ -1996,20 +1895,21 @@ const GradingSheet = () => {
             <button
               onClick={() => document.getElementById("excel-upload").click()}
               style={{
-                border: "2px solid green",
+                border: "1px solid green",
                 backgroundColor: "#f0fdf4",
                 color: "green",
-                borderRadius: "5px",
+                borderRadius: "4px",
                 cursor: "pointer",
-                fontSize: "14px",
+                fontSize: "12px",
                 fontWeight: "bold",
-                height: "50px",
+                height: "38px",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "5px",
                 justifyContent: "center",
                 userSelect: "none",
                 width: "100%",
+                whiteSpace: "nowrap",
               }}
               type="button"
             >
@@ -2029,6 +1929,7 @@ const GradingSheet = () => {
                   borderRadius: "8px",
                   padding: "8px 12px",
                   width: "100%",
+                  gridColumn: "1 / -1",
                 }}
               >
                 <FaFileExcel size={24} color="#16a34a" />
@@ -2056,18 +1957,17 @@ const GradingSheet = () => {
               disabled={!selectedFile}
               onClick={handleImport}
               sx={{
-                height: "50px",
+                height: 38,
                 width: "100%",
                 backgroundColor: selectedFile ? "green" : undefined,
                 "&:hover": { backgroundColor: "#166534" },
                 fontWeight: "bold",
+                fontSize: 12,
+                whiteSpace: "nowrap",
               }}
             >
               Upload
             </Button>
-
-            {/* Divider */}
-            <Box sx={{ width: "100%", borderTop: "1px solid #e0e0e0", my: 0.5 }} />
 
             {/* Post Student Grades */}
             <Button
@@ -2075,7 +1975,7 @@ const GradingSheet = () => {
               variant="contained"
               color="primary"
               disabled={students.length === 0 || isPostingGrades}
-              sx={{ width: "100%", height: "50px", fontSize: "15px", fontWeight: "bold", borderRadius: "5px" }}
+              sx={{ width: "100%", height: 38, fontSize: 11, fontWeight: "bold", borderRadius: "4px", whiteSpace: "nowrap" }}
             >
               Post Student Grades
             </Button>
@@ -2084,20 +1984,21 @@ const GradingSheet = () => {
             <button
               onClick={exportToExcel}
               style={{
-                padding: "5px 20px",
-                border: "2px solid black",
+                padding: "5px 8px",
+                border: "1px solid black",
                 backgroundColor: "#f0f0f0",
                 color: "black",
-                borderRadius: "5px",
+                borderRadius: "4px",
                 cursor: "pointer",
-                fontSize: "14px",
+                fontSize: "12px",
                 fontWeight: "bold",
-                height: "50px",
+                height: "38px",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "5px",
                 width: "100%",
                 justifyContent: "center",
+                whiteSpace: "nowrap",
               }}
             >
               <FaFileExcel size={18} color="green" />

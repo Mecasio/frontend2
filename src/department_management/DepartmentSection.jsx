@@ -55,17 +55,34 @@ const formatSchoolYear = (yearDesc) => {
 const getCurriculumLabel = (option) =>
   `${formatSchoolYear(option.year_description)}: (${option.program_code}) ${option.program_description} ${option.major || ""}`;
 
+const sectionDescriptionCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
+const sortSectionsByDescription = (sections) =>
+  [...sections].sort((first, second) => {
+    const firstDescription = String(first.description ?? "").trim();
+    const secondDescription = String(second.description ?? "").trim();
+    const lengthDifference =
+      [...firstDescription].length - [...secondDescription].length;
+
+    return lengthDifference || sectionDescriptionCollator.compare(firstDescription, secondDescription);
+  });
+
 const filterAutocompleteOptions = (
   options,
   { inputValue },
   getLabel,
   limit = 100,
+  includeAllMatches = false,
 ) => {
   const input = inputValue.trim().toLowerCase();
   if (!input) return options.slice(0, limit);
-  return options
-    .filter((option) => getLabel(option).toLowerCase().includes(input))
-    .slice(0, limit);
+  const matches = options.filter((option) =>
+    getLabel(option).toLowerCase().includes(input),
+  );
+  return includeAllMatches ? matches : matches.slice(0, limit);
 };
 
 const DepartmentSectionFormDialog = memo(
@@ -118,9 +135,13 @@ const DepartmentSectionFormDialog = memo(
       [uniqueCurriculumList],
     );
 
-    const sectionAutocompleteOptions = useMemo(
-      () => sectionsList.slice(0, 100),
+    const sortedSectionsList = useMemo(
+      () => sortSectionsByDescription(sectionsList),
       [sectionsList],
+    );
+    const sectionAutocompleteOptions = useMemo(
+      () => sortedSectionsList.slice(0, 100),
+      [sortedSectionsList],
     );
 
     const handleSave = () => {
@@ -209,9 +230,11 @@ const DepartmentSectionFormDialog = memo(
             }
             filterOptions={(options, state) =>
               filterAutocompleteOptions(
-                sectionsList,
+                sortedSectionsList,
                 state,
                 (option) => option.description || "",
+                100,
+                true,
               )
             }
             ListboxProps={{ style: { maxHeight: 280 } }}
