@@ -5,6 +5,7 @@ import API_BASE_URL from "../apiConfig";
 import {
   Box,
   Typography,
+  Button,
   FormControl,
   InputLabel,
   Snackbar,
@@ -13,6 +14,9 @@ import {
   MenuItem,
   TextField,
 } from "@mui/material";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { Autocomplete } from "@mui/material";
@@ -41,6 +45,7 @@ const CurriculumUnitManagement = () => {
   const [hasAccess, setHasAccess] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [employeeID, setEmployeeID] = useState("");
 
@@ -323,6 +328,388 @@ const CurriculumUnitManagement = () => {
     return `${yearLabelMap[year] || year} - (${year})`;
   };
 
+  const getPdfYearLabel = (year) => {
+    const yearLevel = yearLevelList.find(
+      (item) => item.year_level_description === year,
+    );
+    const yearWords = [
+      "First",
+      "Second",
+      "Third",
+      "Fourth",
+      "Fifth",
+      "Sixth",
+    ];
+
+    if (yearLevel?.level_type === "year") {
+      return `${yearWords[Number(yearLevel.year_level_id) - 1] || yearLevel.year_level_id} Year`;
+    }
+
+    return year;
+  };
+
+  const getDisplayedUnit = (course, field) =>
+    editedCourseReqs[course.program_tagging_id]?.[field] ??
+    course[field] ??
+    0;
+
+  const formatPdfUnit = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  };
+
+  const formatPdfPrerequisite = (value) =>
+    value
+      ? String(value)
+          .split(/\s*,\s*/)
+          .filter(Boolean)
+          .join("\n")
+      : "";
+
+  const handleExportPdf = () => {
+    const years = Object.keys(data).sort(
+      (a, b) => (yearOrder[a] ?? Number.MAX_SAFE_INTEGER) -
+        (yearOrder[b] ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    if (!selectedCurriculum || years.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Select a curriculum with courses before exporting.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const curriculum = curriculumList.find(
+        (item) => item.curriculum_id == selectedCurriculum,
+      );
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+      const gap = 14;
+      const tableWidth = (pageWidth - margin * 2 - gap) / 2;
+      const contentStartY = 22;
+      const contentEndY = pageHeight - 7;
+
+      const sections = years.flatMap((year) => {
+        const semesters = Object.keys(data[year]).sort(
+          (a, b) => (semesterOrder[a] ?? Number.MAX_SAFE_INTEGER) -
+            (semesterOrder[b] ?? Number.MAX_SAFE_INTEGER),
+        );
+
+        const yearSections = [];
+        for (let index = 0; index < semesters.length; index += 2) {
+          yearSections.push({ year, semesters: semesters.slice(index, index + 2) });
+        }
+        return yearSections;
+      });
+
+      const tableRowCount = (courses) =>
+        1 + Math.max(courses.length, 1) * 2 + 1;
+      const totalTableRows = sections.reduce((sum, section) => {
+        const largestTable = Math.max(
+          ...section.semesters.map((semester) =>
+            tableRowCount(data[section.year][semester]),
+          ),
+        );
+        return sum + largestTable;
+      }, 0);
+      // Includes the year banner, semester labels, and a visible gap between years.
+      const sectionHeadingHeight = 12.5;
+      const availableTableHeight =
+        contentEndY -
+        contentStartY -
+        sections.length * sectionHeadingHeight;
+      const rowHeight = Math.max(
+        0.6,
+        Math.min(4.2, availableTableHeight / Math.max(totalTableRows, 1)),
+      );
+      const tableFontSize = Math.max(
+        1,
+        Math.min(5.5, (rowHeight - 0.1) / 0.405),
+      );
+
+      const schoolYear = formatSchoolYear(curriculum?.year_description);
+      const programName = [
+        curriculum?.program_code ? `(${curriculum.program_code})` : "",
+        curriculum?.program_description || "",
+        curriculum?.major ? `- ${curriculum.major}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(programName || selectedCurriculumName, pageWidth / 2, 9, {
+        align: "center",
+        maxWidth: pageWidth - margin * 2,
+      });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(`Curriculum ${schoolYear}`, pageWidth / 2, 14, {
+        align: "center",
+      });
+      doc.setDrawColor(100);
+      doc.line(margin, 17, pageWidth - margin, 17);
+
+      const drawSemesterTable = ({
+        semester,
+        courses,
+        targetRowCount,
+        x,
+        startY,
+      }) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(Math.max(5, tableFontSize + 1));
+        doc.text(semester, x + tableWidth / 2, startY, { align: "center" });
+
+        const body = courses.length
+          ? courses.map((course, index) => [
+              index + 1,
+              {
+                content: "\n",
+                courseCode: course.course_code || "-",
+                courseDescription: course.course_description || "-",
+              },
+              formatPdfPrerequisite(course.prereq),
+              formatPdfUnit(getDisplayedUnit(course, "lec_unit")),
+              formatPdfUnit(getDisplayedUnit(course, "lab_unit")),
+              formatPdfUnit(getDisplayedUnit(course, "course_unit")),
+            ])
+          : [[
+              {
+                content: "No courses assigned\n ",
+                colSpan: 6,
+                styles: { halign: "center", textColor: [100, 100, 100] },
+              },
+            ]];
+
+        while (body.length < targetRowCount) {
+          body.push(["", " \n ", "", "", "", ""]);
+        }
+
+        const total = (field) =>
+          courses.reduce(
+            (sum, course) => sum + Number(getDisplayedUnit(course, field) || 0),
+            0,
+          );
+
+        const previousLineHeightFactor = doc.getLineHeightFactor();
+        doc.setLineHeightFactor(0.78);
+        autoTable(doc, {
+          startY: startY + 1.5,
+          margin: { left: x, right: pageWidth - x - tableWidth },
+          tableWidth,
+          head: [["#", "Course", "Prerequisite", "Lec", "Lab", "Unit"]],
+          body,
+          foot: [[
+            { content: "TOTAL", colSpan: 3, styles: { halign: "center" } },
+            total("lec_unit"),
+            total("lab_unit"),
+            total("course_unit"),
+          ]],
+          theme: "grid",
+          styles: {
+            font: "helvetica",
+            fontSize: tableFontSize,
+            cellPadding: {
+              top: 0.05,
+              right: 0.45,
+              bottom: 0.05,
+              left: 0.45,
+            },
+            minCellHeight: rowHeight,
+            overflow: "ellipsize",
+            valign: "middle",
+            lineColor: [90, 90, 90],
+            lineWidth: 0.15,
+          },
+          headStyles: {
+            fillColor: headerColor,
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            halign: "center",
+            lineColor: [0, 0, 0],
+          },
+          alternateRowStyles: {
+            fillColor: [247, 249, 252],
+          },
+          footStyles: {
+            fillColor: [238, 238, 238],
+            textColor: [0, 0, 0],
+            fontStyle: "bold",
+            halign: "center",
+          },
+          columnStyles: {
+            0: { cellWidth: 3.5, halign: "center" },
+            1: {
+              cellWidth: 53.5,
+              overflow: "ellipsize",
+              cellPadding: {
+                top: (2 * 25.4) / 96,
+                right: 0.45,
+                bottom: (2 * 25.4) / 96,
+                left: 0.45,
+              },
+            },
+            2: { cellWidth: 14 },
+            3: { cellWidth: 5, halign: "center" },
+            4: { cellWidth: 5, halign: "center" },
+            5: { cellWidth: 7, halign: "center" },
+          },
+          didDrawCell: (hookData) => {
+            if (
+              hookData.section !== "body" ||
+              hookData.column.index !== 1 ||
+              !hookData.cell.raw?.courseCode
+            ) {
+              return;
+            }
+
+            const { cell } = hookData;
+            const horizontalPadding = 0.45;
+            const verticalPadding = (2 * 25.4) / 96;
+            const availableWidth = cell.width - horizontalPadding * 2;
+            const availableHeight = cell.height - verticalPadding * 2;
+            const scaleFactor = doc.internal.scaleFactor;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(tableFontSize);
+
+            const wrappedDescriptionLines = doc.splitTextToSize(
+              String(hookData.cell.raw.courseDescription),
+              availableWidth,
+            );
+            const hasTwoDescriptionLines =
+              wrappedDescriptionLines.length > 1;
+            const codeFontSize = hasTwoDescriptionLines
+              ? Math.max(2.5, tableFontSize - 1.5)
+              : tableFontSize;
+            const descriptionFontSize = hasTwoDescriptionLines
+              ? Math.max(2.8, tableFontSize - 0.5)
+              : tableFontSize;
+            const descriptionLines = wrappedDescriptionLines.slice(0, 2);
+            const unscaledTextHeight =
+              (codeFontSize +
+                descriptionFontSize * descriptionLines.length) /
+              scaleFactor;
+            const compactLineFactor = Math.min(
+              0.9,
+              availableHeight / Math.max(unscaledTextHeight, 0.1),
+            );
+
+            if (wrappedDescriptionLines.length > 2) {
+              let finalLine = descriptionLines[1] || "";
+              doc.setFontSize(descriptionFontSize);
+              while (
+                finalLine.length > 0 &&
+                doc.getTextWidth(`${finalLine}...`) > availableWidth
+              ) {
+                finalLine = finalLine.slice(0, -1);
+              }
+              descriptionLines[1] = `${finalLine.trim()}...`;
+            }
+
+            const x = cell.x + horizontalPadding;
+            let y =
+              cell.y +
+              verticalPadding +
+              (codeFontSize / scaleFactor) * compactLineFactor;
+
+            doc.setTextColor(45, 55, 65);
+            doc.setFontSize(codeFontSize);
+            doc.text(String(hookData.cell.raw.courseCode), x, y, {
+              maxWidth: availableWidth,
+            });
+
+            doc.setFontSize(descriptionFontSize);
+            descriptionLines.forEach((line) => {
+              y +=
+                (descriptionFontSize / scaleFactor) * compactLineFactor;
+              doc.text(line, x, y, { maxWidth: availableWidth });
+            });
+          },
+          pageBreak: "avoid",
+          rowPageBreak: "avoid",
+        });
+        doc.setLineHeightFactor(previousLineHeightFactor);
+
+        return doc.lastAutoTable.finalY;
+      };
+
+      let currentY = contentStartY;
+      sections.forEach((section, sectionIndex) => {
+        doc.setFillColor(238, 242, 247);
+        doc.setDrawColor(190, 198, 208);
+        doc.roundedRect(
+          margin,
+          currentY - 3.4,
+          pageWidth - margin * 2,
+          5,
+          0.7,
+          0.7,
+          "FD",
+        );
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(Math.max(6, tableFontSize + 2));
+        const repeatedYear =
+          sectionIndex > 0 && sections[sectionIndex - 1].year === section.year;
+        doc.text(
+          `${getPdfYearLabel(section.year)}${repeatedYear ? " (continued)" : ""}`,
+          pageWidth / 2,
+          currentY,
+          { align: "center" },
+        );
+
+        const semesterTitleY = currentY + 5;
+        const targetRowCount = Math.max(
+          1,
+          ...section.semesters.map(
+            (semester) => data[section.year][semester].length,
+          ),
+        );
+        const tableEnds = section.semesters.map((semester, semesterIndex) =>
+          drawSemesterTable({
+            semester,
+            courses: data[section.year][semester],
+            targetRowCount,
+            x: margin + semesterIndex * (tableWidth + gap),
+            startY: semesterTitleY,
+          }),
+        );
+        // Keep the next year banner visually separate from the previous totals row.
+        currentY = Math.max(...tableEnds) + 6;
+      });
+
+      while (doc.getNumberOfPages() > 1) {
+        doc.deletePage(doc.getNumberOfPages());
+      }
+
+      const safeProgramCode = (curriculum?.program_code || "curriculum")
+        .toString()
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+      doc.save(`${safeProgramCode}-program-units.pdf`);
+      setSnackbar({
+        open: true,
+        message: "PDF exported successfully.",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Error exporting program units PDF:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to export PDF.",
+        severity: "error",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
@@ -396,6 +783,16 @@ const CurriculumUnitManagement = () => {
         >
           PROGRAM UNITS
         </Typography>
+        <Button
+          variant="contained"
+          color="error"
+          startIcon={<PictureAsPdfIcon />}
+          onClick={handleExportPdf}
+          disabled={!selectedCurriculum || Object.keys(data).length === 0 || isExporting}
+          sx={{ fontWeight: "bold" }}
+        >
+          {isExporting ? "Exporting..." : "Export PDF"}
+        </Button>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />

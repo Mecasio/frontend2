@@ -1603,6 +1603,12 @@ const SideBar = ({
           icon: HistoryEdu,
           page_id: 154,
         },
+        {
+          title: "Migrated and Enrolled Data",
+          link: "/reports",
+          icon: Assessment,
+          page_id: 176,
+        },
       ],
     },
     {

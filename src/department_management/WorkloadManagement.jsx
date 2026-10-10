@@ -24,12 +24,12 @@ import {
     FormControl,
     Select,
     MenuItem,
+    Popover,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import SaveIcon from "@mui/icons-material/Save";
 import { SettingsContext } from "../App";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -38,6 +38,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
 const DEFAULT_WORKLOAD_COLOR = "#fde047";
+export const WORKLOAD_MANAGEMENT_PAGE_ID = 171;
 
 const clampChannel = (value) => Math.max(0, Math.min(255, Number(value)));
 
@@ -83,11 +84,12 @@ const normalizeColorForSave = (input) => {
     return parseColorToHex(trimmed) || trimmed;
 };
 
-const WorkloadManagement = () => {
+const WorkloadManagement = ({ embedded = false, onWorkloadChange }) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
   const headerColor = colors.header || "#1976d2";
+  const mainButtonColor = colors.mainButton || "#1976d2";
 
     // 🎨 Theme colors (from company_settings, same as Department Registration)
     const [titleColor, setTitleColor] = useState("#000000");
@@ -102,7 +104,7 @@ const WorkloadManagement = () => {
     // 🔐 Page access control (same pattern as Department Registration)
     // NOTE: replace this with the actual page_id assigned to Workload Management
     // in your page_access table (Department Registration uses 21).
-    const pageId = 171;
+    const pageId = WORKLOAD_MANAGEMENT_PAGE_ID;
 
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
@@ -187,6 +189,7 @@ const WorkloadManagement = () => {
     const colorPickerRef = useRef(null);
 
     const [openModal, setOpenModal] = useState(false);
+    const [addAnchorEl, setAddAnchorEl] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
 
@@ -208,7 +211,10 @@ const WorkloadManagement = () => {
         setWorkloadLoading(true);
         try {
             const res = await axios.get(`${API_BASE_URL}/api/workload`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
-            setWorkloadList(res.data || []);
+            const rows = Array.isArray(res.data) ? res.data : [];
+            setWorkloadList(
+                [...rows].sort((first, second) => Number(second.id) - Number(first.id))
+            );
         } catch (err) {
             console.error(err);
             setWorkloadList([]);
@@ -273,9 +279,11 @@ const WorkloadManagement = () => {
                 );
 
                 showSnack("Workload added successfully!", "success");
+                setCurrentPage(1);
             }
 
             fetchWorkloads();
+            onWorkloadChange?.();
             setWorkload({
                 workloadDescription: "",
                 workloadCode: "",
@@ -284,6 +292,7 @@ const WorkloadManagement = () => {
             setEditMode(false);
             setSelectedId(null);
             setOpenModal(false);
+            setAddAnchorEl(null);
         } catch (err) {
             showSnack(err.response?.data?.message || "Operation failed", "error");
         }
@@ -295,6 +304,7 @@ const WorkloadManagement = () => {
             return;
         }
 
+        setAddAnchorEl(null);
         setWorkload({
             workloadDescription: row.workload_description,
             workloadCode: row.workload_code || "",
@@ -302,7 +312,18 @@ const WorkloadManagement = () => {
         });
         setSelectedId(row.id);
         setEditMode(true);
-        setOpenModal(true);
+        setOpenModal(!embedded);
+    };
+
+    const handleCancelEdit = () => {
+        setEditMode(false);
+        setSelectedId(null);
+        setOpenModal(false);
+        setWorkload({
+            workloadDescription: "",
+            workloadCode: "",
+            workloadColor: DEFAULT_WORKLOAD_COLOR,
+        });
     };
 
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
@@ -318,6 +339,7 @@ const WorkloadManagement = () => {
             await axios.delete(`${API_BASE_URL}/api/workload/${id}`, permissionHeaders);
             showSnack("Workload deleted successfully!", "success");
             fetchWorkloads();
+            onWorkloadChange?.();
         } catch (err) {
             showSnack("Failed to delete workload", "error");
         }
@@ -336,7 +358,7 @@ const WorkloadManagement = () => {
 
     // 📄 Pagination (same behavior as Department Registration)
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 20;
+    const [itemsPerPage, setItemsPerPage] = useState(embedded ? 10 : 20);
 
     const totalPages = Math.ceil(filteredWorkloads.length / itemsPerPage) || 1;
 
@@ -346,7 +368,7 @@ const WorkloadManagement = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery]);
+    }, [searchQuery, itemsPerPage]);
 
     // Put this at the very bottom before the return
     if (loading || hasAccess === null) {
@@ -379,31 +401,56 @@ const WorkloadManagement = () => {
 
     const showCreateActions = canCreate;
     const showActionColumn = canEdit || canDelete;
+    const inlineEditFieldSx = {
+        "& .MuiOutlinedInput-root": {
+            height: 30,
+            borderRadius: "5px",
+            backgroundColor: "#fff",
+            fontSize: "11px",
+            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                borderColor: headerColor,
+            },
+        },
+        "& input": { px: 1, py: 0.5 },
+    };
 
 
 
     return (
-        <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+        <Box
+            sx={{
+                height: embedded ? "auto" : "calc(100vh - 150px)",
+                overflowY: embedded ? "visible" : "auto",
+                paddingRight: embedded ? 0 : 1,
+                backgroundColor: "transparent",
+                mt: embedded ? 0 : 1,
+                p: 2,
+            }}
+        >
+            {!embedded && (
+            <>
             <Box
                 sx={{
                     display: "flex",
-                    justifyContent: "space-between",
+                    justifyContent: embedded ? "flex-end" : "space-between",
                     alignItems: "center",
                     flexWrap: "wrap",
                     gap: 2,
                     mb: 2,
                 }}
             >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    WORKLOAD MANAGEMENT
-                </Typography>
+                {!embedded && (
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            fontWeight: "bold",
+                            color: titleColor,
+                            fontSize: "36px",
+                        }}
+                    >
+                        WORKLOAD MANAGEMENT
+                    </Typography>
+                )}
 
                 <Box
                     sx={{
@@ -968,6 +1015,570 @@ const WorkloadManagement = () => {
 
 
 
+            </>
+            )}
+
+            {embedded && (
+                <Box sx={{ color: "#334155" }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 2,
+                            flexWrap: "wrap",
+                            mb: 1.5,
+                        }}
+                    >
+                        <Typography sx={{ fontSize: "14px", fontWeight: 700 }}>
+                            Total Workload Records: {filteredWorkloads.length}
+                        </Typography>
+                        <TextField
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search Workload Description / Code..."
+                            size="small"
+                            sx={{
+                                width: { xs: "100%", sm: 320 },
+                                backgroundColor: "#fff",
+                                "& .MuiOutlinedInput-root": {
+                                    height: 34,
+                                    borderRadius: "5px",
+                                    fontSize: "12px",
+                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: headerColor,
+                                    },
+                                    "&.Mui-focused .MuiSvgIcon-root": {
+                                        color: headerColor,
+                                    },
+                                },
+                            }}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ mr: 1, color: "#94a3b8", fontSize: 18 }} />,
+                            }}
+                        />
+                    </Box>
+
+                    <Box sx={{ borderTop: "1px solid #e2e8f0", pt: 1.25, mb: 1.25 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: 1.5,
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <FormControl size="small" sx={{ minWidth: 88 }}>
+                                <Select
+                                    value={itemsPerPage}
+                                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                    sx={{ height: 32, fontSize: "12px", borderRadius: 1.5 }}
+                                >
+                                    {[10, 20, 50].map((size) => (
+                                        <MenuItem key={size} value={size} sx={{ fontSize: "12px" }}>
+                                            Show {size}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                                {[
+                                    { label: "« First", action: () => setCurrentPage(1), disabled: currentPage === 1 },
+                                    { label: "‹ Prev", action: () => setCurrentPage((page) => Math.max(page - 1, 1)), disabled: currentPage === 1 },
+                                ].map((item) => (
+                                    <Button
+                                        key={item.label}
+                                        variant="outlined"
+                                        size="small"
+                                        disabled={item.disabled}
+                                        onClick={item.action}
+                                        sx={{ minWidth: 64, height: 32, fontSize: "11px", color: "#475569", borderColor: "#cbd5e1" }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                ))}
+                                <FormControl size="small" sx={{ minWidth: 72 }}>
+                                    <Select
+                                        value={currentPage}
+                                        onChange={(e) => setCurrentPage(Number(e.target.value))}
+                                        sx={{ height: 32, fontSize: "11px", borderRadius: 1.5 }}
+                                    >
+                                        {Array.from({ length: totalPages }, (_, index) => (
+                                            <MenuItem key={index + 1} value={index + 1} sx={{ fontSize: "12px" }}>
+                                                Page {index + 1}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <Typography sx={{ fontSize: "11px", color: "#475569", whiteSpace: "nowrap" }}>
+                                    of {totalPages} page{totalPages > 1 ? "s" : ""}
+                                </Typography>
+                                {[
+                                    { label: "Next ›", action: () => setCurrentPage((page) => Math.min(page + 1, totalPages)), disabled: currentPage === totalPages },
+                                    { label: "Last »", action: () => setCurrentPage(totalPages), disabled: currentPage === totalPages },
+                                ].map((item) => (
+                                    <Button
+                                        key={item.label}
+                                        variant="outlined"
+                                        size="small"
+                                        disabled={item.disabled}
+                                        onClick={item.action}
+                                        sx={{ minWidth: 64, height: 32, fontSize: "11px", color: "#475569", borderColor: "#cbd5e1" }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                ))}
+                                {showCreateActions && (
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        onClick={(event) => {
+                                            setEditMode(false);
+                                            setWorkload({
+                                                workloadDescription: "",
+                                                workloadCode: "",
+                                                workloadColor: DEFAULT_WORKLOAD_COLOR,
+                                            });
+                                            setAddAnchorEl(event.currentTarget);
+                                        }}
+                                        sx={{
+                                            height: 32,
+                                            px: 2,
+                                            borderRadius: 1.5,
+                                            backgroundColor: mainButtonColor,
+                                            fontSize: "11px",
+                                            fontWeight: 700,
+                                            textTransform: "none",
+                                            boxShadow: "none",
+                                            "&:hover": { backgroundColor: mainButtonColor, filter: "brightness(0.92)", boxShadow: "none" },
+                                        }}
+                                    >
+                                        + Add Workload
+                                    </Button>
+                                )}
+                            </Box>
+                        </Box>
+                    </Box>
+
+                    <TableContainer
+                        component={Paper}
+                        elevation={0}
+                        sx={{ border: "1px solid #e2e8f0", borderRadius: 1.5, overflow: "hidden" }}
+                    >
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ backgroundColor: headerColor }}>
+                                    {[
+                                        { label: "#", align: "center", width: 52 },
+                                        { label: "Workload Description", align: "left" },
+                                        { label: "Code", align: "center", width: 150 },
+                                        { label: "Color", align: "center", width: 140 },
+                                        ...(showActionColumn ? [{ label: "Action", align: "center", width: 190 }] : []),
+                                    ].map((column) => (
+                                        <TableCell
+                                            key={column.label}
+                                            align={column.align}
+                                            sx={{
+                                                width: column.width,
+                                                color: "#fff",
+                                                fontSize: "11px",
+                                                fontWeight: 700,
+                                                py: 1,
+                                                borderBottom: 0,
+                                            }}
+                                        >
+                                            {column.label}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {workloadLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={showActionColumn ? 5 : 4} align="center" sx={{ py: 5 }}>
+                                            <CircularProgress size={26} />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : currentWorkloads.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={showActionColumn ? 5 : 4} align="center" sx={{ py: 4, fontSize: "12px" }}>
+                                            No workload records found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    currentWorkloads.map((row, index) => (
+                                        <TableRow
+                                            key={row.id}
+                                            sx={{
+                                                backgroundColor: index % 2 === 0 ? "#ffffff" : "#f6f8fb",
+                                                "&:hover": { backgroundColor: "#eef3f8" },
+                                            }}
+                                        >
+                                            <TableCell align="center" sx={{ fontSize: "11px", color: "#475569", borderColor: "#e8edf3" }}>
+                                                {indexOfFirstItem + index + 1}
+                                            </TableCell>
+                                            <TableCell sx={{ fontSize: "11px", color: "#475569", borderColor: "#e8edf3" }}>
+                                                {editMode && selectedId === row.id ? (
+                                                    <TextField
+                                                        name="workloadDescription"
+                                                        value={workload.workloadDescription}
+                                                        onChange={handleChangesForEverything}
+                                                        placeholder="Description"
+                                                        size="small"
+                                                        fullWidth
+                                                        sx={inlineEditFieldSx}
+                                                    />
+                                                ) : (
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+                                                        <Box
+                                                            sx={{
+                                                                width: 8,
+                                                                height: 8,
+                                                                borderRadius: "50%",
+                                                                flexShrink: 0,
+                                                                backgroundColor: row.workload_color || DEFAULT_WORKLOAD_COLOR,
+                                                            }}
+                                                        />
+                                                        {row.workload_description}
+                                                    </Box>
+                                                )}
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ fontSize: "11px", color: "#475569", borderColor: "#e8edf3" }}>
+                                                {editMode && selectedId === row.id ? (
+                                                    <TextField
+                                                        name="workloadCode"
+                                                        value={workload.workloadCode}
+                                                        onChange={handleChangesForEverything}
+                                                        placeholder="Code"
+                                                        size="small"
+                                                        fullWidth
+                                                        sx={inlineEditFieldSx}
+                                                    />
+                                                ) : (
+                                                    row.workload_code
+                                                )}
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ borderColor: "#e8edf3" }}>
+                                                {editMode && selectedId === row.id ? (
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                                                        <Box
+                                                            component="input"
+                                                            type="color"
+                                                            value={parseColorToHex(workload.workloadColor) || DEFAULT_WORKLOAD_COLOR}
+                                                            onChange={(event) =>
+                                                                setWorkload((previous) => ({
+                                                                    ...previous,
+                                                                    workloadColor: event.target.value,
+                                                                }))
+                                                            }
+                                                            aria-label="Select workload color"
+                                                            sx={{
+                                                                width: 30,
+                                                                height: 30,
+                                                                p: 0,
+                                                                flexShrink: 0,
+                                                                border: `1px solid ${headerColor}`,
+                                                                borderRadius: "5px",
+                                                                backgroundColor: "transparent",
+                                                                cursor: "pointer",
+                                                            }}
+                                                        />
+                                                        <TextField
+                                                            name="workloadColor"
+                                                            value={workload.workloadColor}
+                                                            onChange={handleChangesForEverything}
+                                                            placeholder="Color"
+                                                            size="small"
+                                                            fullWidth
+                                                            sx={inlineEditFieldSx}
+                                                        />
+                                                    </Box>
+                                                ) : (
+                                                    <Box
+                                                        sx={{
+                                                            width: 18,
+                                                            height: 18,
+                                                            borderRadius: 1,
+                                                            border: "1px solid rgba(15,23,42,0.12)",
+                                                            backgroundColor: row.workload_color || DEFAULT_WORKLOAD_COLOR,
+                                                            mx: "auto",
+                                                        }}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                            {showActionColumn && (
+                                                <TableCell align="center" sx={{ borderColor: "#e8edf3" }}>
+                                                    <Box sx={{ display: "flex", justifyContent: "center", gap: 0.75 }}>
+                                                        {editMode && selectedId === row.id ? (
+                                                            <>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    onClick={handleSavingWorkload}
+                                                                    sx={{
+                                                                        minWidth: 70,
+                                                                        height: 28,
+                                                                        borderRadius: "5px",
+                                                                        backgroundColor: mainButtonColor,
+                                                                        fontSize: "10px",
+                                                                        textTransform: "none",
+                                                                        boxShadow: "none",
+                                                                        "&:hover": {
+                                                                            backgroundColor: mainButtonColor,
+                                                                            filter: "brightness(0.92)",
+                                                                            boxShadow: "none",
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    Save
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    size="small"
+                                                                    onClick={handleCancelEdit}
+                                                                    sx={{
+                                                                        minWidth: 70,
+                                                                        height: 28,
+                                                                        borderRadius: "5px",
+                                                                        borderColor: headerColor,
+                                                                        color: headerColor,
+                                                                        fontSize: "10px",
+                                                                        textTransform: "none",
+                                                                        "&:hover": {
+                                                                            borderColor: headerColor,
+                                                                            backgroundColor: "#f8fafc",
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {canEdit && (
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        size="small"
+                                                                        onClick={() => handleEdit(row)}
+                                                                        startIcon={<EditIcon sx={{ fontSize: "13px !important" }} />}
+                                                                        sx={{
+                                                                            minWidth: 70,
+                                                                            height: 28,
+                                                                            borderRadius: 1,
+                                                                            backgroundColor: "#16a34a",
+                                                                            fontSize: "10px",
+                                                                            textTransform: "none",
+                                                                            boxShadow: "none",
+                                                                            "&:hover": { backgroundColor: "#15803d", boxShadow: "none" },
+                                                                        }}
+                                                                    >
+                                                                        Edit
+                                                                    </Button>
+                                                                )}
+                                                                {canDelete && (
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        size="small"
+                                                                        onClick={() => {
+                                                                            setWorkloadToDelete(row);
+                                                                            setOpenDeleteDialog(true);
+                                                                        }}
+                                                                        startIcon={<DeleteIcon sx={{ fontSize: "13px !important" }} />}
+                                                                        sx={{
+                                                                            minWidth: 76,
+                                                                            height: 28,
+                                                                            borderRadius: 1,
+                                                                            backgroundColor: "#dc2626",
+                                                                            fontSize: "10px",
+                                                                            textTransform: "none",
+                                                                            boxShadow: "none",
+                                                                            "&:hover": { backgroundColor: "#b91c1c", boxShadow: "none" },
+                                                                        }}
+                                                                    >
+                                                                        Delete
+                                                                    </Button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </Box>
+                                                </TableCell>
+                                            )}
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Box>
+            )}
+
+            <Popover
+                open={Boolean(addAnchorEl)}
+                anchorEl={addAnchorEl}
+                onClose={() => setAddAnchorEl(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                PaperProps={{
+                    sx: {
+                        width: 240,
+                        mt: 0.5,
+                        p: 1,
+                        border: `1px solid ${headerColor}`,
+                        borderRadius: "5px",
+                        backgroundColor: "#fff",
+                        boxShadow: "0 5px 14px rgba(0, 0, 0, 0.28)",
+                    },
+                }}
+            >
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <TextField
+                        name="workloadCode"
+                        value={workload.workloadCode}
+                        onChange={handleChangesForEverything}
+                        placeholder="Code"
+                        size="small"
+                        fullWidth
+                        inputProps={{ "aria-label": "Workload code" }}
+                        sx={{
+                            "& .MuiOutlinedInput-root": {
+                                height: 30,
+                                borderRadius: "5px",
+                                backgroundColor: "#fff",
+                                color: "#334155",
+                                fontSize: "12px",
+                                "& fieldset": { borderColor: "#cbd5e1" },
+                                "&:hover fieldset": { borderColor: headerColor },
+                                "&.Mui-focused fieldset": { borderColor: headerColor },
+                            },
+                            "& input": { py: 0.5, textAlign: "center" },
+                            "& input::placeholder": { color: "#64748b", opacity: 1 },
+                        }}
+                    />
+
+                    <TextField
+                        name="workloadDescription"
+                        value={workload.workloadDescription}
+                        onChange={handleChangesForEverything}
+                        placeholder="Description"
+                        size="small"
+                        fullWidth
+                        inputProps={{ "aria-label": "Workload description" }}
+                        sx={{
+                            "& .MuiOutlinedInput-root": {
+                                height: 30,
+                                borderRadius: "5px",
+                                backgroundColor: "#fff",
+                                color: "#334155",
+                                fontSize: "12px",
+                                "& fieldset": { borderColor: "#cbd5e1" },
+                                "&:hover fieldset": { borderColor: headerColor },
+                                "&.Mui-focused fieldset": { borderColor: headerColor },
+                            },
+                            "& input": { py: 0.5, textAlign: "center" },
+                            "& input::placeholder": { color: "#64748b", opacity: 1 },
+                        }}
+                    />
+
+                    <Box sx={{ display: "flex", gap: 0.75 }}>
+                        <Box
+                            onClick={() => colorPickerRef.current?.click()}
+                            sx={{
+                                width: 30,
+                                height: 30,
+                                flexShrink: 0,
+                                border: `1px solid ${headerColor}`,
+                                borderRadius: "5px",
+                                backgroundColor: isValidCssColor(workload.workloadColor)
+                                    ? workload.workloadColor
+                                    : "#fff",
+                                cursor: "pointer",
+                            }}
+                        >
+                            <input
+                                ref={colorPickerRef}
+                                type="color"
+                                value={parseColorToHex(workload.workloadColor) || DEFAULT_WORKLOAD_COLOR}
+                                onChange={(event) =>
+                                    setWorkload((previous) => ({
+                                        ...previous,
+                                        workloadColor: event.target.value,
+                                    }))
+                                }
+                                style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+                            />
+                        </Box>
+                        <TextField
+                            name="workloadColor"
+                            value={workload.workloadColor}
+                            onChange={handleChangesForEverything}
+                            placeholder="Color"
+                            size="small"
+                            fullWidth
+                            inputProps={{ "aria-label": "Workload color" }}
+                            sx={{
+                                "& .MuiOutlinedInput-root": {
+                                    height: 30,
+                                    borderRadius: "5px",
+                                    backgroundColor: "#fff",
+                                    color: "#334155",
+                                    fontSize: "12px",
+                                    "& fieldset": { borderColor: "#cbd5e1" },
+                                    "&:hover fieldset": { borderColor: headerColor },
+                                    "&.Mui-focused fieldset": { borderColor: headerColor },
+                                },
+                                "& input": { py: 0.5, textAlign: "center" },
+                                "& input::placeholder": { color: "#64748b", opacity: 1 },
+                            }}
+                        />
+                    </Box>
+
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75, mt: 0.75 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => setAddAnchorEl(null)}
+                            sx={{
+                                height: 30,
+                                borderRadius: "5px",
+                                borderColor: headerColor,
+                                color: headerColor,
+                                backgroundColor: "#fff",
+                                fontSize: "11px",
+                                textTransform: "none",
+                                boxShadow: "none",
+                                "&:hover": {
+                                    borderColor: headerColor,
+                                    backgroundColor: "#f8fafc",
+                                    boxShadow: "none",
+                                },
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleSavingWorkload}
+                            sx={{
+                                height: 30,
+                                borderRadius: "5px",
+                                backgroundColor: mainButtonColor,
+                                fontSize: "11px",
+                                textTransform: "none",
+                                boxShadow: "none",
+                                "&:hover": {
+                                    backgroundColor: mainButtonColor,
+                                    filter: "brightness(0.92)",
+                                    boxShadow: "none",
+                                },
+                            }}
+                        >
+                            Add
+                        </Button>
+                    </Box>
+                </Box>
+            </Popover>
+
             {/* ADD / EDIT MODAL */}
             <Dialog
                 open={openModal}
@@ -1002,36 +1613,52 @@ const WorkloadManagement = () => {
                 </DialogTitle>
 
                 <DialogContent sx={{ p: 3 }}>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                        <Typography fontWeight="bold" mt={2}>
-                            Workload Description:
-                        </Typography>
-
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                            gap: 2,
+                            mt: 2,
+                            "& .MuiInputBase-input": {
+                                fontSize: "12px",
+                            },
+                            "& .MuiInputLabel-root": {
+                                fontSize: "12px",
+                            },
+                            "& .MuiOutlinedInput-root.Mui-focused:not(.Mui-error) .MuiOutlinedInput-notchedOutline": {
+                                borderColor: headerColor,
+                            },
+                            "& .MuiInputLabel-root.Mui-focused:not(.Mui-error)": {
+                                color: headerColor,
+                            },
+                        }}
+                    >
                         <TextField
-                            label="Workload Description"
-                            name="workloadDescription"
-                            value={workload.workloadDescription}
-                            onChange={handleChangesForEverything}
-                            fullWidth
-                        />
-
-                        <Typography fontWeight="bold" mt={1}>
-                            Workload Code:
-                        </Typography>
-
-                        <TextField
-                            label="Workload Code"
+                            label="Code"
+                            placeholder="Workload Code"
                             name="workloadCode"
                             value={workload.workloadCode}
                             onChange={handleChangesForEverything}
                             fullWidth
                         />
 
-                        <Typography fontWeight="bold" mt={1}>
-                            Color:
-                        </Typography>
+                        <TextField
+                            label="Description"
+                            placeholder="Workload Description"
+                            name="workloadDescription"
+                            value={workload.workloadDescription}
+                            onChange={handleChangesForEverything}
+                            fullWidth
+                        />
 
-                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 1.5,
+                                gridColumn: "1 / -1",
+                            }}
+                        >
                             <Box
                                 onClick={() => colorPickerRef.current?.click()}
                                 sx={{
@@ -1107,10 +1734,18 @@ const WorkloadManagement = () => {
 
                     <Button
                         variant="contained"
-                        sx={{ px: 4, fontWeight: 600, textTransform: "none" }}
+                        sx={{
+                            px: 4,
+                            fontWeight: 600,
+                            textTransform: "none",
+                            backgroundColor: mainButtonColor,
+                            "&:hover": {
+                                backgroundColor: mainButtonColor,
+                                filter: "brightness(0.92)",
+                            },
+                        }}
                         onClick={handleSavingWorkload}
                     >
-                        <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
                         Save
                     </Button>
                 </DialogActions>

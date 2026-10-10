@@ -19,11 +19,10 @@ import {
   Avatar,
   FormControl,
   InputLabel,
-  Stack,
   Select,
   Grid,
   MenuItem,
-  Checkbox,
+  Tooltip,
 } from "@mui/material";
 import { Add, Search, SortByAlpha, FileDownload } from "@mui/icons-material";
 import axios from "axios";
@@ -50,7 +49,6 @@ import InputAdornment from "@mui/material/InputAdornment";
 import PrintIcon from "@mui/icons-material/Print";
 import SendIcon from "@mui/icons-material/Send";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
-import SchoolIcon from "@mui/icons-material/School";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -79,6 +77,22 @@ const getFacultySuggestionValue = (prof) =>
   cleanSuggestionValue(prof?.email) ||
   cleanSuggestionValue(prof?.employeeNumber) ||
   cleanSuggestionValue(prof?.employee_id);
+
+const compactDialogControlStyles = {
+  "& .MuiInputBase-input, & .MuiInputLabel-root, & .MuiFormHelperText-root, & .MuiButton-root, & .MuiSelect-select, & .MuiTypography-body1, & .MuiTypography-body2, & .MuiTypography-subtitle2, & .MuiTableCell-root, & .MuiChip-label": {
+    fontSize: "12px",
+  },
+  "& .MuiInputBase-input::placeholder": {
+    fontSize: "12px",
+    opacity: 1,
+  },
+};
+
+const compactSelectMenuProps = {
+  PaperProps: {
+    sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+  },
+};
 
 const RegisterProf = () => {
   useAccountAuditMac();
@@ -224,6 +238,8 @@ const RegisterProf = () => {
   const [sortAsc, setSortAsc] = useState(true);
   const [professors, setProfessors] = useState([]);
   const [department, setDepartment] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -277,22 +293,22 @@ const RegisterProf = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // success | error | info | warning
-  const [educationDialogOpen, setEducationDialogOpen] = useState(false);
   const [educationRecords, setEducationRecords] = useState([]);
-  const [educationPersonId, setEducationPersonId] = useState("");
   const [educationBachelor, setEducationBachelor] = useState("");
   const [educationMaster, setEducationMaster] = useState("");
   const [educationDoctor, setEducationDoctor] = useState("");
-  const [educationSaving, setEducationSaving] = useState(false);
 
-  const openFacultyEducation = async () => {
-    // person_prof_table.person_id stores the professor's prof_id.
-    // Do not use prof.person_id here; that is a different identifier.
-    const professorId = editData?.prof_id ? String(editData.prof_id) : "";
-    setEducationPersonId(professorId);
+  const resetFacultyEducation = () => {
     setEducationBachelor("");
     setEducationMaster("");
     setEducationDoctor("");
+  };
+
+  const loadFacultyEducation = async (professorId) => {
+    // person_prof_table.person_id stores the professor's prof_id.
+    // Do not use prof.person_id here; that is a different identifier.
+    const normalizedProfessorId = professorId ? String(professorId) : "";
+    resetFacultyEducation();
 
     try {
       const response = await axios.get(`${API_BASE_URL}/api/person_prof_list`, {
@@ -301,8 +317,10 @@ const RegisterProf = () => {
       const records = Array.isArray(response.data) ? response.data : [];
       setEducationRecords(records);
 
-      if (professorId) {
-        const existing = records.find((record) => String(record.person_id) === professorId);
+      if (normalizedProfessorId) {
+        const existing = records.find(
+          (record) => String(record.person_id) === normalizedProfessorId,
+        );
         if (existing) {
           setEducationBachelor(existing.bachelor || "");
           setEducationMaster(existing.master || "");
@@ -311,70 +329,7 @@ const RegisterProf = () => {
       }
     } catch (error) {
       console.error("Failed to load faculty education records:", error);
-    }
-
-    setEducationDialogOpen(true);
-  };
-
-  const closeFacultyEducation = () => {
-    if (educationSaving) return;
-    setEducationDialogOpen(false);
-    setEducationPersonId("");
-    setEducationBachelor("");
-    setEducationMaster("");
-    setEducationDoctor("");
-  };
-
-  const saveFacultyEducation = async () => {
-    // A new professor does not have a prof_id until the account is created.
-    // Keep the entered education in the parent form and save it after creation.
-    if (!editData) {
-      setEducationDialogOpen(false);
-      setEducationPersonId("");
-      return;
-    }
-
-    if (!educationPersonId) {
-      setSnackbarMessage("Please select a professor first.");
-      setSnackbarSeverity("warning");
-      setOpenSnackbar(true);
-      return;
-    }
-
-    const existing = educationRecords.find(
-      (record) => String(record.person_id) === String(educationPersonId),
-    );
-    setEducationSaving(true);
-    try {
-      const config = {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-      };
-      if (existing) {
-        await axios.put(`${API_BASE_URL}/api/person_prof/${educationPersonId}`, {
-          bachelor: educationBachelor,
-          master: educationMaster,
-          doctor: educationDoctor,
-        }, config);
-      } else {
-        await axios.post(`${API_BASE_URL}/api/person_prof`, {
-          person_id: educationPersonId,
-          bachelor: educationBachelor,
-          master: educationMaster,
-          doctor: educationDoctor,
-        }, config);
-      }
-
-      setSnackbarMessage(existing ? "Faculty education updated successfully." : "Faculty education added successfully.");
-      setSnackbarSeverity("success");
-      setOpenSnackbar(true);
-      setEducationDialogOpen(false);
-    } catch (error) {
-      console.error("Failed to save faculty education:", error);
-      setSnackbarMessage(error.response?.data?.message || "Failed to save faculty education.");
-      setSnackbarSeverity("error");
-      setOpenSnackbar(true);
-    } finally {
-      setEducationSaving(false);
+      setEducationRecords([]);
     }
   };
 
@@ -567,12 +522,18 @@ const RegisterProf = () => {
 
 
   const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    setDepartmentsError("");
     try {
       const res = await axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
-      setDepartment(res.data);
-      console.log(res.data);
+      const rows = Array.isArray(res.data) ? res.data : res.data?.data;
+      setDepartment(Array.isArray(rows) ? rows : []);
     } catch (err) {
       console.error("Fetch error:", err);
+      setDepartment([]);
+      setDepartmentsError(err.response?.data?.message || "Unable to load departments.");
+    } finally {
+      setDepartmentsLoading(false);
     }
   };
 
@@ -584,7 +545,7 @@ const RegisterProf = () => {
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
 
 
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const itemsPerPage = 9;
   const [sortOrder, setSortOrder] = useState("");
 
   const normalizeDepartmentId = (value) => {
@@ -724,7 +685,7 @@ const RegisterProf = () => {
     const { silent = false } = options;
     if (e && typeof e.preventDefault === "function") e.preventDefault();
 
-    const requiredFields = ["fname", "lname", "email"];
+    const requiredFields = ["fname", "lname", "email", "dprtmnt_id"];
 
     // Only required when creating a new professor
     if (!editData) {
@@ -773,6 +734,31 @@ const RegisterProf = () => {
           formData,
           permissionHeaders,
         );
+
+        const existingEducation = educationRecords.find(
+          (record) => String(record.person_id) === String(editData.prof_id),
+        );
+        const hasEducation = [educationBachelor, educationMaster, educationDoctor]
+          .some((value) => String(value || "").trim());
+        const educationPayload = {
+          bachelor: educationBachelor,
+          master: educationMaster,
+          doctor: educationDoctor,
+        };
+
+        if (existingEducation) {
+          await axios.put(
+            `${API_BASE_URL}/api/person_prof/${editData.prof_id}`,
+            educationPayload,
+            permissionHeaders,
+          );
+        } else if (hasEducation) {
+          await axios.post(
+            `${API_BASE_URL}/api/person_prof`,
+            { person_id: editData.prof_id, ...educationPayload },
+            permissionHeaders,
+          );
+        }
       } else {
         response = await axios.post(
           `${API_BASE_URL}/api/register_prof`,
@@ -821,6 +807,10 @@ const RegisterProf = () => {
         );
         setSnackbarSeverity("success");
         setOpenSnackbar(true);
+      }
+
+      if (!editData) {
+        setCurrentPage(1);
       }
 
       setTimeout(() => {
@@ -902,6 +892,7 @@ const RegisterProf = () => {
       profileImage: null,
       preview: prof.profile_image ? `${API_BASE_URL}/uploads/Faculty1by1/${prof.profile_image}` : "",
     });
+    loadFacultyEducation(prof.prof_id);
     setOpenDialog(true);
   };
 
@@ -909,6 +900,8 @@ const RegisterProf = () => {
     setOpenDialog(false);
     setShowPassword(false);
     setEditData(null);
+    setEducationRecords([]);
+    resetFacultyEducation();
     setForm({
       employee_id: "",
       fname: "",
@@ -1377,6 +1370,7 @@ const RegisterProf = () => {
                               sx: {
                                 maxHeight: 200,
                                 backgroundColor: '#fff',
+                                '& .MuiMenuItem-root': { fontSize: '12px' },
                               }
                             }
                           }}
@@ -1457,9 +1451,19 @@ const RegisterProf = () => {
             width: "100%",
             border: `1px solid ${borderColor}`,
             mb: -2,
+            "& .MuiButton-root, & .MuiInputLabel-root, & .MuiSelect-select": {
+              fontSize: "12px",
+            },
           }}
         >
-          <Table>
+          <Table
+            size="small"
+            sx={{
+              "& .MuiTableCell-root, & .MuiAvatar-root, & .MuiButton-root": {
+                fontSize: "12px",
+              },
+            }}
+          >
             <TableBody>
               <TableRow>
                 <TableCell>
@@ -1478,6 +1482,8 @@ const RegisterProf = () => {
                       variant="contained"
                       onClick={() => {
                         setEditData(null);
+                        setEducationRecords([]);
+                        resetFacultyEducation();
                         setSearchQuery("");
                         setForm((prev) => ({
                           ...prev,
@@ -1501,8 +1507,8 @@ const RegisterProf = () => {
                         color: "white",
                         textTransform: "none",
                         fontWeight: "bold",
-                        width: "350px",
-
+                        width: "200px",
+                        "&:hover": { backgroundColor: "#000" },
                       }}
                     >
                       Add Professor
@@ -1512,12 +1518,30 @@ const RegisterProf = () => {
                     <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                       {/* Department Filter */}
                       <FormControl sx={{ width: "350px" }} size="small">
-                        <InputLabel id="filter-department-label">Filter by Department</InputLabel>
                         <Select
-                          labelId="filter-department-label"
                           value={selectedDepartmentFilter}
                           onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-                          label="Filter by Department"
+                          displayEmpty
+                          renderValue={(selected) => {
+                            if (!selected) return "Filter by Department";
+                            const selectedDepartment = department.find(
+                              (dep) => String(dep.dprtmnt_id) === String(selected),
+                            );
+                            return selectedDepartment
+                              ? `${selectedDepartment.dprtmnt_name} (${selectedDepartment.dprtmnt_code})`
+                              : selected;
+                          }}
+                          sx={{
+                            "& .MuiSelect-select": {
+                              display: "flex",
+                              alignItems: "center",
+                            },
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+                            },
+                          }}
                         >
                           <MenuItem value="">All Departments</MenuItem>
                           {department.map((dep) => (
@@ -1534,6 +1558,11 @@ const RegisterProf = () => {
                           value={sortOrder}
                           onChange={(e) => setSortOrder(e.target.value)}
                           displayEmpty
+                          MenuProps={{
+                            PaperProps: {
+                              sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+                            },
+                          }}
                         >
                           <MenuItem value="">Select Order</MenuItem>
                           <MenuItem value="asc">Ascending</MenuItem>
@@ -1602,7 +1631,14 @@ const RegisterProf = () => {
 
       </Box>
       <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, }}>
-        <Table>
+        <Table
+          size="small"
+          sx={{
+            "& .MuiTableCell-root, & .MuiAvatar-root, & .MuiButton-root": {
+              fontSize: "12px",
+            },
+          }}
+        >
           <TableHead sx={{
             backgroundColor: headerColor || "#1976d2",
 
@@ -1721,11 +1757,11 @@ const RegisterProf = () => {
                     }
                     alt={prof.fname}
                     sx={{
-                      width: 60,
-                      height: 60,
+                      width: 42,
+                      height: 42,
                       margin: "auto",
                       border: `1px solid ${borderColor}`,
-                      bgcolor: prof.profile_picture ? "transparent" : "#6D2323",
+                      bgcolor: prof.profile_image ? "transparent" : "#6D2323",
                     }}
                   >
                     {prof.fname?.[0]}
@@ -1742,41 +1778,58 @@ const RegisterProf = () => {
                 </TableCell>
                 <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
 
-                  <Box sx={{ display: "flex", justifyContent: "center", gap: 1, flexWrap: "wrap" }}>
-                    <Button
-                      onClick={() => handleEdit(prof)}
-                      sx={{
-                        backgroundColor: "green",
-                        color: "white",
-                        borderRadius: "5px",
-                        padding: "8px 14px",
-                        width: "100px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "5px",
+                  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 1.5, width: "100%" }}>
+                    <Tooltip
+                      title="Edit"
+                      arrow
+                      slotProps={{
+                        tooltip: {
+                          sx: { fontSize: "14px", fontWeight: 600, px: 1.25, py: 0.75 },
+                        },
                       }}
                     >
-                      <EditIcon fontSize="small" /> Edit
-                    </Button>
-                    {canDelete && (
-                      <Button
-                        onClick={() => handleDeleteClick(prof)}
+                      <IconButton
+                        aria-label="Edit faculty"
+                        onClick={() => handleEdit(prof)}
+                        size="small"
                         sx={{
-                          backgroundColor: "#9E0000",
+                          backgroundColor: "green",
                           color: "white",
                           borderRadius: "5px",
-                          padding: "8px 14px",
-                          width: "100px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "5px",
-
+                          width: 36,
+                          height: 36,
+                          "&:hover": { backgroundColor: "#006b00" },
                         }}
                       >
-                        <DeleteIcon fontSize="small" /> Delete
-                      </Button>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {canDelete && (
+                      <Tooltip
+                        title="Delete"
+                        arrow
+                        slotProps={{
+                          tooltip: {
+                            sx: { fontSize: "14px", fontWeight: 600, px: 1.25, py: 0.75 },
+                          },
+                        }}
+                      >
+                        <IconButton
+                          aria-label="Delete faculty"
+                          onClick={() => handleDeleteClick(prof)}
+                          size="small"
+                          sx={{
+                            backgroundColor: "#9E0000",
+                            color: "white",
+                            borderRadius: "5px",
+                            width: 36,
+                            height: 36,
+                            "&:hover": { backgroundColor: "#7d0000" },
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     )}
                   </Box>
                 </TableCell>
@@ -1787,182 +1840,6 @@ const RegisterProf = () => {
           </TableBody>
         </Table>
       </TableContainer>
-            <TableContainer component={Paper} sx={{ width: '100%' }}>
-          <Table size="small">
-            <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
-              <TableRow>
-                <TableCell
-                  colSpan={10}
-                  sx={{
-                    border: `1px solid ${borderColor}`,
-                    py: 0.5,
-                    backgroundColor: headerColor || "#1976d2",
-                    color: "white"
-                  }}
-                >
-                  <Box display="flex" justifyContent="space-between" alignItems="center" >
-                    {/* Left: Applicant List Count */}
-                    <Typography fontSize="14px" fontWeight="bold" color="white">
-                      Total Faculty's Records': {filteredProfessors.length}
-                    </Typography>
-
-                    {/* Right: Pagination Controls */}
-                    <Box display="flex" alignItems="center" gap={1}>
-                      {/* First & Prev */}
-                      <Button
-                        onClick={() => setCurrentPage(1)}
-                        disabled={currentPage === 1}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          minWidth: 80,
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          '&:hover': {
-                            borderColor: 'white',
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                          },
-                          '&.Mui-disabled': {
-                            color: "white",
-                            borderColor: "white",
-                            backgroundColor: "transparent",
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        First
-                      </Button>
-
-                      <Button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          minWidth: 80,
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          '&:hover': {
-                            borderColor: 'white',
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                          },
-                          '&.Mui-disabled': {
-                            color: "white",
-                            borderColor: "white",
-                            backgroundColor: "transparent",
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        Prev
-                      </Button>
-
-                      {/* Page Dropdown */}
-                      <FormControl size="small" sx={{ minWidth: 80 }}>
-                        <Select
-                          value={currentPage}
-                          onChange={(e) => setCurrentPage(Number(e.target.value))}
-                          displayEmpty
-                          sx={{
-                            fontSize: '12px',
-                            height: 36,
-                            color: 'white',
-                            border: '1px solid white',
-                            backgroundColor: 'transparent',
-                            '.MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'white',
-                            },
-                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'white',
-                            },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'white',
-                            },
-                            '& svg': {
-                              color: 'white',
-                            }
-                          }}
-                          MenuProps={{
-                            PaperProps: {
-                              sx: {
-                                maxHeight: 200,
-                                backgroundColor: '#fff',
-                              }
-                            }
-                          }}
-                        >
-                          {Array.from({ length: totalPages }, (_, i) => (
-                            <MenuItem key={i + 1} value={i + 1}>
-                              Page {i + 1}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-
-                      <Typography fontSize="11px" color="white">
-                        of {totalPages} page{totalPages > 1 ? 's' : ''}
-                      </Typography>
-
-                      {/* Next & Last */}
-                      <Button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          minWidth: 80,
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          '&:hover': {
-                            borderColor: 'white',
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                          },
-                          '&.Mui-disabled': {
-                            color: "white",
-                            borderColor: "white",
-                            backgroundColor: "transparent",
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        Next
-                      </Button>
-
-                      <Button
-                        onClick={() => setCurrentPage(totalPages)}
-                        disabled={currentPage === totalPages}
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          minWidth: 80,
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          '&:hover': {
-                            borderColor: 'white',
-                            backgroundColor: 'rgba(255,255,255,0.1)',
-                          },
-                          '&.Mui-disabled': {
-                            color: "white",
-                            borderColor: "white",
-                            backgroundColor: "transparent",
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        Last
-                      </Button>
-                    </Box>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-          </Table>
-        </TableContainer>
-
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -1972,7 +1849,35 @@ const RegisterProf = () => {
           transition: { onEntered: updateDepartmentColumnHeight },
         }}
         PaperProps={{
-          sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 }
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            boxShadow: 6,
+            ...compactDialogControlStyles,
+            "& .MuiInputLabel-root.MuiInputLabel-shrink": {
+              fontSize: "14px",
+              lineHeight: 1.2,
+              transform: "translate(14px, -8px) scale(0.75)",
+              transformOrigin: "top left",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend": {
+              fontSize: "10.5px",
+            },
+            "& .MuiOutlinedInput-notchedOutline legend > span": {
+              paddingLeft: "3px",
+              paddingRight: "6px",
+            },
+            "& .MuiInputLabel-root.Mui-focused": {
+              color: headerColor,
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+              borderColor: headerColor,
+              borderWidth: "1px",
+            },
+            "& .MuiOutlinedInput-root.Mui-focused .MuiSelect-icon": {
+              color: headerColor,
+            },
+          }
         }}
       >
         {/* HEADER */}
@@ -2088,22 +1993,15 @@ const RegisterProf = () => {
               mb: 1.5,
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
               gap: 1,
             }}
           >
-            <Typography fontWeight={700}>
+            <Typography
+              fontWeight={700}
+              sx={{ fontSize: "16px !important", textTransform: "uppercase" }}
+            >
               User's Account Information
             </Typography>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SchoolIcon fontSize="small" />}
-              onClick={openFacultyEducation}
-              sx={{ fontWeight: 600, textTransform: "none" }}
-            >
-              {editData ? "Edit Faculty Education" : "Add Faculty Education"}
-            </Button>
           </Box>
 
           <Grid
@@ -2188,11 +2086,25 @@ const RegisterProf = () => {
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             helperText="Generate a password or type one here before saving."
+            sx={{
+              ...(!showPassword && {
+                "& .MuiOutlinedInput-root.Mui-focused .MuiIconButton-root": {
+                  color: headerColor,
+                },
+              }),
+            }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton onClick={() => setShowPassword((p) => !p)} edge="end" size="small">
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  <IconButton
+                    onClick={() => setShowPassword((p) => !p)}
+                    edge="end"
+                    size="small"
+                    sx={{ color: "text.secondary" }}
+                  >
+                    {showPassword
+                      ? <VisibilityOff sx={{ fontSize: 18 }} />
+                      : <Visibility sx={{ fontSize: 18 }} />}
                   </IconButton>
                 </InputAdornment>
               ),
@@ -2203,7 +2115,7 @@ const RegisterProf = () => {
             mt={1}
             p={2.5}
             sx={{
-              border: "2px dashed #1976d2",
+              border: `2px dashed ${headerColor}`,
               borderRadius: 2,
               textAlign: "center",
               backgroundColor: "#f9f9f9",
@@ -2242,7 +2154,15 @@ const RegisterProf = () => {
               size="small"
               startIcon={<LockResetIcon />}
               onClick={handleGeneratePassword}
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 600,
+                color: mainButtonColor,
+                borderColor: mainButtonColor,
+                "&:hover": {
+                  borderColor: mainButtonColor,
+                  backgroundColor: `${mainButtonColor}12`,
+                },
+              }}
             >
               Generate
             </Button>
@@ -2252,7 +2172,15 @@ const RegisterProf = () => {
               startIcon={<PrintIcon />}
               disabled={!form.password}
               onClick={() => printFacultySlip(form, form.password, form.email)}
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 600,
+                color: mainButtonColor,
+                borderColor: mainButtonColor,
+                "&:hover": {
+                  borderColor: mainButtonColor,
+                  backgroundColor: `${mainButtonColor}12`,
+                },
+              }}
             >
               Print
             </Button>
@@ -2266,6 +2194,7 @@ const RegisterProf = () => {
                 value={form.status}
                 onChange={handleSelect}
                 label="Status"
+                MenuProps={compactSelectMenuProps}
               >
                 <MenuItem value="">Select Status</MenuItem>
                 <MenuItem value={1}>Active</MenuItem>
@@ -2289,121 +2218,98 @@ const RegisterProf = () => {
                 },
               }}
             >
-              <Typography fontWeight={700} mb={0.5} sx={{ mt: 2 }}>
+              <Typography
+                fontWeight={700}
+                mb={0.5}
+                sx={{ mt: 2, fontSize: "16px !important", textTransform: "uppercase" }}
+              >
+                Faculty Education
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
+                <TextField
+                  size="small"
+                  label="Bachelor's Degree"
+                  value={educationBachelor}
+                  onChange={(event) => setEducationBachelor(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  size="small"
+                  label="Master's Degree"
+                  value={educationMaster}
+                  onChange={(event) => setEducationMaster(event.target.value)}
+                  fullWidth
+                />
+                <TextField
+                  size="small"
+                  label="Doctorate"
+                  value={educationDoctor}
+                  onChange={(event) => setEducationDoctor(event.target.value)}
+                  fullWidth
+                />
+              </Box>
+              <Typography
+                fontWeight={700}
+                mb={0.5}
+                sx={{ mt: 2.5, fontSize: "16px !important", textTransform: "uppercase" }}
+              >
                 Department
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Select the department assigned to this faculty member.
-              </Typography>
-              <Box
-                sx={{
-                  border: "1px solid #e0e0e0",
-                  borderRadius: 2,
-                  p: 1,
-                  mt: 1.5,
-                  flex: 1,
-                  minHeight: { xs: 220, md: 0 },
-                  maxHeight: { xs: 280, md: "none" },
-                  overflowY: "auto",
-                }}
-              >
-                {department.map((dep) => {
-                  const departmentId = String(dep.dprtmnt_id);
-                  const isSelected = String(form.dprtmnt_id) === departmentId;
-
-                  return (
-                    <Box
-                      key={dep.dprtmnt_id}
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          dprtmnt_id: isSelected ? "" : dep.dprtmnt_id,
-                        }))
-                      }
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        mb: 1,
-                        px: 1,
-                        py: 0.5,
-                        border: "1px solid #e0e0e0",
-                        borderRadius: 2,
-                        backgroundColor: isSelected ? "#eaf3ff" : "#f5f5f5",
-                        cursor: "pointer",
-                        userSelect: "none",
-                        "&:last-child": { mb: 0 },
-                      }}
-                    >
-                      <Checkbox
-                        size="small"
-                        checked={isSelected}
-                        onChange={(event) => {
-                          event.stopPropagation();
-                          setForm((prev) => ({
-                            ...prev,
-                            dprtmnt_id: event.target.checked ? dep.dprtmnt_id : "",
-                          }));
-                        }}
-                      />
-                      <Typography variant="body2" fontWeight={600}>
-                        {dep.dprtmnt_name}
-                      </Typography>
-                    </Box>
-                  );
-                })}
-              </Box>
+              <FormControl fullWidth size="small" sx={{ mt: 1 }} error={Boolean(departmentsError)}>
+                <Select
+                  name="dprtmnt_id"
+                  value={form.dprtmnt_id}
+                  onChange={handleSelect}
+                  disabled={departmentsLoading}
+                  MenuProps={compactSelectMenuProps}
+                  displayEmpty
+                  sx={{
+                    "& .MuiOutlinedInput-notchedOutline legend": {
+                      maxWidth: "0.01px",
+                    },
+                    "& .MuiOutlinedInput-notchedOutline legend > span": {
+                      padding: 0,
+                    },
+                  }}
+                  renderValue={(selected) => {
+                    if (!selected) {
+                      return departmentsLoading ? "Loading departments..." : "Select Department";
+                    }
+                    const selectedDepartment = department.find(
+                      (dep) => String(dep.dprtmnt_id) === String(selected),
+                    );
+                    return selectedDepartment
+                      ? `${selectedDepartment.dprtmnt_name} (${selectedDepartment.dprtmnt_code})`
+                      : selected;
+                  }}
+                >
+                  <MenuItem value="">
+                    {departmentsLoading ? "Loading departments..." : "Select Department"}
+                  </MenuItem>
+                  {department.map((dep) => (
+                    <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
+                      {dep.dprtmnt_name} ({dep.dprtmnt_code})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {departmentsError && (
+                <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography variant="caption" color="error">
+                    {departmentsError}
+                  </Typography>
+                  <Button size="small" onClick={fetchDepartments}>Retry</Button>
+                </Box>
+              )}
+              {!departmentsLoading && !departmentsError && department.length === 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  No departments are available.
+                </Typography>
+              )}
             </Box>
           </Box>
 
         </DialogContent>
-
-        <Dialog
-          open={educationDialogOpen}
-          onClose={closeFacultyEducation}
-          maxWidth="sm"
-          fullWidth
-          PaperProps={{
-            sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 },
-          }}
-        >
-          <DialogTitle
-            sx={{
-              background: headerColor || "#1976d2",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: "1.1rem",
-              py: 2,
-            }}
-          >
-            {editData ? "Edit Faculty Education" : "Add Faculty Education"}
-          </DialogTitle>
-          <DialogContent sx={{ p: { xs: 2, md: 2.5 }, pt: 3 }}>
-            {editData && (
-              <Typography sx={{ mt: 1, mb: 2 }} color="text.secondary">
-                Editing education for {editData.fname} {editData.lname}
-              </Typography>
-            )}
-            <Stack spacing={2} sx={{ mt: 2 }}>
-              <TextField label="Bachelor's Degree" value={educationBachelor} onChange={(event) => setEducationBachelor(event.target.value)} fullWidth />
-              <TextField label="Master's Degree" value={educationMaster} onChange={(event) => setEducationMaster(event.target.value)} fullWidth />
-              <TextField label="Doctorate" value={educationDoctor} onChange={(event) => setEducationDoctor(event.target.value)} fullWidth />
-            </Stack>
-          </DialogContent>
-          <DialogActions
-            sx={{
-              px: 3,
-              py: 2,
-              borderTop: "1px solid #e0e0e0",
-              backgroundColor: "#fafafa",
-              justifyContent: "space-between",
-            }}
-          >
-            <Button onClick={closeFacultyEducation} color="error" variant="outlined">Cancel</Button>
-            <Button onClick={saveFacultyEducation} variant="contained" disabled={educationSaving} startIcon={<SaveIcon />}>
-              {editData ? "Save" : "Done"}
-            </Button>
-          </DialogActions>
-        </Dialog>
 
         {/* ACTIONS — same layout as the Student Accounts modal:
             Cancel on the left, Generate / Print / Save / Send on the right */}
@@ -2471,7 +2377,14 @@ const RegisterProf = () => {
         onClose={() => { setOpenDeleteDialog(false); setProfToDelete(null); }}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            boxShadow: 6,
+            ...compactDialogControlStyles,
+          },
+        }}
       >
         <DialogTitle
           sx={{
@@ -2493,7 +2406,7 @@ const RegisterProf = () => {
             </strong>?
           </Typography>
 
-          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>
+          <Typography sx={{ color: "#d32f2f", fontSize: "12px" }}>
             Deleting this professor will permanently remove them from the system.
             <br />
             All related schedules and assignments linked to this professor
@@ -2520,6 +2433,7 @@ const RegisterProf = () => {
         onClose={() => setOpenImportResultDialog(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={{ sx: compactDialogControlStyles }}
       >
         <DialogTitle sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff" }}>
           Imported Faculty Temporary Passwords

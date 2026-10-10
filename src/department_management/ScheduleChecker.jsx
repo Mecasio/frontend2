@@ -9,6 +9,7 @@ import {
   Snackbar,
   Alert,
   FormControl,
+  InputLabel,
   Select,
   MenuItem,
   TextField,
@@ -30,6 +31,10 @@ import {
 } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import WorkloadManagement, {
+  WORKLOAD_MANAGEMENT_PAGE_ID,
+} from "./WorkloadManagement";
+import FacultyLoadTimetable from "./FacultyLoadTimetable";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
@@ -55,6 +60,67 @@ const isDesignationEntry = (entry) =>
   entry?.department_section_id == null ||
   entry?.department_section_id === "" ||
   Number(entry?.department_section_id) === 0;
+
+const SCHEDULE_FORM_CONTROL_STYLES = {
+  "& form select, & form input": {
+    fontSize: "12px",
+  },
+  "& form .MuiInputBase-input, & form .MuiInputLabel-root, & form .MuiFormHelperText-root, & form .MuiSelect-select, & form .MuiFormControlLabel-label": {
+    fontSize: "12px",
+  },
+  "& form .MuiInputBase-input::placeholder": {
+    fontSize: "12px",
+    opacity: 1,
+  },
+  "& form .MuiOutlinedInput-root": {
+    borderRadius: "4px",
+  },
+  "& form .MuiInputLabel-root.MuiInputLabel-shrink": {
+    lineHeight: 1.2,
+    transform: "translate(14px, -7px) scale(0.75)",
+    transformOrigin: "top left",
+  },
+  "& form .MuiOutlinedInput-notchedOutline legend": {
+    fontSize: "9px",
+  },
+  "& form .MuiOutlinedInput-notchedOutline legend > span": {
+    paddingLeft: "1px",
+    paddingRight: "6px",
+  },
+  "& form input[type='time']": {
+    borderRadius: "4px",
+  },
+  "& form .MuiSelect-icon": {
+    right: "8px",
+    fontSize: "18px",
+  },
+  "& form .MuiAutocomplete-endAdornment": {
+    right: "8px",
+  },
+  "& form .MuiAutocomplete-popupIndicator": {
+    marginRight: 0,
+    padding: 0,
+  },
+  "& form .MuiAutocomplete-popupIndicator .MuiSvgIcon-root": {
+    fontSize: "18px",
+  },
+};
+
+const SCHEDULE_AUTOCOMPLETE_SLOT_PROPS = {
+  paper: {
+    sx: {
+      "& .MuiAutocomplete-option, & .MuiAutocomplete-noOptions, & .MuiAutocomplete-loading": {
+        fontSize: "12px",
+      },
+    },
+  },
+};
+
+const SCHEDULE_SELECT_MENU_PROPS = {
+  PaperProps: {
+    sx: { "& .MuiMenuItem-root": { fontSize: "12px" } },
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Shared transaction confirm dialog — same component used in
@@ -216,6 +282,9 @@ const ScheduleChecker = () => {
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isGeneratingClassProgramPdf, setIsGeneratingClassProgramPdf] = useState(false);
+  const [canManageWorkloadTypes, setCanManageWorkloadTypes] = useState(false);
+  const [openWorkloadManagementDialog, setOpenWorkloadManagementDialog] =
+    useState(false);
 
   const pageId = 53;
 
@@ -304,6 +373,10 @@ const ScheduleChecker = () => {
   const [selectedReviewEmployeeId, setSelectedReviewEmployeeId] = useState("");
   const [reviewSchedules, setReviewSchedules] = useState([]);
   const [reviewScheduleLoading, setReviewScheduleLoading] = useState(false);
+  const [reviewDepartmentId, setReviewDepartmentId] = useState("");
+  const [reviewDepartments, setReviewDepartments] = useState([]);
+  const [reviewDepartmentProfessors, setReviewDepartmentProfessors] = useState([]);
+  const [reviewProfessorLoading, setReviewProfessorLoading] = useState(false);
   const [professorSchedule, setProfessorSchedule] = useState([]);
 
   // Workload types, fetched straight from the DB (`workload_type` table) so
@@ -320,6 +393,17 @@ const ScheduleChecker = () => {
       console.log(error);
       setWorkloadTypeList([]);
     }
+  };
+
+  const refreshManagedDesignations = () => {
+    setSelectedSubject("");
+    fetchWorkloadTypeList();
+    if (isDesignationMode) fetchDesignationList();
+  };
+
+  const closeWorkloadManagementDialog = () => {
+    setOpenWorkloadManagementDialog(false);
+    refreshManagedDesignations();
   };
 
   const fetchRoom = async () => {
@@ -368,6 +452,48 @@ const ScheduleChecker = () => {
       setProfList(res.data);
     } catch (err) {
       console.error("Error fetching professors:", err);
+    }
+  };
+
+  const fetchReviewDepartments = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/get_department`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      });
+      setReviewDepartments(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error fetching review departments:", error);
+      setReviewDepartments([]);
+    }
+  };
+
+  const handleReviewDepartmentChange = async (departmentId) => {
+    setReviewDepartmentId(departmentId);
+    setSelectedReviewEmployeeId("");
+    setReviewSchedules([]);
+
+    if (!departmentId) {
+      setReviewDepartmentProfessors([]);
+      return;
+    }
+
+    setReviewProfessorLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/prof_list/${departmentId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      });
+      setReviewDepartmentProfessors(
+        (Array.isArray(response.data) ? response.data : []).filter(
+          (professor) =>
+            Number(professor.status) === 1 ||
+            String(professor.status || "").toLowerCase() === "active",
+        ),
+      );
+    } catch (error) {
+      console.error("Error fetching department professors:", error);
+      setReviewDepartmentProfessors([]);
+    } finally {
+      setReviewProfessorLoading(false);
     }
   };
 
@@ -713,6 +839,7 @@ const ScheduleChecker = () => {
     fetchSchoolYearList();
     fetchDayList();
     fetchWorkloadTypeList();
+    fetchReviewDepartments();
   }, []);
 
   useEffect(() => {
@@ -748,12 +875,6 @@ const ScheduleChecker = () => {
       .catch((err) => console.error(err));
 
   }, []);
-
-  useEffect(() => {
-    if (roomList.length > 0 && !selectedRoom) {
-      setSelectedRoom(String(roomList[0].room_id));
-    }
-  }, [roomList]);
 
   useEffect(() => {
     if (selectedRoom) {
@@ -810,6 +931,35 @@ const ScheduleChecker = () => {
     return () => {
       document.removeEventListener("contextmenu", blockContextMenu);
       document.removeEventListener("keydown", blockDevToolsShortcuts);
+    };
+  }, []);
+
+  useEffect(() => {
+    const storedEmployeeID = localStorage.getItem("employee_id");
+    if (!storedEmployeeID) {
+      setCanManageWorkloadTypes(false);
+      return;
+    }
+
+    let active = true;
+    axios
+      .get(
+        `${API_BASE_URL}/api/page_access/${storedEmployeeID}/${WORKLOAD_MANAGEMENT_PAGE_ID}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
+      )
+      .then(({ data }) => {
+        if (!active) return;
+        const hasPageAccess = Number(data?.page_privilege) === 1;
+        const hasCrudAccess = [data?.can_create, data?.can_edit, data?.can_delete]
+          .some((permission) => Number(permission) === 1);
+        setCanManageWorkloadTypes(hasPageAccess && hasCrudAccess);
+      })
+      .catch(() => {
+        if (active) setCanManageWorkloadTypes(false);
+      });
+
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -1057,6 +1207,7 @@ const ScheduleChecker = () => {
       } else {
         setMessage("Network error. Please try again.");
       }
+      setSnackbarSeverity("error");
       setOpenSnackbar(true);
     }
   };
@@ -1254,6 +1405,7 @@ const ScheduleChecker = () => {
       } else {
         setMessage("Network error. Please try again.");
       }
+      setSnackbarSeverity("error");
       setOpenSnackbar(true);
     }
   };
@@ -1451,6 +1603,45 @@ const ScheduleChecker = () => {
         return endA - endB;
       })
     : [];
+
+  const reviewProfessorOptions = (
+    reviewDepartmentId ? reviewDepartmentProfessors : profList
+  ).filter(
+    (professor) =>
+      Number(professor.status) === 1 ||
+      String(professor.status || "").toLowerCase() === "active",
+  );
+  const selectedReviewProfessor =
+    reviewProfessorOptions.find(
+      (professor) =>
+        String(professor.employee_id) === String(selectedReviewEmployeeId),
+    ) || null;
+  const reviewedProfessorAssignedMinutes = reviewedProfessorSchedules.reduce(
+    (total, row) => {
+      const workloadLabels = [
+        row.course_code,
+        row.load_description,
+        row.workload_code,
+        row.workload_description,
+        row.course_description,
+      ];
+      if (workloadLabels.some((label) => /break|brk/i.test(String(label || "")))) {
+        return total;
+      }
+
+      const start = parseScheduleTimeToMinutes(row.school_time_start);
+      const end = parseScheduleTimeToMinutes(row.school_time_end);
+      if (
+        start === Number.MAX_SAFE_INTEGER ||
+        end === Number.MAX_SAFE_INTEGER ||
+        end <= start
+      ) {
+        return total;
+      }
+      return total + end - start;
+    },
+    0,
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1882,33 +2073,44 @@ const ScheduleChecker = () => {
   }
 
   const loadTypeSection = !isDesignationMode ? (
-    <div className="flex mb-4">
-      <div className="p-2 w-[12rem]">Load Type:</div>
-      <div className="flex flex-col gap-2 pt-1">
-        <label className="flex items-center gap-2">
+    <div className="mb-4">
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-wide">Load Type</div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-[12px]">
+          <input
+            type="checkbox"
+            checked={!isHonorarium && !isServiceCredit && !isTemporarySubstitution}
+            onChange={(e) => {
+              if (e.target.checked) clearScheduleLoadTypes();
+            }}
+            className="h-3 w-3"
+          />
+          Regular Load
+        </label>
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-[12px]">
           <input
             type="checkbox"
             checked={isHonorarium}
             onChange={(e) => handleHonorariumToggle(e.target.checked)}
-            className="h-4 w-4"
+            className="h-3 w-3"
           />
           Honorarium Load
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-[12px]">
           <input
             type="checkbox"
             checked={isServiceCredit}
             onChange={(e) => handleServiceCreditToggle(e.target.checked)}
-            className="h-4 w-4"
+            className="h-3 w-3"
           />
           Service Credit
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-[12px]">
           <input
             type="checkbox"
             checked={isTemporarySubstitution}
             onChange={(e) => handleTemporarySubstitutionToggle(e.target.checked)}
-            className="h-4 w-4"
+            className="h-3 w-3"
           />
           Temporary Substitution
         </label>
@@ -1917,7 +2119,7 @@ const ScheduleChecker = () => {
   ) : null;
 
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1, md: 2 } }}>
       {/* ---------------------------------------------------------------- */}
       {/* Header                                                          */}
       {/* ---------------------------------------------------------------- */}
@@ -1925,10 +2127,10 @@ const ScheduleChecker = () => {
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-end",
           flexWrap: "wrap",
           gap: 2,
-          mb: 2,
+          mb: 1.5,
         }}
       >
         <Typography
@@ -1936,11 +2138,22 @@ const ScheduleChecker = () => {
           sx={{
             fontWeight: "bold",
             color: titleColor,
-            fontSize: "36px",
+            fontSize: { xs: "26px", md: "32px" },
+            lineHeight: 1,
+            width: "100%",
           }}
         >
-          SCHEDULE CHECKER
+          SCHEDULE PLOTTING
         </Typography>
+
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: titleColor, textTransform: "uppercase" }}>
+            {editingScheduleId ? "Update Selected Schedule" : isDesignationMode ? "Plot a Designation" : "Plot Regular Class"}
+          </Typography>
+          <Typography variant="caption" sx={{ color: subtitleColor }}>
+            {getSelectedSchoolYearEntry()?.year_description || "School year"} {getSelectedSchoolYearEntry()?.semester_description || ""}
+          </Typography>
+        </Box>
 
         <Box
           sx={{
@@ -1952,7 +2165,7 @@ const ScheduleChecker = () => {
           }}
         >
           <Button
-            variant="outlined"
+            variant="contained"
             onClick={() => {
               const newMode = !isDesignationMode;
               clearEditMode();
@@ -1969,28 +2182,34 @@ const ScheduleChecker = () => {
             startIcon={<AutorenewIcon />}
             sx={{
               height: "40px",
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 600,
+              borderRadius: 0.75,
+              textTransform: "uppercase",
+              fontWeight: 700,
+              fontSize: "0.72rem",
               whiteSpace: "nowrap",
+              boxShadow: "none",
+              backgroundColor: mainButtonColor,
             }}
           >
             {isDesignationMode ? "Assign Regular Load" : "Assign Designation"}
           </Button>
 
           <Button
-            variant="outlined"
+            variant="contained"
             onClick={() => setOpenReviewDialog(true)}
             startIcon={<VisibilityIcon />}
             sx={{
               height: "40px",
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 600,
+              borderRadius: 0.75,
+              textTransform: "uppercase",
+              fontWeight: 700,
+              fontSize: "0.72rem",
               whiteSpace: "nowrap",
+              boxShadow: "none",
+              backgroundColor: mainButtonColor,
             }}
           >
-            View Schedule
+            Review Faculty Load
           </Button>
 
           <Button
@@ -1999,44 +2218,47 @@ const ScheduleChecker = () => {
             disabled={!dprtmnt_id || !allschedules.length}
             sx={{
               height: "40px",
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 600,
+              borderRadius: 0.75,
+              textTransform: "uppercase",
+              fontWeight: 700,
+              fontSize: "0.72rem",
               whiteSpace: "nowrap",
+              boxShadow: "none",
+              backgroundColor: mainButtonColor,
+              order: 4,
             }}
           >
             Export Official Time
           </Button>
 
-          <Tooltip title={!selectedSection ? "Select a section first" : "Download the printable class program"}>
-            <span>
+          {isDesignationMode ? (
+            canManageWorkloadTypes && (
               <Button
                 variant="contained"
-                onClick={handleDownloadClassSchedule}
-                disabled={isGeneratingClassProgramPdf || isDesignationMode}
-                startIcon={<FcPrint size={20} />}
+                onClick={() => setOpenWorkloadManagementDialog(true)}
                 sx={{
-                  minWidth: "220px",
+                  minWidth: "150px",
                   whiteSpace: "nowrap",
                   height: "40px",
                   px: "20px",
                   py: "5px",
-                  border: "2px solid black",
-                  borderRadius: "8px",
-                  backgroundColor: "#f0f0f0",
-                  color: "black",
-                  fontSize: "14px",
+                  borderRadius: 0.75,
+                  backgroundColor: mainButtonColor,
+                  color: "white",
+                  fontSize: "0.72rem",
                   fontWeight: "bold",
-                  textTransform: "none",
+                  textTransform: "uppercase",
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
                   userSelect: "none",
                   boxShadow: "none",
+                  order: 3,
                   transition: "background-color 0.3s, transform 0.2s",
 
                   "&:hover": {
-                    backgroundColor: "#d3d3d3",
+                    backgroundColor: mainButtonColor,
+                    filter: "brightness(0.9)",
                     boxShadow: "none",
                   },
 
@@ -2045,34 +2267,61 @@ const ScheduleChecker = () => {
                   },
 
                   "&.Mui-disabled": {
-                    backgroundColor: "#f0f0f0",
+                    backgroundColor: "#e0e0e0",
                     color: "#888",
-                    border: "2px solid #999",
                   },
                 }}
               >
-                {isGeneratingClassProgramPdf ? "Generating PDF..." : "Download Class Schedule"}
+                Manage Designation
               </Button>
-            </span>
-          </Tooltip>
+            )
+          ) : (
+            <Tooltip title={!selectedSection ? "Select a section first" : "Download the printable class program"}>
+              <span style={{ order: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleDownloadClassSchedule}
+                  disabled={isGeneratingClassProgramPdf}
+                  startIcon={<FcPrint size={20} />}
+                  sx={{
+                    minWidth: "150px",
+                    whiteSpace: "nowrap",
+                    height: "40px",
+                    px: "20px",
+                    py: "5px",
+                    borderRadius: 0.75,
+                    backgroundColor: mainButtonColor,
+                    color: "white",
+                    fontSize: "0.72rem",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    userSelect: "none",
+                    boxShadow: "none",
+                    transition: "background-color 0.3s, transform 0.2s",
+                    "&:hover": {
+                      backgroundColor: mainButtonColor,
+                      filter: "brightness(0.9)",
+                      boxShadow: "none",
+                    },
+                    "&:active": { transform: "scale(0.95)" },
+                    "&.Mui-disabled": {
+                      backgroundColor: "#e0e0e0",
+                      color: "#888",
+                    },
+                  }}
+                >
+                  {isGeneratingClassProgramPdf ? "Generating PDF..." : "Class Schedule"}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
         </Box>
 
-        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-        <br />
+        <Divider sx={{ width: "100%" }} />
       </Box>
-
-      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, borderRadius: 2, overflow: "hidden" }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: headerColor }}>
-            <TableRow>
-              <TableCell sx={{ color: "white", textAlign: "center", fontWeight: 600, letterSpacing: 0.3 }}>
-                College Schedule Plotting and Management
-              </TableCell>
-            </TableRow>
-          </TableHead>
-        </Table>
-      </TableContainer>
-      <Box sx={{ mb: 2 }} />
 
       {message && (
         <Snackbar
@@ -2104,54 +2353,61 @@ const ScheduleChecker = () => {
       {/* ---------------------------------------------------------------- */}
       {/* Main content: form + grid                                       */}
       {/* ---------------------------------------------------------------- */}
-      <Box sx={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-        <Box>
+      <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", flexDirection: { xs: "column", lg: "row" } }}>
+        <Box
+          sx={{
+            width: { xs: "100%", lg: 360 },
+            flex: { lg: "0 0 360px" },
+            ...SCHEDULE_FORM_CONTROL_STYLES,
+            "& form input[type='checkbox']": {
+              accentColor: headerColor,
+            },
+          }}
+        >
           <form
+            id="department-schedule-plotting-form"
             onSubmit={handleInsertWrapper}
             style={{
               width: "100%",
-              maxWidth: "600px",
+              maxWidth: "none",
               border: `1px solid ${borderColor}`,
-              borderRadius: "12px",
+              borderRadius: "4px",
               backgroundColor: "white",
-              padding: "2rem",
-              boxShadow: "0px 2px 12px rgba(0,0,0,0.08)",
+              padding: "1rem",
+              boxShadow: "none",
             }}
           >
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: titleColor }}>
-              {editingScheduleId
-                ? "Update Selected Schedule"
-                : isDesignationMode
-                  ? "Plot a Designation"
-                  : "Plot a Regular Class"}
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-
             {/* Day */}
-            <div className="flex mb-2 mt-2">
-              <div className="p-2 w-[12rem]">Day:</div>
-              <select
-                className="border border-gray-500 outline-none rounded w-full h-10 px-2 disabled:bg-gray-100"
-                value={selectedDay}
-                onChange={(e) => setSelectedDay(e.target.value)}
-                disabled={Boolean(editingScheduleId)}
-                required
-              >
-                <option value="">Select Day</option>
-                {dayList.map((day) => (
-                  <option key={day.day_id} value={day.day_id}>
-                    {day.day_description}
-                  </option>
-                ))}
-              </select>
+            <div className="flex mb-3">
+              <FormControl fullWidth size="small" disabled={Boolean(editingScheduleId)} required>
+                <InputLabel id="department-schedule-day-label">
+                  Select Day
+                </InputLabel>
+                <Select
+                  labelId="department-schedule-day-label"
+                  value={selectedDay}
+                  onChange={(e) => setSelectedDay(e.target.value)}
+                  required
+                  label="Select Day"
+                  inputProps={{ "aria-label": "Select day" }}
+                  MenuProps={SCHEDULE_SELECT_MENU_PROPS}
+                >
+                  <MenuItem value="">Select Day</MenuItem>
+                  {dayList.map((day) => (
+                    <MenuItem key={day.day_id} value={String(day.day_id)}>
+                      {day.day_description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </div>
 
             {/* Section */}
             {!isDesignationMode && (
-              <div className="flex mb-2">
-                <div className="p-2 w-[12rem]">Section:</div>
+              <div className="flex mb-3">
                 <Autocomplete
                   options={sectionList}
+                  slotProps={SCHEDULE_AUTOCOMPLETE_SLOT_PROPS}
                   fullWidth
                   disabled={Boolean(editingScheduleId)}
                   getOptionLabel={(option) =>
@@ -2199,31 +2455,42 @@ const ScheduleChecker = () => {
 
             {/* Room */}
             {!isDesignationMode && (
-              <div className="flex mb-2">
-                <div className="p-2 w-[12rem]">Room:</div>
-                <select
-                  className="border border-gray-500 outline-none rounded w-full h-10 px-2 disabled:bg-gray-100"
-                  value={selectedRoom}
-                  onChange={(e) => setSelectedRoom(e.target.value)}
+              <div className="flex mb-3">
+                <Autocomplete
+                  options={roomList}
+                  slotProps={SCHEDULE_AUTOCOMPLETE_SLOT_PROPS}
+                  fullWidth
                   disabled={Boolean(editingScheduleId)}
-                  required
-                >
-                  <option value="">Select Room</option>
-                  {roomList.map((room) => (
-                    <option key={room.room_id} value={String(room.room_id)}>
-                      {room.room_description}
-                    </option>
-                  ))}
-                </select>
+                  getOptionLabel={(option) => option.room_description || ""}
+                  value={
+                    roomList.find(
+                      (room) => String(room.room_id) === String(selectedRoom)
+                    ) || null
+                  }
+                  onChange={(event, newValue) => {
+                    setSelectedRoom(newValue ? String(newValue.room_id) : "");
+                  }}
+                  isOptionEqualToValue={(option, value) =>
+                    String(option.room_id) === String(value.room_id)
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select Room"
+                      size="small"
+                      required
+                    />
+                  )}
+                />
               </div>
             )}
 
             {/* Search Course & Course Select */}
-            <div className="flex flex-col mb-2 w-full">
-              <div className="flex mb-1 items-center">
-                <div className="p-2 w-[12rem]">{isDesignationMode ? "Designation:" : "Course:"}</div>
+            <div className="flex flex-col mb-3 w-full">
+              <div className="flex items-center">
                 <Autocomplete
                   options={courseList}
+                  slotProps={SCHEDULE_AUTOCOMPLETE_SLOT_PROPS}
                   fullWidth
                   disabled={Boolean(editingScheduleId)}
                   getOptionLabel={(option) =>
@@ -2276,10 +2543,10 @@ const ScheduleChecker = () => {
             {editingScheduleId && loadTypeSection}
 
             {/* Professor Select */}
-            <div className="flex mb-2">
-              <div className="p-2 w-[12rem]">Professor:</div>
+            <div className="flex mb-3">
               <Autocomplete
                 options={profList}
+                slotProps={SCHEDULE_AUTOCOMPLETE_SLOT_PROPS}
                 fullWidth
                 disabled={Boolean(editingScheduleId) && !isTemporarySubstitution}
                 getOptionLabel={(option) =>
@@ -2312,49 +2579,48 @@ const ScheduleChecker = () => {
               />
             </div>
 
-            {/* School Year */}
-            <div className="flex mb-2">
-              <div className="p-2 w-[12rem]">School Year:</div>
-              <div className="border border-gray-500 rounded w-full h-10 px-2 flex items-center bg-gray-100">
-                {getSelectedSchoolYearEntry()?.year_description}{" "}
-                -{" "}
-                {getSelectedSchoolYearEntry()?.semester_description}
-              </div>
-            </div>
-
             {/* Start Time */}
-            <div className="flex mb-2">
-              <div className="p-2 w-[12rem]">Start Time:</div>
-              <input
-                className="border border-gray-500 rounded w-full h-10 px-2 disabled:bg-gray-100"
+            <div className="flex mb-3">
+              <TextField
+                fullWidth
+                size="small"
+                label="Start Time"
                 type="time"
                 value={selectedStartTime}
-                min={SCHEDULE_TIME_INPUT_MIN}
-                max={SCHEDULE_TIME_INPUT_MAX}
-                step={SCHEDULE_TIME_INPUT_STEP}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
                 disabled={Boolean(editingScheduleId)}
                 required
+                InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: SCHEDULE_TIME_INPUT_MIN,
+                  max: SCHEDULE_TIME_INPUT_MAX,
+                  step: SCHEDULE_TIME_INPUT_STEP,
+                }}
               />
             </div>
 
             {/* End Time */}
-            <div className="flex mb-4">
-              <div className="p-2 w-[12rem]">End Time:</div>
-              <input
-                className="border border-gray-500 rounded w-full h-10 px-2 disabled:bg-gray-100"
+            <div className="flex mb-3">
+              <TextField
+                fullWidth
+                size="small"
+                label="End Time"
                 type="time"
                 value={selectedEndTime}
-                min={SCHEDULE_TIME_INPUT_MIN}
-                max={SCHEDULE_TIME_INPUT_MAX}
-                step={SCHEDULE_TIME_INPUT_STEP}
                 onChange={(e) => handleEndTimeChange(e.target.value)}
                 disabled={Boolean(editingScheduleId)}
                 required
+                InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: SCHEDULE_TIME_INPUT_MIN,
+                  max: SCHEDULE_TIME_INPUT_MAX,
+                  step: SCHEDULE_TIME_INPUT_STEP,
+                }}
               />
             </div>
             {!editingScheduleId && loadTypeSection}
-            <div className="flex justify-between items-center gap-2">
+          </form>
+            <div className="flex justify-between items-center gap-2 mt-3">
               {editingScheduleId && (
                 <Button
                   color="error"
@@ -2369,28 +2635,21 @@ const ScheduleChecker = () => {
                   Cancel Edit
                 </Button>
               )}
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-2 ml-auto w-full">
                 <button
-                  type="button"
-                  className="bg-[#800000] hover:bg-red-900 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 hover:brightness-90 text-white text-[12px] px-6 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-[filter]"
                   style={{ backgroundColor: mainButtonColor }}
-                  onClick={handleSubmitWrapper}
-                >
-                  Check Schedule
-                </button>
-                <button
-                  className="bg-[#1967d2] hover:bg-[#000000] text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   type="submit"
+                  form="department-schedule-plotting-form"
                   disabled={Boolean(editingScheduleId) && !hasValidUpdate()}
                 >
-                  {editingScheduleId ? "Update Schedule" : "Insert Schedule"}
+                  {editingScheduleId ? "Update Block" : "Create Block"}
                 </button>
               </div>
             </div>
-          </form>
         </Box>
 
-        <Box sx={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: 1, minWidth: 300 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: 1, width: { xs: "100%", lg: "auto" }, minWidth: 0 }}>
           {/* -------------------------------------------------------------- */}
           {/* Legend — built from the workload_type table via /api/workload, */}
           {/* not hard-coded. "Regular Load" stays fixed since it's just the */}
@@ -2405,7 +2664,8 @@ const ScheduleChecker = () => {
               p: 1.25,
               backgroundColor: "white",
               border: `1px solid ${borderColor}`,
-              borderRadius: 2,
+              borderRadius: 1,
+              order: 2,
             }}
           >
             <Typography variant="caption" sx={{ fontWeight: 700, color: subtitleColor, mr: 1 }}>
@@ -2432,10 +2692,11 @@ const ScheduleChecker = () => {
             sx={{
               backgroundColor: "white",
               border: `1px solid ${borderColor}`,
-              borderRadius: 2,
+              borderRadius: 1,
               p: 1,
               overflowX: "auto",
-              boxShadow: "0px 2px 12px rgba(0,0,0,0.06)",
+              boxShadow: "none",
+              order: 1,
             }}
           >
             {isDesignationMode
@@ -2450,6 +2711,181 @@ const ScheduleChecker = () => {
       {/* -------------------------------------------------------------- */}
       <Dialog
         open={openReviewDialog}
+        onClose={() => setOpenReviewDialog(false)}
+        fullWidth
+        maxWidth="lg"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            minHeight: "70vh",
+            maxHeight: "92vh",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "18px",
+            py: 1.5,
+          }}
+        >
+          Review Faculty Load
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", lg: "minmax(220px, 1fr) minmax(0, 2fr)" },
+              gap: 2,
+              alignItems: "center",
+              mb: 2,
+              "& .MuiInputBase-input, & .MuiSelect-select": { fontSize: "12px" },
+              "& .MuiOutlinedInput-root": { height: 40, boxSizing: "border-box" },
+              "& .MuiAutocomplete-inputRoot": { py: "0 !important" },
+              "& .MuiAutocomplete-input": { py: "0 !important" },
+              "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                borderColor: headerColor,
+              },
+            }}
+          >
+            <Box sx={{ minHeight: 40, display: "flex", alignItems: "center", gap: 1.25 }}>
+              {selectedReviewProfessor ? (
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    p: 0.2,
+                    flexShrink: 0,
+                    borderRadius: 2,
+                    border: `1px solid ${headerColor}`,
+                    backgroundColor: "#fff",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: 1.25,
+                      backgroundColor: headerColor,
+                      color: "#fff",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "14px", lineHeight: 1, fontWeight: 800 }}>
+                      {(reviewedProfessorAssignedMinutes / 60).toFixed(1).replace(/\.0$/, "")}
+                    </Typography>
+                    <Typography sx={{ mt: 0.15, fontSize: "6px", fontWeight: 700 }}>
+                      HOURS
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : null}
+              {selectedReviewProfessor ? (
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#1f2937" }}>
+                    {selectedReviewProfessor.fname} {selectedReviewProfessor.mname?.charAt(0) || ""}{selectedReviewProfessor.mname ? ". " : " "}{selectedReviewProfessor.lname} ({selectedReviewProfessor.employee_id})
+                  </Typography>
+                  {reviewedProfessorSchedules[0] && (
+                    <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
+                      {reviewedProfessorSchedules[0].current_year}
+                      {reviewedProfessorSchedules[0].next_year ? `-${reviewedProfessorSchedules[0].next_year}` : ""}
+                      {reviewedProfessorSchedules[0].semester_description ? `, ${reviewedProfessorSchedules[0].semester_description}` : ""}
+                      {` · ${reviewedProfessorSchedules.length} load record${reviewedProfessorSchedules.length === 1 ? "" : "s"}`}
+                    </Typography>
+                  )}
+                </Box>
+              ) : null}
+            </Box>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 320px) minmax(0, 380px)" },
+                justifyContent: "end",
+                gap: 1.5,
+              }}
+            >
+              <FormControl fullWidth size="small">
+                <Select
+                  value={reviewDepartmentId}
+                  onChange={(event) => handleReviewDepartmentChange(event.target.value)}
+                  displayEmpty
+                  inputProps={{ "aria-label": "Department" }}
+                >
+                  <MenuItem value="">All Departments</MenuItem>
+                  {reviewDepartments.map((department) => (
+                    <MenuItem key={department.dprtmnt_id} value={department.dprtmnt_id}>
+                      {department.dprtmnt_code
+                        ? `${department.dprtmnt_code} - ${department.dprtmnt_name}`
+                        : department.dprtmnt_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Autocomplete
+                options={reviewProfessorOptions}
+                fullWidth
+                size="small"
+                loading={reviewProfessorLoading}
+                ListboxProps={{
+                  sx: {
+                    "& .MuiAutocomplete-option": {
+                      minHeight: 30,
+                      py: 0.5,
+                      fontSize: "12px",
+                    },
+                  },
+                }}
+                getOptionLabel={(option) =>
+                  `${option.employee_id || ""} - ${option.fname || ""} ${option.mname?.charAt(0) || ""}${option.mname ? "." : ""} ${option.lname || ""}`.trim()
+                }
+                value={selectedReviewProfessor}
+                onChange={(event, professor) =>
+                  setSelectedReviewEmployeeId(professor ? professor.employee_id : "")
+                }
+                isOptionEqualToValue={(option, value) =>
+                  String(option.employee_id) === String(value.employee_id)
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder={reviewProfessorLoading ? "Loading professors..." : "Select Professor *"}
+                  />
+                )}
+              />
+            </Box>
+          </Box>
+
+          <FacultyLoadTimetable
+            schedules={reviewedProfessorSchedules}
+            loading={reviewScheduleLoading}
+            selectedProfessor={selectedReviewProfessor}
+            showProfessorInfo={false}
+            headerColor={headerColor}
+            borderColor={borderColor}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.25 }}>
+          <Button
+            onClick={() => setOpenReviewDialog(false)}
+            color="error"
+            variant="outlined"
+            sx={{ fontSize: "12px", textTransform: "none" }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={false}
         onClose={() => setOpenReviewDialog(false)}
         fullWidth
         maxWidth="lg"
@@ -2558,6 +2994,50 @@ const ScheduleChecker = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenReviewDialog(false)} color="error" variant="outlined">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* -------------------------------------------------------------- */}
+      {/* Authorized designation management                              */}
+      {/* -------------------------------------------------------------- */}
+      <Dialog
+        open={openWorkloadManagementDialog}
+        onClose={closeWorkloadManagementDialog}
+        fullWidth
+        maxWidth="xl"
+        PaperProps={{
+          sx: {
+            height: "auto",
+            maxHeight: "90vh",
+            borderRadius: 2,
+            overflow: "hidden",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            py: 1.5,
+          }}
+        >
+          Manage Designation
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, overflowY: "auto" }}>
+          <WorkloadManagement
+            embedded
+            onWorkloadChange={refreshManagedDesignations}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button
+            color="error"
+            variant="outlined"
+            onClick={closeWorkloadManagementDialog}
+          >
             Close
           </Button>
         </DialogActions>

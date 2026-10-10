@@ -33,6 +33,7 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
 import { formatYearSection } from "../utils/sectionDisplay";
+import { formatCorStudentName } from "../utils/nameFormatters";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import {
@@ -1847,13 +1848,12 @@ const CertificateOfRegistration = forwardRef(
                         {renderDetailField(
                           "Name",
                           <span>
-                            <span style={{ fontWeight: "bold" }}>
-                              {(data[0]?.last_name || "").toUpperCase()}
-                            </span>
-                            {`, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`
-                              .replace(/\s+/g, " ")
-                              .trimEnd()
-                              .toUpperCase()}
+                            {formatCorStudentName({
+                              lastName: data[0]?.last_name,
+                              firstName: data[0]?.first_name,
+                              middleName: data[0]?.middle_name,
+                              extension: data[0]?.extension,
+                            })}
                           </span>,
                           LEFT_LABEL_WIDTH,
                         )}
@@ -2411,7 +2411,7 @@ const CertificateOfRegistration = forwardRef(
                               .trim()
                               .replace(/^TBA$/i, "");
                             const sectionOnly = formatYearSection(
-                              item.year_level_id,
+                              item.year_level_id ?? yearlevel,
                               item.section_description ??
                                 item.section ??
                                 item.description,

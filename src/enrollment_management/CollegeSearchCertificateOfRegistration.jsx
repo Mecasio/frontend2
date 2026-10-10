@@ -38,6 +38,7 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import { formatCorStudentName } from "../utils/nameFormatters";
 import StudentHistoryDialog from "../components/StudentHistoryDialog";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import {
@@ -1027,7 +1028,12 @@ const CollegeSearchCertificateOfRegistration = () => {
                   }}
                 >
                   {studentData && studentData.last_name
-                    ? `${studentData?.last_name?.toUpperCase()}, ${studentData?.first_name?.toUpperCase()} ${studentData?.middle_name?.toUpperCase()}`
+                    ? formatCorStudentName({
+                        lastName: studentData.last_name,
+                        firstName: studentData.first_name,
+                        middleName: studentData.middle_name,
+                        extension: studentData.extension,
+                      })
                     : "N/A"}
                 </span>
               </TableCell>

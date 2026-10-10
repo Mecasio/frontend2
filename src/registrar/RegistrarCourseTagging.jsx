@@ -687,6 +687,7 @@ const RegistrarCourseTagging = () => {
       return;
     }
     const sectionId = e.target.value;
+    const previousSectionId = selectedSection;
     setSelectedSection(sectionId);
     try {
       await axios.put(`${API_BASE_URL}/api/update-active-curriculum`, {
@@ -713,10 +714,11 @@ const RegistrarCourseTagging = () => {
       });
     } catch (error) {
       console.error("Error updating curriculum:", error);
+      setSelectedSection(previousSectionId);
       setSnack({
         open: true,
         message:
-          error.response?.data?.error ||
+          error.response?.data?.message ||
           "Failed to change section. Please try again.",
         severity: "error",
       });
@@ -893,6 +895,7 @@ const RegistrarCourseTagging = () => {
         auditConfig,
       );
       await refreshEnrolledCourses();
+      await fetchSubjectCounts(sectionForEnroll);
       setSnack({
         open: true,
         message: `Enrolled ${course.course_code} successfully.`,
@@ -901,7 +904,9 @@ const RegistrarCourseTagging = () => {
     } catch (err) {
       setSnack({
         open: true,
-        message: "Error enrolling in this course. Please try again.",
+        message:
+          err.response?.data?.message ||
+          "Error enrolling in this course. Please try again.",
         severity: "error",
       });
     }
@@ -938,7 +943,7 @@ const RegistrarCourseTagging = () => {
       setSnack({
         open: true,
         message:
-          err.response?.data?.error ||
+          err.response?.data?.message ||
           "Failed to update subject section. Please try again.",
         severity: "error",
       });
@@ -1044,6 +1049,7 @@ const RegistrarCourseTagging = () => {
         auditConfig,
       );
       enrolledCount = res.data?.enrolledCount || 0;
+      const fullCount = res.data?.fullCount || 0;
       const enrolledYearMeta = yearLevel.find(
         (y) => Number(y.year_level_id) === Number(yearLevelId),
       );
@@ -1060,16 +1066,20 @@ const RegistrarCourseTagging = () => {
       setSnack({
         open: true,
         message:
-          enrolledCount > 0
+          fullCount > 0
+            ? `${enrolledCount} subject(s) enrolled; ${fullCount} skipped because the section is full.`
+            : enrolledCount > 0
             ? "Bulk enroll finished. All available subjects were enrolled."
             : "No new subjects were enrolled.",
-        severity: enrolledCount > 0 ? "success" : "info",
+        severity: fullCount > 0 ? "warning" : enrolledCount > 0 ? "success" : "info",
       });
     } catch (err) {
       console.error("Error during bulk enrollment:", err);
       setSnack({
         open: true,
-        message: "Unexpected error during bulk enrollment.",
+        message:
+          err.response?.data?.message ||
+          "Unexpected error during bulk enrollment.",
         severity: "error",
       });
     }

@@ -570,6 +570,21 @@ const getScheduleDurationHours = (entry) => {
   return Math.max(0, (end - start) / 60);
 };
 
+const isBreakWorkloadEntry = (entry) => {
+  const workloadName = [
+    entry?.load_description,
+    entry?.workload_description,
+    entry?.course_description,
+    entry?.workload_code,
+    entry?.course_code,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase();
+
+  return workloadName.includes("BREAK") || /\bBRKS?\b/.test(workloadName);
+};
+
 const normalizeCourseCode = (courseCode) =>
   String(courseCode || "")
     .toUpperCase()
@@ -580,12 +595,37 @@ const isDesignationScheduleEntry = (entry) =>
   entry.department_section_id === "" ||
   Number(entry.department_section_id) === 0;
 
+const getScheduleDisplayLabel = (entry) =>
+  isDesignationScheduleEntry(entry)
+    ? entry.load_description ||
+      entry.workload_description ||
+      entry.course_description ||
+      entry.course_code
+    : entry.course_code;
+
 const isWorkloadFlagEnabled = (value) => Number(value) === 1;
 
 const isHonorariumEntry = (entry) => isWorkloadFlagEnabled(entry?.ishonorarium);
 const isServiceCreditEntry = (entry) => isWorkloadFlagEnabled(entry?.is_servicecredit);
 const isTemporarySubstitutionEntry = (entry) =>
   isWorkloadFlagEnabled(entry?.is_temporary_substitution);
+
+const DESIGNATION_CATEGORY_ALIASES = {
+  DESIGNATION: "designation",
+  DESG: "designation",
+  RESEARCH: "research",
+  RES: "research",
+  EXTENSION: "extension",
+  EXT: "extension",
+  PRODUCTION: "production",
+  PROD: "production",
+  ACCREDITATION: "accreditation",
+  ACC: "accreditation",
+  CONSULTATION: "consultation",
+  CONS: "consultation",
+  LESSONPREPARATION: "lessonPreparation",
+  LPOC: "lessonPreparation",
+};
 
 const EXTRA_TEACHING_LOAD_ROW_COUNT = 5;
 const FTE_CALCULATOR_ROW_COUNT = 11;
@@ -635,14 +675,16 @@ const getWorkloadCategory = (entry) => {
     return "emergencyLoad";
   }
   if (isDesignationScheduleEntry(entry)) {
-    const normalized = normalizeCourseCode(entry.course_code);
-    if (normalized === "RESEARCH") return "research";
-    if (normalized === "EXTENSION") return "extension";
-    if (normalized === "PRODUCTION") return "production";
-    if (normalized === "ACCREDITATION") return "accreditation";
-    if (normalized === "CONSULTATION") return "consultation";
-    if (normalized === "LESSONPREPARATION") return "lessonPreparation";
-    return "designation";
+    const description = normalizeCourseCode(
+      entry.load_description || entry.workload_description || entry.course_description,
+    );
+    const code = normalizeCourseCode(entry.course_code || entry.workload_code);
+
+    const descriptionCategory = Object.entries(DESIGNATION_CATEGORY_ALIASES).find(
+      ([token]) => description === token || description.startsWith(token),
+    )?.[1];
+
+    return descriptionCategory || DESIGNATION_CATEGORY_ALIASES[code] || "designation";
   }
   return "regular";
 };
@@ -737,6 +779,8 @@ const buildDailyWorkloadDistribution = (scheduleEntries) => {
   };
 
   scheduleEntries.forEach((entry) => {
+    if (isBreakWorkloadEntry(entry)) return;
+
     const day = normalizeWorkloadDay(entry.day_description);
     if (!WORKLOAD_DAYS.includes(day)) return;
 
@@ -824,6 +868,12 @@ const FacultyWorkload = () => {
     semester_description: "",
     current_year: "",
     next_year: "",
+  });
+  const [workloadSignatories, setWorkloadSignatories] = useState({
+    prepared_by_name: "",
+    prepared_by_title: "",
+    certified_by_name: "",
+    certified_by_title: "",
   });
 
   // Workload types (description / code / color) managed on the
@@ -925,6 +975,36 @@ const FacultyWorkload = () => {
 
   useEffect(() => {
     if (!profData.prof_id) return;
+    setWorkloadSignatories({
+      prepared_by_name: "",
+      prepared_by_title: "",
+      certified_by_name: "",
+      certified_by_title: "",
+    });
+
+    const fetchWorkloadSignatories = async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/faculty-workload-signatories/${profData.prof_id}`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
+        );
+        setWorkloadSignatories({
+          prepared_by_name: "",
+          prepared_by_title: "",
+          certified_by_name: "",
+          certified_by_title: "",
+          ...(response.data || {}),
+        });
+      } catch (err) {
+        console.error("Error fetching faculty workload signatories:", err);
+        setWorkloadSignatories({
+          prepared_by_name: "",
+          prepared_by_title: "",
+          certified_by_name: "",
+          certified_by_title: "",
+        });
+      }
+    };
 
     const fetchProfessorEducation = async () => {
       try {
@@ -955,6 +1035,7 @@ const FacultyWorkload = () => {
       }
     };
 
+    fetchWorkloadSignatories();
     fetchProfessorEducation();
     fetchSchedule();
   }, [profData.prof_id]);
@@ -965,12 +1046,12 @@ const FacultyWorkload = () => {
   );
 
   const honorariumSchedules = useMemo(
-    () => schedule.filter((entry) => isHonorariumEntry(entry)),
+    () => schedule.filter((entry) => !isBreakWorkloadEntry(entry) && isHonorariumEntry(entry)),
     [schedule]
   );
 
   const serviceCreditSchedules = useMemo(
-    () => schedule.filter((entry) => isServiceCreditEntry(entry)),
+    () => schedule.filter((entry) => !isBreakWorkloadEntry(entry) && isServiceCreditEntry(entry)),
     [schedule]
   );
 
@@ -978,6 +1059,7 @@ const FacultyWorkload = () => {
     const uniqueAssignments = new Map();
 
     schedule.forEach((entry) => {
+      if (isBreakWorkloadEntry(entry)) return;
       if (getWorkloadCategory(entry) !== "regular") return;
 
       const key = getRegularTeachingAssignmentKey(entry);
@@ -1038,7 +1120,8 @@ const FacultyWorkload = () => {
       (_, index) => entries[index] || null
     );
     const totalHours = entries.reduce(
-      (sum, entry) => sum + getScheduleDurationHours(entry),
+      (sum, entry) =>
+        sum + (isBreakWorkloadEntry(entry) ? 0 : getScheduleDurationHours(entry)),
       0
     );
 
@@ -1251,13 +1334,14 @@ const FacultyWorkload = () => {
 
       const totalHours = (schedEnd - schedStart) / (1000 * 60 * 60);
       const isTopSlot = slotStart.getTime() === schedStart.getTime();
+      const displayLabel = getScheduleDisplayLabel(entry);
 
       let textContent = null;
       if (totalHours === 1) {
         textContent = (
           <>
             <span className="block truncate text-[10px]">
-              {entry.course_code}
+              {displayLabel}
             </span>
             {entry.program_code && entry.section_description && (
               <span className="block truncate text-[8px]">
@@ -1282,10 +1366,10 @@ const FacultyWorkload = () => {
 
         textContent = (
           <span
-            className="absolute inset-0 flex flex-col items-center justify-center text-center text-[11px] leading-tight cursor-pointer"
+            className={`absolute inset-0 flex flex-col items-center justify-center text-center text-[11px] leading-tight ${isDesignationScheduleEntry(entry) ? "" : "cursor-pointer"}`}
             style={{ top: `${marginTop}rem` }}
           >
-            {entry.course_code} <br />
+            {displayLabel} <br />
             {(entry.program_code || entry.section_description) && (
               <>
                 {[entry.program_code, entry.section_description]
@@ -1304,12 +1388,13 @@ const FacultyWorkload = () => {
 
       return (
         <div
-          className="schedule-block relative w-full h-full cursor-pointer text-center"
-          onClick={() =>
-            navigate("/faculty_classlist", {
+          className={`schedule-block relative w-full h-full text-center ${isDesignationScheduleEntry(entry) ? "" : "cursor-pointer"}`}
+          onClick={
+            isDesignationScheduleEntry(entry)
+              ? undefined
+              : () => navigate("/faculty_classlist", {
               state: {
                 course_id: entry.course_id,
-                section_id: entry.section_id,
                 department_section_id: entry.department_section_id,
                 school_year_id: entry.school_year_id,
               },
@@ -1473,7 +1558,7 @@ const FacultyWorkload = () => {
             color: "black",
             borderRadius: "5px",
             cursor: isGeneratingWorkloadPdf ? "not-allowed" : "pointer",
-            fontSize: "16px",
+            fontSize: "13px",
             fontWeight: "bold",
             opacity: isGeneratingWorkloadPdf ? 0.6 : 1,
             transition: "background-color 0.3s, transform 0.2s",
@@ -1505,10 +1590,10 @@ const FacultyWorkload = () => {
               gap: "8px",
             }}
           >
-            <FcPrint size={20} />
+            <FcPrint size={16} />
             {isGeneratingWorkloadPdf
               ? "Generating PDF..."
-              : "Download Faculty Workload"}
+              : "Download PDF"}
           </span>
         </button>
       </Box>
@@ -3767,11 +3852,11 @@ const FacultyWorkload = () => {
                       </div>
                       <div className="flex flex-col mt-[2rem] w-full items-center">
                         <span className="text-[12px] ">
-                          Prof. HAZEL F. ANUNCIO
+                          {workloadSignatories.prepared_by_name || ""}
                         </span>
                         <br />
                         <span className="text-[11px] mt-[-1.7rem] font-[500] tracking-[-1px]">
-                          Information Technology Department Head
+                          {workloadSignatories.prepared_by_title || ""}
                         </span>
                       </div>
                     </div>
@@ -3783,11 +3868,11 @@ const FacultyWorkload = () => {
                       </div>
                       <div className="flex flex-col mt-[2rem] w-full items-center">
                         <span className="text-[12px] ">
-                          DR. JESUS PANGUIGAN
+                          {workloadSignatories.certified_by_name || ""}
                         </span>
                         <br />
                         <span className="text-[11px] mt-[-1.7rem] font-[500] tracking-[-1px]">
-                          Dean, CCS
+                          {workloadSignatories.certified_by_title || ""}
                         </span>
                       </div>
                     </div>

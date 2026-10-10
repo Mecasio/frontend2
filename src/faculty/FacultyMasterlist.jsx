@@ -20,7 +20,6 @@ import {
   Paper,
   FormControl,
   Select,
-  InputLabel,
   MenuItem,
   Button,
   TextField,
@@ -184,6 +183,9 @@ const FacultyMasterList = () => {
   });
   const [schoolYears, setSchoolYears] = useState([]);
   const [schoolSemester, setSchoolSemester] = useState([]);
+  const [activeSchoolYearStart, setActiveSchoolYearStart] = useState(
+    new Date().getFullYear(),
+  );
   const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
   const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
   const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
@@ -262,7 +264,13 @@ const FacultyMasterList = () => {
   useEffect(() => {
     if (profData.prof_id) {
       axios
-        .get(`${API_BASE_URL}/api/faculty_masterlist_bootstrap/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
+        .get(`${API_BASE_URL}/api/faculty_masterlist_bootstrap/${profData.prof_id}`, {
+          params: {
+            school_year_id: school_year_id || undefined,
+            course_id: course_id || undefined,
+          },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+        })
         .then((res) => {
           const data = res.data || {};
           const active = data.activeSchoolYear || {};
@@ -273,7 +281,7 @@ const FacultyMasterList = () => {
           setSectionAssignedTo(sections);
           setClassListAndDetails(Array.isArray(data.classDetails) ? data.classDetails : []);
 
-          if (!school_year_id && active.year_id) setSelectedSchoolYear(active.year_id);
+          if (active.year_id) setSelectedSchoolYear(active.year_id);
           if (active.semester_id) setSelectedSchoolSemester(active.semester_id);
           if (active.school_year_id) setSelectedActiveSchoolYear(active.school_year_id);
 
@@ -319,7 +327,6 @@ const FacultyMasterList = () => {
     if (initialDepartmentSectionId) {
       setSelectedSection(String(initialDepartmentSectionId));
     }
-    if (school_year_id) setSelectedSchoolYear(school_year_id);
   }, [course_id, initialDepartmentSectionId, school_year_id]);
 
   useEffect(() => {
@@ -357,18 +364,18 @@ const FacultyMasterList = () => {
   ]);
 
   useEffect(() => {
-    const currentYear = new Date().getFullYear();
     Promise.all([
       axios.get(`${API_BASE_URL}/api/get_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
       axios.get(`${API_BASE_URL}/api/get_school_semester/`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+      axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
     ])
-      .then(([yearRes, semRes]) => {
-        setSchoolYears(
-          yearRes.data.filter(
-            (yearObj) => Number(yearObj.current_year) <= currentYear,
-          ),
-        );
+      .then(([yearRes, semRes, activeYearRes]) => {
+        setSchoolYears(yearRes.data || []);
         setSchoolSemester(semRes.data);
+        const activeYearStart = Number(activeYearRes.data?.[0]?.current_year);
+        if (Number.isFinite(activeYearStart)) {
+          setActiveSchoolYearStart(activeYearStart);
+        }
       })
       .catch((err) => console.error(err));
   }, []);
@@ -391,96 +398,12 @@ const FacultyMasterList = () => {
       .catch((err) => console.error(err));
   }, [selectedSchoolYear, selectedSchoolSemester]);
 
-  const handleSchoolYearChange = (event) => {
-    setSelectedSchoolYear(event.target.value);
-  };
-
-  const handleSchoolSemesterChange = (event) => {
-    setSelectedSchoolSemester(event.target.value);
-  };
-
   const handleSelectCourseChange = (event) => {
     setSelectedCourse(event.target.value);
   };
 
   const handleSelectSectionChange = (event) => {
     setSelectedSection(String(event.target.value));
-  };
-
-  const findPastClass = async () => {
-    try {
-      if (!profData.prof_id || !selectedSchoolYear || !selectedSchoolSemester) {
-        setMessage("Please select School Year and Semester first.");
-        return;
-      }
-
-      // 1ï¸âƒ£ Fetch courses assigned to the professor
-      const courseRes = await axios.get(
-        `${API_BASE_URL}/api/course_assigned_to/${profData.prof_id}/${selectedSchoolYear}/${selectedSchoolSemester}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
-      );
-      const courses = courseRes.data;
-      setCoursesAssignedTo(courses);
-
-      if (courses.length === 0) {
-        setSectionAssignedTo([]);
-        setSelectedCourse("");
-        setSelectedSection("");
-        setMessage("No courses found for this period.");
-        return;
-      }
-
-      // 2ï¸âƒ£ Choose first course if none selected
-      const selectedCourseExists = courses.some(
-        (course) => String(course.course_id) === String(selectedCourse),
-      );
-      const courseId = selectedCourseExists ? selectedCourse : courses[0].course_id;
-      setSelectedCourse(courseId);
-
-      // 3ï¸âƒ£ Fetch sections for the selected course
-      const sectionRes = await axios.get(
-        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${courseId}/${selectedActiveSchoolYear}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
-      );
-
-      const sections = sectionRes.data;
-      setSectionAssignedTo(sections);
-      if (sections.length > 0) {
-        const selectedSectionExists = sections.some(
-          (section) =>
-            String(section.department_section_id) === String(selectedSection),
-        );
-        setSelectedSection(
-          selectedSectionExists
-            ? String(selectedSection)
-            : String(sections[0].department_section_id),
-        );
-      } else {
-        setSelectedSection("");
-      }
-
-      if (sections.length === 0) {
-        setSectionAssignedTo([]);
-        setSelectedSection("");
-        setMessage("No sections found for this course.");
-        return;
-      }
-
-      // 4ï¸âƒ£ Choose first section if none selected
-      const sectionId = sections.some(
-        (section) =>
-          String(section.department_section_id) === String(selectedSection),
-      )
-        ? selectedSection
-        : sections[0].department_section_id;
-      setSelectedSection(String(sectionId));
-
-      // 5ï¸âƒ£ Fetch students for this section
-      const detailsRes = await axios.get(`${API_BASE_URL}/api/get_class_details/${profData.prof_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
-      setClassListAndDetails(detailsRes.data);
-      setMessage("");
-    } catch (err) {
-      console.error("Error fetching past class data:", err);
-      setMessage("Failed to fetch data.");
-    }
   };
 
   const filteredStudents = useMemo(() => {
@@ -583,14 +506,30 @@ const FacultyMasterList = () => {
     [groupedList, currentPage, itemsPerPage],
   );
 
+  const visibleSchoolYears = useMemo(() => {
+    const activeStartYear = Number(activeSchoolYearStart);
+    if (!Number.isFinite(activeStartYear)) return schoolYears;
+
+    return schoolYears
+      .filter((yearObj) => {
+        const startYear = Number(yearObj.current_year);
+        return (
+          Number.isFinite(startYear) &&
+          startYear <= activeStartYear &&
+          startYear >= activeStartYear - 10
+        );
+      })
+      .sort((a, b) => Number(a.current_year) - Number(b.current_year));
+  }, [schoolYears, activeSchoolYearStart]);
+
   const selectedSchoolYearValue = useMemo(
     () =>
-      schoolYears.some(
+      visibleSchoolYears.some(
         (yearObj) => String(yearObj.year_id) === String(selectedSchoolYear),
       )
         ? selectedSchoolYear
         : "",
-    [schoolYears, selectedSchoolYear],
+    [visibleSchoolYears, selectedSchoolYear],
   );
 
   const selectedSchoolSemesterValue = useMemo(
@@ -1086,34 +1025,36 @@ const FacultyMasterList = () => {
       </TableContainer>
       <TableContainer
         component={Paper}
-        sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, borderRadius: 1, p: 1.5 }}
       >
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            margin: "1rem 0",
-            padding: "0 1rem",
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "repeat(2, minmax(0, 1fr))",
+              md: "minmax(240px, 2.3fr) minmax(170px, 1.15fr) repeat(2, minmax(100px, 0.68fr))",
+              lg: "minmax(280px, 2.3fr) minmax(170px, 1.15fr) minmax(105px, 0.68fr) minmax(105px, 0.68fr) 1px minmax(140px, 0.8fr) minmax(140px, 0.8fr)",
+            },
+            alignItems: "end",
+            gap: 1.5,
           }}
         >
           {/* LEFT SIDE: Course, Section, Student Status + Sort */}
-          <Box display="flex" flexDirection="column" gap={2}>
+          <Box sx={{ display: "contents" }}>
 
             {/* Course */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "110px" }}>
-                Course:
-              </Typography>
-              <FormControl sx={{ width: "550px" }}>
-                <InputLabel id="demo-simple-select-label">Course</InputLabel>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>Course</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="demo-simple-select-label"
                   id="demo-simple-select"
                   value={selectedCourseValue}
-                  label="Course"
                   onChange={handleSelectCourseChange}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 13 }}
                 >
+                  <MenuItem value="" disabled>Select Course</MenuItem>
                   {!courseAssignedTo || courseAssignedTo.length === 0 ? (
                     <MenuItem disabled>No Course Assigned this Academic Year</MenuItem>
                   ) : filteredCourses.length > 0 ? (
@@ -1130,19 +1071,20 @@ const FacultyMasterList = () => {
             </Box>
 
             {/* Section */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "110px" }}>
-                Section:
-              </Typography>
-              <FormControl sx={{ width: "550px" }}>
-                <InputLabel id="section-select-label">Section</InputLabel>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>Section</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="section-select-label"
                   id="section-select"
-                  label="Section"
                   value={selectedSectionValue}
                   onChange={handleSelectSectionChange}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 13 }}
                 >
+                  <MenuItem value="" disabled>
+                    {!selectedCourse ? "Please select a course first" : "Select Section"}
+                  </MenuItem>
                   {!selectedCourse ? (
                     <MenuItem disabled>
                       <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
@@ -1170,57 +1112,65 @@ const FacultyMasterList = () => {
             </Box>
 
             {/* Student Status + Sort beside it */}
-            <Box display="flex" alignItems="center" gap={2}>
-              <Typography fontSize={13} sx={{ minWidth: "110px" }}>
-                Student Status:
-              </Typography>
-              <FormControl sx={{ width: "150px" }}>
+            <Box sx={{ display: "contents" }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>Student Status</Typography>
+              <FormControl fullWidth size="small">
                 <Select
+                  labelId="student-status-label"
                   value={selectedStatusFilter}
                   onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                  displayEmpty
+                  sx={{ height: 38, fontSize: 13 }}
                 >
                   <MenuItem value="">All</MenuItem>
                   <MenuItem value="Regular">Regular</MenuItem>
                   <MenuItem value="Irregular">Irregular</MenuItem>
                 </Select>
               </FormControl>
+              </Box>
 
-              <Typography fontSize={13}>Sort:</Typography>
-              <FormControl sx={{ width: "120px" }}>
-                <InputLabel id="sort-label">Sort</InputLabel>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>Sort</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="sort-label"
-                  label="Sort"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
+                  sx={{ height: 38, fontSize: 13 }}
                 >
-                  <MenuItem value="asc">A â€“ Z</MenuItem>
-                  <MenuItem value="desc">Z â€“ A</MenuItem>
+                  <MenuItem value="asc">A–Z</MenuItem>
+                  <MenuItem value="desc">Z–A</MenuItem>
                 </Select>
               </FormControl>
+              </Box>
             </Box>
 
           </Box>
 
-          {/* RIGHT SIDE: School Year, Semester, Find Last Grade */}
-          <Box display="flex" flexDirection="column" gap={2} alignItems="flex-end">
+          {/* RIGHT SIDE: School Year and Semester */}
+          <Box sx={{ display: "contents" }}>
 
             {/* School Year */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }} textAlign="right">
-                School Year:
-              </Typography>
-              <FormControl sx={{ width: "180px" }}>
-                <InputLabel id="school-year-label">School Year</InputLabel>
+            <Box
+              sx={{
+                display: { xs: "none", lg: "block" },
+                borderLeft: "1px solid #e2e8f0",
+                alignSelf: "stretch",
+              }}
+            />
+
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>School Year</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="school-year-label"
-                  label="School Year"
                   value={selectedSchoolYearValue}
                   onChange={(e) => setSelectedSchoolYear(e.target.value)}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 13 }}
                 >
                   <MenuItem value="" disabled>Select School Year</MenuItem>
-                  {schoolYears.map((yearObj) => (
+                  {visibleSchoolYears.map((yearObj) => (
                     <MenuItem key={yearObj.year_id} value={yearObj.year_id}>
                       {yearObj.current_year} - {yearObj.next_year}
                     </MenuItem>
@@ -1230,17 +1180,15 @@ const FacultyMasterList = () => {
             </Box>
 
             {/* Semester */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }} textAlign="right">
-                Semester:
-              </Typography>
-              <FormControl sx={{ width: "180px" }}>
-                <InputLabel id="semester-label">Semester</InputLabel>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ mb: 0.75, fontSize: 12, color: "#64748b" }}>Semester</Typography>
+              <FormControl fullWidth size="small">
                 <Select
                   labelId="semester-label"
-                  label="Semester"
                   value={selectedSchoolSemesterValue}
                   onChange={(e) => setSelectedSchoolSemester(e.target.value)}
+                  displayEmpty
+                  sx={{ height: 38, fontSize: 13 }}
                 >
                   <MenuItem value="" disabled>Select Semester</MenuItem>
                   {schoolSemester.map((sem) => (
@@ -1248,27 +1196,6 @@ const FacultyMasterList = () => {
                       {sem.semester_description}
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
-            </Box>
-
-            {/* Find Last Grade */}
-            <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }} textAlign="right">
-                Find Last Grade:
-              </Typography>
-              <FormControl sx={{ width: "150px" }}>
-                <InputLabel id="find-grade-label">Action</InputLabel>
-                <Select
-                  labelId="find-grade-label"
-                  label="Action"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value === "find") findPastClass();
-                  }}
-                  displayEmpty
-                >
-                  <MenuItem value="find">Run Search</MenuItem>
                 </Select>
               </FormControl>
             </Box>

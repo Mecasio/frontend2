@@ -10,6 +10,7 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
 import { formatYearSection } from "../utils/sectionDisplay";
+import { formatCorStudentName } from "../utils/nameFormatters";
 import {
   computeTotalAssessment,
   computeTuitionAmount,
@@ -299,9 +300,6 @@ const CertificateOfRegistration = forwardRef(
     const [middle_name, setUserMiddleName] = useState(null); // Dynamic userId
 
     const [last_name, setUserLastName] = useState(null); // Dynamic userId
-    const middleInitial = data[0]?.middle_name?.trim()
-      ? `${data[0].middle_name.trim().charAt(0).toUpperCase()}.`
-      : "";
     const [currId, setCurr] = useState(null); // Dynamic userId
     const [courseCode, setCourseCode] = useState("");
     const [courseDescription, setCourseDescription] = useState("");
@@ -1509,11 +1507,12 @@ const CertificateOfRegistration = forwardRef(
                         {renderDetailField(
                           "Name",
                           <span>
-                            {(data[0]?.last_name || "").toUpperCase()}
-                            {`, ${data[0]?.first_name || ""} ${middleInitial} ${data[0]?.extension || ""}`
-                              .replace(/\s+/g, " ")
-                              .trimEnd()
-                              .toUpperCase()}
+                            {formatCorStudentName({
+                              lastName: data[0]?.last_name,
+                              firstName: data[0]?.first_name,
+                              middleName: data[0]?.middle_name,
+                              extension: data[0]?.extension,
+                            })}
                           </span>,
                           LEFT_LABEL_WIDTH,
                         )}
@@ -2065,7 +2064,7 @@ const CertificateOfRegistration = forwardRef(
                               .trim()
                               .replace(/^TBA$/i, "");
                             const sectionOnly = formatYearSection(
-                              item.year_level_id,
+                              item.year_level_id ?? yearlevel,
                               item.section_description ??
                                 item.section ??
                                 item.description,

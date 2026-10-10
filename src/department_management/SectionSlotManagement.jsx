@@ -21,6 +21,7 @@ import {
     DialogActions,
     Autocomplete,
     IconButton,
+    Chip,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -86,6 +87,7 @@ const SectionSlotManagement = () => {
     const [untagTarget, setUntagTarget] = useState(null);
     const [untagCheck, setUntagCheck] = useState(null);
     const [savingTags, setSavingTags] = useState(false);
+    const [syncingProgramSubjects, setSyncingProgramSubjects] = useState(false);
     const [dataRefreshKey, setDataRefreshKey] = useState(0);
     const [snackbar, setSnackbar] = useState({
         open: false,
@@ -287,6 +289,7 @@ const SectionSlotManagement = () => {
 
     const getSectionSlotHeaders = () => ({
         headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
         },
     });
@@ -686,6 +689,63 @@ const SectionSlotManagement = () => {
         setSnackbar({ open: true, message, severity });
     };
 
+    const syncProgramSubjects = async ({ notify = false } = {}) => {
+        if (!hasSectionSlotFilters || !canCreate) return null;
+
+        setSyncingProgramSubjects(true);
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/section-slot/sync-program`,
+                {
+                    departmentId: selectedDepartmentFilter,
+                    programId: selectedProgram,
+                    curriculumId: selectedCurriculumId,
+                    yearLevelId: selectedYearLevel,
+                    semesterId: selectedSchoolSemester,
+                    campus: resolvedCampus,
+                    activeSchoolYearId: selectedActiveSchoolYear,
+                },
+                getPermissionHeaders(),
+            );
+
+            setDataRefreshKey((prev) => prev + 1);
+            if (activeTagSectionId) {
+                await fetchTaggedSubjects(activeTagSectionId);
+            }
+
+            if (notify) {
+                const result = response.data || {};
+                showSnackbar(
+                    `Program subjects synchronized for ${result.section_count || 0} section(s).`,
+                );
+            }
+            return response.data;
+        } catch (err) {
+            console.error("Error synchronizing Program Tagging subjects:", err);
+            showSnackbar(
+                err.response?.data?.error || "Failed to synchronize Program Tagging subjects.",
+                "error",
+            );
+            return null;
+        } finally {
+            setSyncingProgramSubjects(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!hasSectionSlotFilters || !canCreate) return;
+        syncProgramSubjects();
+    }, [
+        canCreate,
+        selectedDepartmentFilter,
+        selectedProgram,
+        selectedCurriculumId,
+        selectedYearLevel,
+        selectedSchoolSemester,
+        selectedActiveSchoolYear,
+        resolvedCampus,
+    ]);
+
     const fetchTaggedSubjects = async (departmentSectionId) => {
         const sectionId = departmentSectionId || activeTagSectionId;
         if (!sectionId || !selectedActiveSchoolYear) {
@@ -836,6 +896,9 @@ const SectionSlotManagement = () => {
         const previousRows = slotRows;
 
         setSlotRows((prev) =>
+            prev.filter((row) => String(row.section_subject_id) !== String(removedId)),
+        );
+        setTaggedSubjects((prev) =>
             prev.filter((row) => String(row.section_subject_id) !== String(removedId)),
         );
         setUntagTarget(null);
@@ -1652,9 +1715,30 @@ const SectionSlotManagement = () => {
                     Tag Subjects{activeTagSectionLabel ? ` — ${activeTagSectionLabel}` : ""}
                 </DialogTitle>
                 <DialogContent>
+                    <Box
+                        sx={{
+                            mt: 1,
+                            p: 1.5,
+                            borderRadius: 1,
+                            backgroundColor: "action.hover",
+                        }}
+                    >
+                        <Typography variant="body2">
+                            Subjects from Program Tagging are added automatically. You can still add
+                            subjects manually or remove an automatic subject as a section override.
+                        </Typography>
+                    </Box>
                     <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 2, mb: 2 }}>
                         <Autocomplete
-                            options={courses}
+                            options={courses.filter(
+                                (course) =>
+                                    !taggedSubjects.some(
+                                        (item) => String(item.course_id) === String(course.course_id),
+                                    ) &&
+                                    !pendingCourseTags.some(
+                                        (item) => String(item.course_id) === String(course.course_id),
+                                    ),
+                            )}
                             fullWidth
                             getOptionLabel={(option) =>
                                 `${option.course_code || ""} - ${option.course_description || ""}`.trim()
@@ -1737,6 +1821,12 @@ const SectionSlotManagement = () => {
                                 <Typography>
                                     {item.course_code} - {item.course_description}
                                 </Typography>
+                                <Chip
+                                    size="small"
+                                    label={item.tag_source === "automatic" ? "Automatic" : "Manual"}
+                                    color={item.tag_source === "automatic" ? "primary" : "default"}
+                                    sx={{ ml: "auto", mr: 1 }}
+                                />
                                 {canDelete && (
                                     <Button
                                         size="small"
@@ -1753,6 +1843,12 @@ const SectionSlotManagement = () => {
                     )}
                 </DialogContent>
                 <DialogActions>
+                    <Button
+                        onClick={() => syncProgramSubjects({ notify: true })}
+                        disabled={syncingProgramSubjects}
+                    >
+                        {syncingProgramSubjects ? "Syncing..." : "Sync Program Subjects"}
+                    </Button>
                     <Button
                         onClick={() => {
                             setTagModalOpen(false);
